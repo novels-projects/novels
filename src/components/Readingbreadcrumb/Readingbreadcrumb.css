@@ -2,32 +2,47 @@
 .rbreadcrumb {
     display: flex;
     align-items: center;
+    justify-content: space-between;
+    width: 100%;
     gap: 12px;
-    margin-bottom: 32px;
-    flex-wrap: wrap;
+    margin-bottom: 28px;
+    flex-wrap: nowrap;
+    box-sizing: border-box;
+}
+
+.rbreadcrumb__left {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
 }
 
 .rbreadcrumb__back {
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     gap: 6px;
-    padding: 7px 14px;
-    border-radius: 24px;
-    border: 1.5px solid var(--gray-100);
-    background: var(--white);
+    padding: 0 16px;
+    height: 38px;
+    border-radius: 999px;
+    border: 1.5px solid var(--gray-100, #e5e7eb);
+    background: var(--white, #ffffff);
     font-family: 'Sarabun', sans-serif;
-    font-size: 15px;
+    font-size: 14px;
     font-weight: 500;
-    color: var(--gray-600);
+    color: var(--gray-600, #4b5563);
     cursor: pointer;
-    transition: all 0.15s;
+    transition: all 0.15s ease;
     flex-shrink: 0;
+    box-sizing: border-box;
+    line-height: 1;
+    white-space: nowrap;
+    margin: 0;
 }
 
 .rbreadcrumb__back:hover {
-    border-color: var(--pink-300);
-    color: var(--pink-500);
-    background: var(--pink-50);
+    border-color: var(--pink-300, #f472b6);
+    color: var(--pink-500, #ec4899);
+    background: var(--pink-50, #fdf2f8);
 }
 
 .rbreadcrumb__path {
@@ -37,50 +52,169 @@
     flex: 1;
     min-width: 0;
     overflow: hidden;
+    margin: 0 8px;
 }
 
 .rbreadcrumb__novel,
 .rbreadcrumb__chapter {
     font-family: 'Sarabun', sans-serif;
-    font-size: 15px;
+    font-size: 14px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
 
 .rbreadcrumb__novel {
-    color: var(--gray-600);
+    color: var(--gray-600, #4b5563);
 }
 
 .rbreadcrumb__path svg {
-    color: var(--gray-300);
+    color: var(--gray-300, #d1d5db);
     flex-shrink: 0;
 }
 
 .rbreadcrumb__chapter {
-    color: var(--gray-300);
+    color: var(--gray-400, #9ca3af);
+}
+
+.rbreadcrumb__actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    flex-shrink: 0;
+    height: 38px;
+    margin: 0;
 }
 
 .rbreadcrumb__map {
     display: inline-flex;
     align-items: center;
-    gap: 7px;
-    padding: 7px 15px;
-    border-radius: 24px;
-    border: 1.5px solid var(--gray-100);
-    background: var(--white);
+    justify-content: center;
+    gap: 6px;
+    padding: 0 16px;
+    height: 38px;
+    border-radius: 999px;
+    border: 1.5px solid var(--reader-accent, #db2777);
+    background: var(--reader-accent, #db2777);
     font-family: 'Sarabun', sans-serif;
-    font-size: 15px;
-    font-weight: 500;
-    color: var(--gray-600);
+    font-size: 14px;
+    font-weight: 700;
+    color: #ffffff !important;
     cursor: pointer;
-    transition: all 0.15s;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    box-shadow: 0 3px 10px rgba(219, 39, 119, 0.22);
     flex-shrink: 0;
-    margin-left: 0;
+    box-sizing: border-box;
+    line-height: 1;
+    white-space: nowrap;
+    margin: 0;
 }
 
 .rbreadcrumb__map:hover {
-    border-color: var(--pink-300);
-    color: var(--pink-500);
-    background: var(--pink-50);
+    background: var(--reader-accent-hover, #be185d);
+    transform: translateY(-1px);
+    box-shadow: 0 5px 14px rgba(219, 39, 119, 0.32);
+}
+
+/* Ensure setting toggle inside rbreadcrumb__actions matches height & vertical center alignment */
+.rbreadcrumb__actions .reading-settings-wrapper {
+    display: inline-flex;
+    align-items: center;
+    height: 38px;
+    margin: 0;
+}
+
+.rbreadcrumb__actions .reading-settings__toggle {
+    height: 38px;
+    box-sizing: border-box;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    white-space: nowrap;
+    margin: 0;
+}
+
+/* ══════════════════════════════════════════
+   📱 Responsive Media Queries
+   ══════════════════════════════════════════ */
+@media (max-width: 768px) {
+    .rbreadcrumb {
+        margin-bottom: 20px;
+        gap: 8px;
+    }
+
+    .rbreadcrumb__path {
+        display: none;
+    }
+}
+
+@media (max-width: 520px) {
+    .rbreadcrumb {
+        gap: 6px;
+    }
+
+    .rbreadcrumb__back {
+        padding: 0 12px;
+        font-size: 13px;
+        height: 36px;
+    }
+
+    .rbreadcrumb__actions {
+        gap: 6px;
+        height: 36px;
+    }
+
+    .rbreadcrumb__map {
+        padding: 0 12px;
+        font-size: 13px;
+        height: 36px;
+    }
+
+    .rbreadcrumb__actions .reading-settings-wrapper,
+    .rbreadcrumb__actions .reading-settings__toggle {
+        height: 36px;
+    }
+
+    .rbreadcrumb__actions .reading-settings__toggle {
+        padding: 0 12px;
+        font-size: 13px;
+    }
+}
+
+@media (max-width: 380px) {
+    .rbreadcrumb {
+        gap: 4px;
+    }
+
+    .rbreadcrumb__back {
+        padding: 0 8px;
+        font-size: 12px;
+        gap: 4px;
+        height: 34px;
+    }
+
+    .rbreadcrumb__actions {
+        gap: 4px;
+        height: 34px;
+    }
+
+    .rbreadcrumb__map {
+        padding: 0 8px;
+        font-size: 12px;
+        gap: 4px;
+        height: 34px;
+    }
+
+    .rbreadcrumb__actions .reading-settings-wrapper,
+    .rbreadcrumb__actions .reading-settings__toggle {
+        height: 34px;
+    }
+
+    .rbreadcrumb__actions .reading-settings__toggle {
+        padding: 0 8px;
+        font-size: 12px;
+        gap: 4px;
+    }
 }

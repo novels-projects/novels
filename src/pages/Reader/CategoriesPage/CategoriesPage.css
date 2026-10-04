@@ -709,10 +709,44 @@
   margin: 0;
 }
 
+@media (max-width: 768px) {
+  .toolbar-bar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+    padding: 12px 16px;
+    border-radius: 18px;
+  }
+
+  .toolbar-left-group {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .toolbar-right-group {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .toolbar-result-count {
+    border-left: none;
+    padding-left: 0;
+  }
+}
+
 @media (max-width: 560px) {
   .search-page {
-    padding-right: 12px;
-    padding-left: 12px;
+    padding: 24px 12px 60px;
+  }
+
+  .category-hero-banner {
+    padding: 30px 16px;
+    border-radius: 20px;
+    margin-bottom: 24px;
+  }
+
+  .banner-title {
+    font-size: 1.7rem;
   }
 
   .categories-theme-grid {
@@ -722,5 +756,26 @@
 
   .theme-card {
     padding: 12px;
+    border-radius: 14px;
+    gap: 8px;
   }
-}
+
+  .theme-emoji {
+    font-size: 1.4rem;
+  }
+
+  .theme-name {
+    font-size: 0.88rem;
+  }
+
+  .status-tabs-group {
+    width: 100%;
+    overflow-x: auto;
+  }
+
+  .status-tab-btn {
+    padding: 6px 10px;
+    font-size: 0.8rem;
+    white-space: nowrap;
+  }
+}

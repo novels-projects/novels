@@ -11,6 +11,9 @@ const STATUS_CFG = {
 };
 
 function Avatar({ writer, size = 52 }) {
+  const avatarSrc = writer.avatar || writer.avatar_url || writer.avatarUrl || writer.pic_profile || null;
+  const initial = (writer.name || "N").charAt(0).toUpperCase();
+
   return (
     <div 
       className="avatar"
@@ -19,12 +22,28 @@ function Avatar({ writer, size = 52 }) {
         height: size, 
         borderRadius: "50%",
         flexShrink: 0,
-        background: `linear-gradient(135deg, ${writer.color}, ${writer.color}88)`,
+        background: avatarSrc ? "#fce7f3" : `linear-gradient(135deg, ${writer.color || "#db2777"}, ${writer.color || "#db2777"}88)`,
         fontSize: size * 0.4, 
-        boxShadow: `0 2px 10px ${writer.color}40`,
+        boxShadow: `0 2px 10px ${writer.color || "#db2777"}30`,
+        overflow: "hidden",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        border: "1.5px solid #fbcfe8",
       }}
     >
-      {writer.name.charAt(0)}
+      {avatarSrc ? (
+        <img
+          src={avatarSrc}
+          alt={writer.name}
+          style={{ width: "100%", height: "100%", objectFit: "cover" }}
+          onError={(e) => {
+            e.target.style.display = "none";
+          }}
+        />
+      ) : (
+        <span style={{ color: "#ffffff", fontWeight: 700 }}>{initial}</span>
+      )}
     </div>
   );
 }
@@ -178,6 +197,8 @@ export default function WriterCard({ writer, onUnfollow, isFollowing = false }) 
         <FollowButton
           writerId={writer.id}
           writerName={writer.name}
+          avatarUrl={writer.avatar}
+          novels={writer.novels}
           isFollowing={isFollowed}
           onFollowChange={(newFollowStatus) => {
             setIsFollowed(newFollowStatus);

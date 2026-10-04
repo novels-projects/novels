@@ -1,11 +1,21 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import "./FollowButton.css";
 import { showToast } from "../../utils/toast";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
 
+const getErrorMessage = (body, status) => {
+  if (!body) return `การติดตามล้มเหลว (${status})`;
+  const msg = body.message || body.error || body.msg;
+  if (typeof msg === "string") return msg;
+  if (typeof msg === "object" && msg !== null) {
+    return msg.message || msg.error || JSON.stringify(msg);
+  }
+  return `การติดตามล้มเหลว (${status})`;
+};
+
 /**
- * FollowButton Component - ปุ่มติดตามนักเขียน
+ * FollowButton Component - ปุ่มติดตามนักเขียน (Capsule shape with Sparkle/Fireworks Animation)
  * @param {object} props
  * @param {number} props.writerId - ID ของนักเขียนที่ต้องการติดตาม
  * @param {string} props.writerName - ชื่อนักเขียน (สำหรับ display/logging)
@@ -16,6 +26,8 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080
 export default function FollowButton({
   writerId,
   writerName = "นักเขียน",
+  avatarUrl = null,
+  novels = [],
   isFollowing = false,
   onFollowChange,
   size = "medium"
@@ -23,6 +35,11 @@ export default function FollowButton({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [isFollowed, setIsFollowed] = useState(isFollowing);
+  const [isSparking, setIsSparking] = useState(false);
+
+  useEffect(() => {
+    setIsFollowed(isFollowing);
+  }, [isFollowing]);
 
   const handleFollowClick = async (e) => {
     e.preventDefault();
@@ -36,7 +53,6 @@ export default function FollowButton({
     try {
       const token = localStorage.getItem("token");
       if (!token) {
-        // Redirect to login page immediately when not logged in
         showToast("กรุณาเข้าสู่ระบบก่อน", { type: "info" });
         window.location.href = "/login-register";
         return;
@@ -58,8 +74,8 @@ export default function FollowButton({
       // Validate writerId (ensure numeric)
       const numericWriterId = Number(writerId);
       if (!numericWriterId || Number.isNaN(numericWriterId)) {
-        const msg = "FollowButton: missing writerId";
-        console.error(msg);
+        const msg = "missing writerId";
+        console.error("FollowButton:", msg);
         showToast(msg, { type: "error" });
         setLoading(false);
         return;
@@ -72,34 +88,45 @@ export default function FollowButton({
       }
 
       // เรียก API ติดตามนักเขียน
-      const endpoint = isFollowed
+      const primaryEndpoint = isFollowed
         ? `${API_BASE_URL}/api/writers/${numericWriterId}/unfollow`
         : `${API_BASE_URL}/api/writers/${numericWriterId}/follow`;
 
-      // Debug info (use console.log so it's visible even if debug level filtered)
-      console.log("FollowButton: calling endpoint", endpoint, { writerId, isFollowed });
-      showToast("กำลังติดตาม...", { type: "info", duration: 1200 });
+      console.log("FollowButton: calling endpoint", primaryEndpoint, { writerId, isFollowed });
 
-      const response = await fetch(endpoint, {
+      const headers = {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      };
+
+      let response = await fetch(primaryEndpoint, {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: "application/json",
-          "Content-Type": "application/json",
-        },
+        headers,
       });
 
-      // log status and body for debugging follow behavior
+      // Fallback endpoint if primary fails with 500 or 404
+      if (!response.ok && (response.status === 500 || response.status === 404)) {
+        const fallbackEndpoint = isFollowed
+          ? `${API_BASE_URL}/writers/${numericWriterId}/unfollow`
+          : `${API_BASE_URL}/writers/${numericWriterId}/follow`;
+        try {
+          const fbRes = await fetch(fallbackEndpoint, { method: "POST", headers });
+          if (fbRes.ok) {
+            response = fbRes;
+          }
+        } catch (_) {}
+      }
+
       let respBody = null;
       try {
         respBody = await response.json().catch(() => null);
       } catch (e) {
         respBody = null;
       }
-      console.debug("FollowButton: response", { status: response.status, ok: response.ok, body: respBody });
 
       if (!response.ok) {
-        const errorText = (respBody && (respBody.message || respBody.error)) || `การติดตามล้มเหลว (${response.status})`;
+        const errorText = getErrorMessage(respBody, response.status);
         showToast(errorText, { type: "error" });
         throw new Error(errorText);
       }
@@ -107,19 +134,76 @@ export default function FollowButton({
       // อัปเดต state เฉพาะเมื่อ API สำเร็จ
       const newFollowStatus = !isFollowed;
       setIsFollowed(newFollowStatus);
+
+      // ซิงค์ข้อมูลลง localStorage เพื่อให้หน้านักเขียนที่ติดตาม (FollowingWriters) แสดงผลได้ทันที
+      try {
+        const saved = localStorage.getItem("local_following_writers");
+        let list = saved ? JSON.parse(saved) : [];
+        if (!Array.isArray(list)) list = [];
+
+        if (newFollowStatus) {
+          let writerDetails = {
+            id: numericWriterId,
+            writer_id: numericWriterId,
+            pen_name: writerName,
+            name: writerName,
+            avatar_url: avatarUrl || null,
+            avatarUrl: avatarUrl || null,
+            novels: novels || [],
+          };
+
+          try {
+            const wRes = await fetch(`${API_BASE_URL}/writer/${numericWriterId}`, { headers });
+            if (wRes.ok) {
+              const wJson = await wRes.json().catch(() => null);
+              const wData = wJson?.data || wJson?.writer || wJson || {};
+              if (wData) {
+                writerDetails = {
+                  ...writerDetails,
+                  ...wData,
+                  id: numericWriterId,
+                  writer_id: numericWriterId,
+                  pen_name: wData.pen_name || writerName,
+                  follower_count: wData.follower_count ?? wData.followers ?? 1,
+                  novel_count: wData.novel_count ?? (Array.isArray(wData.novels) ? wData.novels.length : 1),
+                  novels: Array.isArray(wData.novels) && wData.novels.length > 0 ? wData.novels : writerDetails.novels,
+                };
+              }
+            }
+          } catch (_) {}
+
+          const existsIndex = list.findIndex((w) => Number(w.id || w.writer_id) === numericWriterId);
+          if (existsIndex >= 0) {
+            list[existsIndex] = { ...list[existsIndex], ...writerDetails };
+          } else {
+            list.push(writerDetails);
+          }
+          localStorage.setItem("local_following_writers", JSON.stringify(list));
+        } else {
+          list = list.filter((w) => Number(w.id || w.writer_id) !== numericWriterId);
+          localStorage.setItem("local_following_writers", JSON.stringify(list));
+        }
+      } catch (localErr) {
+        console.warn("FollowButton: failed to sync local_following_writers", localErr);
+      }
+
+      // Trigger burst sparkle animation when followed
+      if (newFollowStatus) {
+        setIsSparking(true);
+        setTimeout(() => setIsSparking(false), 900);
+      }
+
       if (onFollowChange) onFollowChange(newFollowStatus);
       showToast(newFollowStatus ? `ติดตาม ${writerName} แล้ว` : `เลิกติดตาม ${writerName} แล้ว`, { type: "success" });
-      console.debug("FollowButton: success", { writerId, newFollowStatus });
     } catch (err) {
-      console.error("ติดตามนักเขียนล้มเหลว:", err);
-      setError(err.message || "เกิดข้อผิดพลาด");
-      // rollback handled by not changing isFollowed until success
+      const errMsg = typeof err === "object" && err !== null ? (err.message || String(err)) : String(err);
+      console.error("ติดตามนักเขียนล้มเหลว:", errMsg);
+      setError(errMsg);
     } finally {
       setLoading(false);
     }
   };
 
-  // เพื่อให้ render สะอาด ให้แยก state เป็น variables
   const getIcon = () => {
     if (loading) return "⏳";
     return isFollowed ? "✓" : "+";
@@ -131,21 +215,35 @@ export default function FollowButton({
   };
 
   return (
-    <button
-      className={`follow-button follow-button--${size} ${
-        isFollowed ? "follow-button--followed" : ""
-      } ${loading ? "follow-button--loading" : ""}`}
-      onClick={handleFollowClick}
-      disabled={loading}
-      title={isFollowed ? `เลิกติดตาม ${writerName}` : `ติดตาม ${writerName}`}
-      aria-label={isFollowed ? `เลิกติดตาม ${writerName}` : `ติดตาม ${writerName}`}
-    >
-      <span className="follow-button__icon">
-        {getIcon()}
-      </span>
-      <span className="follow-button__text">
-        {getText()}
-      </span>
-    </button>
+    <div className="follow-button-wrapper">
+      {isSparking && (
+        <div className="follow-sparkles" aria-hidden="true">
+          <span className="spark spark-1">✨</span>
+          <span className="spark spark-2">✦</span>
+          <span className="spark spark-3">💖</span>
+          <span className="spark spark-4">✦</span>
+          <span className="spark spark-5">✨</span>
+          <span className="spark spark-6">✦</span>
+        </div>
+      )}
+      <button
+        className={`follow-button follow-button--${size} ${
+          isFollowed ? "follow-button--followed" : ""
+        } ${loading ? "follow-button--loading" : ""} ${
+          isSparking ? "follow-button--sparking" : ""
+        }`}
+        onClick={handleFollowClick}
+        disabled={loading}
+        title={isFollowed ? `เลิกติดตาม ${writerName}` : `ติดตาม ${writerName}`}
+        aria-label={isFollowed ? `เลิกติดตาม ${writerName}` : `ติดตาม ${writerName}`}
+      >
+        <span className="follow-button__icon">
+          {getIcon()}
+        </span>
+        <span className="follow-button__text">
+          {getText()}
+        </span>
+      </button>
+    </div>
   );
 }

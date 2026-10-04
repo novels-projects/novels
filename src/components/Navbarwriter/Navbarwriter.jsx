@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import ReactDOM from "react-dom";
 import { Link, useNavigate, useLocation } from "react-router-dom";
-import { Bell, Menu, X } from "lucide-react";
+import { Bell, Menu, X, LogOut, User } from "lucide-react";
 import "./Navbarwriter.css";
 import { getNovelStatusInfo } from "../../utils/novelStatus";
 
@@ -900,7 +900,8 @@ const Navbarwriter = () => {
                                             navigate("/writer/profile");
                                         }}
                                     >
-                                        👤 โปรไฟล์ของฉัน
+                                        <User size={16} />
+                                        <span>โปรไฟล์ของฉัน</span>
                                     </button>
 
                                     <hr className="nav-dropdown__divider" style={{ marginTop: "4px", marginBottom: "10px" }} />
@@ -913,7 +914,8 @@ const Navbarwriter = () => {
                                             setShowLogoutModal(true);
                                         }}
                                     >
-                                        🚪 ออกจากระบบ
+                                        <LogOut size={16} />
+                                        <span>ออกจากระบบ</span>
                                     </button>
                                 </div>
                             )}
@@ -995,32 +997,34 @@ const Navbarwriter = () => {
             {showLogoutModal && ReactDOM.createPortal(
                 <div style={{
                     position: "fixed", top: 0, left: 0, width: "100vw", height: "100vh",
-                    backgroundColor: "rgba(17, 24, 39, 0.45)", backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)",
+                    backgroundColor: "rgba(15, 23, 42, 0.45)", backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)",
                     display: "flex", justifyContent: "center", alignItems: "center", zIndex: 999999, padding: "20px"
                 }}>
                     <div style={{
-                        background: "#ffffff", width: "100%", maxWidth: "400px", borderRadius: "24px",
-                        boxShadow: "0 20px 50px rgba(0,0,0,0.18), 0 4px 12px rgba(0,0,0,0.08)",
+                        background: "#ffffff", width: "100%", maxWidth: "350px", borderRadius: "24px",
+                        boxShadow: "0 20px 40px -15px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(0, 0, 0, 0.04)",
                         padding: "28px 24px 24px", textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center"
                     }}>
                         <div style={{
-                            width: "60px", height: "60px", borderRadius: "50%", background: "#fff1f2", color: "#e11d48",
-                            display: "flex", alignItems: "center", justifyContent: "center", fontSize: "28px", marginBottom: "16px",
-                            boxShadow: "0 4px 12px rgba(225,29,72,0.15)"
-                        }}>🚪</div>
-                        <h3 style={{ fontSize: "20px", fontWeight: "800", color: "#1e293b", margin: "0 0 8px 0" }}>
+                            width: "60px", height: "60px", borderRadius: "18px", background: "#FFF0F6", border: "1px solid #FCE7F3",
+                            display: "flex", alignItems: "center", justifyContent: "center", marginBottom: "16px"
+                        }}>
+                            <LogOut size={26} color="#E91E8C" strokeWidth={2.2} />
+                        </div>
+                        <h3 style={{ fontSize: "19px", fontWeight: "800", color: "#0F172A", margin: "0 0 8px 0" }}>
                             ยืนยันการออกจากระบบ
                         </h3>
-                        <p style={{ fontSize: "14px", color: "#64748b", margin: "0 0 24px 0", lineHeight: "1.5" }}>
-                            คุณต้องการออกจากระบบบัญชีนี้ใช่หรือไม่?
+                        <p style={{ fontSize: "13.5px", color: "#64748b", margin: "0 0 24px 0", lineHeight: "1.5" }}>
+                            คุณต้องการออกจากระบบบัญชีผู้ใช้งานนี้ใช่หรือไม่?
                         </p>
                         <div style={{ display: "flex", gap: "12px", width: "100%" }}>
                             <button
                                 type="button"
                                 onClick={() => setShowLogoutModal(false)}
                                 style={{
-                                    flex: 1, padding: "11px", borderRadius: "12px", border: "1.5px solid #e2e8f0",
-                                    background: "#ffffff", color: "#475569", fontSize: "14px", fontWeight: "700", cursor: "pointer"
+                                    flex: 1, padding: "11px 16px", borderRadius: "14px", border: "1.5px solid #F1F5F9",
+                                    background: "#ffffff", color: "#1E293B", fontSize: "14px", fontWeight: "700", cursor: "pointer",
+                                    transition: "all 0.2s ease"
                                 }}
                             >
                                 ยกเลิก
@@ -1032,9 +1036,10 @@ const Navbarwriter = () => {
                                     handleLogout(e);
                                 }}
                                 style={{
-                                    flex: 1, padding: "11px", borderRadius: "12px", border: "none",
-                                    background: "linear-gradient(135deg, #e11d48 0%, #be123c 100%)", color: "#ffffff",
-                                    fontSize: "14px", fontWeight: "700", cursor: "pointer", boxShadow: "0 4px 14px rgba(225,29,72,0.3)"
+                                    flex: 1.1, padding: "11px 16px", borderRadius: "14px", border: "none",
+                                    background: "#E91E8C", color: "#ffffff",
+                                    fontSize: "14px", fontWeight: "700", cursor: "pointer", boxShadow: "0 4px 14px rgba(233, 30, 140, 0.35)",
+                                    transition: "all 0.2s ease"
                                 }}
                             >
                                 ยืนยันออกจากระบบ

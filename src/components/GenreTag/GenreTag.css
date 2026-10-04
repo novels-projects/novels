@@ -23,19 +23,10 @@
   border: 1px solid var(--pink-100);
 }
 
-.genre-tag--primary:hover {
-  background: var(--pink-100);
-}
-
 .genre-tag--outline {
   background: transparent;
   color: var(--gray-600);
   border: 1px solid var(--gray-100);
-}
-
-.genre-tag--outline:hover {
-  border-color: var(--pink-300);
-  color: var(--pink-500);
 }
 
 /* ─────────────────────────────────── */
@@ -106,18 +97,4 @@
   background: #fafaf9;
   color: #78716c;
   border: 1px solid #e7e5e4;
-}
-
-.genre-tag--category-default:hover,
-.genre-tag--category-romance:hover,
-.genre-tag--category-fantasy:hover,
-.genre-tag--category-adventure:hover,
-.genre-tag--category-comedy:hover,
-.genre-tag--category-drama:hover,
-.genre-tag--category-horror:hover,
-.genre-tag--category-mystery:hover,
-.genre-tag--category-action:hover,
-.genre-tag--category-scifi:hover,
-.genre-tag--category-slice:hover {
-  filter: brightness(0.96);
 }

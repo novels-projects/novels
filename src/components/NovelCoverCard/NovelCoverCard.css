@@ -18,8 +18,7 @@
   box-shadow: 0 8px 32px rgba(45, 27, 61, 0.15);
 }
 
-/* "จบแล้ว" ribbon — วางทับมุมขวาบนของปก ใช้พื้นหลังทึบ+shadow
-   เพราะต้องอ่านออกชัดบนรูปปกที่สีพื้นหลังไม่แน่นอน */
+/* "จบแล้ว" ribbon — วางทับมุมขวาบนของปก ใช้พื้นหลังทึบ+shadow */
 .novel-cover-card__ribbon {
   position: absolute;
   top: 12px;
@@ -67,21 +66,16 @@
   filter: drop-shadow(0 4px 8px rgba(233, 30, 140, 0.2));
 }
 
-/* Stats 2x2 grid — wrapped in a soft card panel so the 4 stat badges +
-   cover read as one cohesive sidebar block instead of floating apart */
+/* Stats 2x2 grid — transparent container, individual white boxes with light borders */
 .novel-cover-card__stats {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 8px;
-  padding: 12px;
-  background: var(--pink-50, #fdf2f8);
-  border: 1px solid var(--pink-100, #fce7f3);
-  border-radius: 16px;
+  gap: 10px;
+  padding: 0;
+  background: transparent;
+  border: none;
 }
 
-/* สถิติ 4 อันนี้กดไม่ได้ (แค่แสดงตัวเลข) — ปิด hover/cursor ของลูกๆ ไว้กันสับสนว่าคลิกได้
-   NOTE: สีของตัวเลข/ไอคอนจริงๆ ถูกกำหนดใน StatBadge component (ไม่ได้แนบไฟล์มาด้วย)
-   ถ้าต้องการปรับสีตรงนั้น ส่ง StatBadge.jsx / StatBadge.css มาด้วยนะ */
 .novel-cover-card__stats [role="listitem"] {
   cursor: default;
 }
@@ -90,4 +84,3 @@
   transform: none !important;
   box-shadow: none !important;
 }
-

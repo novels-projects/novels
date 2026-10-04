@@ -1,3 +1,5 @@
+// ⚠️ รอการแก้ไขโค้ดเรื่อง Backend PUT /novels/:id ล้างสถานะการถูกระงับ (suspended) เมื่อผู้เขียนแก้ไขรูปปกหรือข้อมูลนิยาย
+
 import React, { useState, useEffect } from "react";
 import ReactQuill from "react-quill-new";
 import "quill/dist/quill.snow.css";
@@ -7,7 +9,7 @@ import CoverUpload from "../../../components/CoverUpload/CoverUpload";
 import Toggle from "../../../components/Toggle/Toggle";
 import LoadingScreen from "../../../components/LoadingScreen/LoadingScreen";
 import { useNavigate, useParams } from "react-router-dom";
-import { getNovelStatusInfo } from "../../../utils/novelStatus";
+import { getNovelStatusInfo, registerBannedNovel, isNovelBannedInRegistry } from "../../../utils/novelStatus";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
 
@@ -83,6 +85,8 @@ const EditNovelPage = ({ onNavigate }) => {
         statusMode: "draft",
     });
     const [originalStatus, setOriginalStatus] = useState("draft");
+    const [isBannedNovel, setIsBannedNovel] = useState(false);
+    const [bannedRawStatus, setBannedRawStatus] = useState("");
 
     const [errors, setErrors] = useState({});
     const [submissionError, setSubmissionError] = useState(null);
@@ -184,6 +188,21 @@ const EditNovelPage = ({ onNavigate }) => {
                     const coverPreview = rawCover ? String(rawCover).replace("http://minio:9000", "http://localhost:9000") : null;
 
                     const statusStr = String(novelData.status || novelData.Status || "").toLowerCase().trim();
+                    const statusInfo = getNovelStatusInfo({
+                        id: novelData.id || idCandidate || novelId,
+                        status: statusStr,
+                        is_banned: novelData.is_banned,
+                        isBanned: novelData.isBanned,
+                        banned: novelData.banned,
+                        is_published: novelData.is_published,
+                        is_completed: novelData.is_completed,
+                        isPublished: novelData.isPublished,
+                        isCompleted: novelData.isCompleted,
+                    });
+
+                    setIsBannedNovel(statusInfo.isBanned);
+                    setBannedRawStatus(statusStr || "suspended");
+
                     const { isCompleted, isPublished } = getStatusFlags({
                         status: statusStr,
                         is_published: novelData.is_published,
@@ -311,22 +330,32 @@ const EditNovelPage = ({ onNavigate }) => {
                 .filter((cat) => form.categories.includes(cat.name))
                 .map((cat) => cat.id);
 
-            const finalStatus = getStatusFromFlags({
+            const calculatedStatus = getStatusFromFlags({
                 isCompleted: form.isCompleted,
                 isPublished: form.isPublished,
             });
+
+            // 🔒 หากนิยายโดนระงับ (Banned / Suspended) ให้คงค่าสถานะแบนเดิมไว้เสมอ ไม่ล้างเป็น draft/published
+            const isBanned = isBannedNovel || isNovelBannedInRegistry(novelId);
+            const finalStatus = isBanned
+                ? (bannedRawStatus || "suspended")
+                : calculatedStatus;
 
             const novelPayload = {
                 title: form.title,
                 captions: form.tagline,
                 introduction: form.description,
                 status: finalStatus,
-                is_published: form.isPublished,
+                is_published: isBanned ? false : form.isPublished,
                 is_completed: form.isCompleted,
                 cover_image: coverImageUrl || form.coverPreview || "",
             };
             if (categoriesLoaded) {
                 novelPayload.category_ids = selectedCategoryIds;
+            }
+
+            if (isBanned) {
+                registerBannedNovel(novelId, novelPayload);
             }
 
             console.debug("EditNovelPage: PUT payload", novelPayload);
@@ -381,7 +410,11 @@ const EditNovelPage = ({ onNavigate }) => {
                     const verifyData = await verifyRes.json().catch(() => null);
                     const novelFresh = verifyData?.data?.novel || verifyData?.data || verifyData?.novel || verifyData || {};
                     const freshStatus = getNovelStatusInfo({
+                        id: novelId,
                         status: novelFresh.status || novelFresh.Status,
+                        is_banned: novelFresh.is_banned,
+                        isBanned: novelFresh.isBanned,
+                        banned: novelFresh.banned,
                         is_published: novelFresh.is_published,
                         is_completed: novelFresh.is_completed,
                         isPublished: novelFresh.isPublished,
@@ -390,7 +423,7 @@ const EditNovelPage = ({ onNavigate }) => {
                     const freshPublished = freshStatus.isPublished;
                     const freshCompleted = freshStatus.isCompleted;
                     const freshTitle = novelFresh.title || "";
-                    if (freshPublished !== form.isPublished || freshCompleted !== form.isCompleted || freshTitle !== form.title) {
+                    if (!isBannedNovel && (freshPublished !== form.isPublished || freshCompleted !== form.isCompleted || freshTitle !== form.title)) {
                         const msg = "อัปเดตสำเร็จแต่ค่าที่กลับมาไม่ตรงกับที่คาดไว้ (ยังไม่ได้บันทึก)";
                         console.error("EditNovelPage: verification mismatch", { novelFresh, expected: novelPayload });
                         setSubmissionError(msg);

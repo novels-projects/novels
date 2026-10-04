@@ -29,7 +29,20 @@ import {
 } from "recharts";
 import "./AdminDashboardPage.css";
 
+import { getPendingAppealsList } from "../AdminReportsDashboard/AdminReportsDashboard";
+
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
+
+const PROCESSED_REPORTS_KEY = "processed_reports_registry";
+
+function getProcessedReportsRegistry() {
+  try {
+    const raw = localStorage.getItem(PROCESSED_REPORTS_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
 
 // =========================================================================
 // Thai Date Formatting Helpers
@@ -142,6 +155,11 @@ export default function AdminDashboardPage() {
   const [trendData, setTrendData] = useState([]);
   const [trendLoading, setTrendLoading] = useState(true);
   const [trendError, setTrendError] = useState("");
+
+  // Reports Queue State for "รายการตรวจสอบ" Card
+  const [reportsData, setReportsData] = useState([]);
+  const [reportsLoading, setReportsLoading] = useState(true);
+  const [reportsError, setReportsError] = useState("");
 
   // Global Access Denied State (403)
   const [accessDenied, setAccessDenied] = useState(false);
@@ -260,12 +278,97 @@ export default function AdminDashboardPage() {
   }, [handleAuthError]);
 
   // -----------------------------------------------------------------------
+  // Fetch Pending Reports API (รายการตรวจสอบ)
+  // -----------------------------------------------------------------------
+  const fetchPendingReports = useCallback(async () => {
+    setReportsLoading(true);
+    setReportsError("");
+
+    const token = localStorage.getItem("token");
+    if (!token) {
+      handleAuthError(401);
+      return;
+    }
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/admin/reports?status=all&limit=100`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (res.status === 401) {
+        handleAuthError(401);
+        return;
+      }
+      if (res.status === 403) {
+        handleAuthError(403);
+        setReportsLoading(false);
+        return;
+      }
+
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.message || "ไม่สามารถโหลดข้อมูลรายการตรวจสอบได้");
+      }
+
+      const json = await res.json();
+      const rawReports = json.reports || [];
+      const processedReg = getProcessedReportsRegistry();
+
+      // Filter reports from backend that are pending review
+      const pendingFromBackend = rawReports.filter((item) => {
+        const rId = String(item.report_id || item.id);
+        const pStatus = processedReg[rId];
+        const isPendingStatus = item.status === "pending" || item.status === "appeal_pending";
+        if (pStatus && pStatus !== "pending" && pStatus !== "appeal_pending") {
+          return false;
+        }
+        return isPendingStatus;
+      });
+
+      // Merge with any unban appeals from localStorage registry if not already present
+      const pendingAppealsFromReg = getPendingAppealsList();
+      const existingIds = new Set(pendingFromBackend.map((item) => String(item.report_id || item.id || `novel-${item.novel_id}`)));
+
+      const mergedList = [...pendingFromBackend];
+      pendingAppealsFromReg.forEach((appeal) => {
+        const aId = String(appeal.report_id || appeal.id || `novel-${appeal.novel_id}`);
+        if (!existingIds.has(aId)) {
+          mergedList.push({
+            report_id: aId,
+            novel_id: appeal.novel_id,
+            novel_title: appeal.novel_title || `นิยาย #${appeal.novel_id}`,
+            reason: appeal.reason || appeal.appeal_reason || "คำขอปลดระงับจากนักเขียน",
+            report_type: "appeal",
+            status: "appeal_pending",
+            created_at: appeal.created_at || appeal.appeal_at || new Date().toISOString(),
+            isAppeal: true,
+          });
+          existingIds.add(aId);
+        }
+      });
+
+      // Sort by created_at DESC
+      mergedList.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+
+      setReportsData(mergedList);
+    } catch (err) {
+      console.error("Fetch pending reports error:", err);
+      setReportsError(err.message || "เกิดข้อผิดพลาดในการโหลดรายการตรวจสอบ กรุณาลองใหม่อีกครั้ง");
+    } finally {
+      setReportsLoading(false);
+    }
+  }, [handleAuthError]);
+
+  // -----------------------------------------------------------------------
   // Initial Load
   // -----------------------------------------------------------------------
   useEffect(() => {
     fetchSummary();
     fetchTrend();
-  }, [fetchSummary, fetchTrend]);
+    fetchPendingReports();
+  }, [fetchSummary, fetchTrend, fetchPendingReports]);
 
   // -----------------------------------------------------------------------
   // Render Access Denied UI (403)
@@ -296,11 +399,6 @@ export default function AdminDashboardPage() {
   // Writer Requests Data
   const writerRequestsCount = summaryData?.pending_writer_requests?.count ?? 0;
   const writerRequestsRecent = summaryData?.pending_writer_requests?.recent ?? [];
-
-  // Reports Data
-  const reportsCount = summaryData?.pending_reports?.count ?? 0;
-  const reportsRecent = summaryData?.pending_reports?.recent ?? [];
-  const appealCount = summaryData?.appeal_pending?.count ?? 0;
 
   return (
     <div className="admin-dashboard-container">
@@ -445,15 +543,33 @@ export default function AdminDashboardPage() {
             </div>
 
             {/* ------------------------------------------------------------- */}
-            {/* Action Card 2: รายงาน / แจ้งลบ (Orange / Amber Theme) */}
+            {/* Action Card 2: รายการตรวจสอบ (Orange / Amber Theme) */}
             {/* ------------------------------------------------------------- */}
             <div className="admin-action-card admin-action-card--orange">
-              {summaryLoading ? (
+              {reportsLoading ? (
                 <div className="admin-action-card__skeleton">
-                  <div className="skeleton-box skeleton-title" />
-                  <div className="skeleton-box skeleton-item" />
-                  <div className="skeleton-box skeleton-item" />
-                  <div className="skeleton-box skeleton-footer" />
+                  <div className="skeleton-box skeleton-title" style={{ width: "60%", height: "20px" }} />
+                  <div className="skeleton-box skeleton-item" style={{ height: "65px", marginTop: "16px" }} />
+                  <div className="skeleton-box skeleton-item" style={{ height: "65px", marginTop: "8px" }} />
+                  <div className="skeleton-box skeleton-footer" style={{ width: "100px", height: "16px", marginTop: "16px" }} />
+                </div>
+              ) : reportsError ? (
+                <div className="admin-card-error-state">
+                  <div className="admin-card-error-state__content">
+                    <AlertCircle size={20} color="#ef4444" />
+                    <div className="admin-card-error-state__text">
+                      <strong>ไม่สามารถโหลดรายการตรวจสอบได้</strong>
+                      <p>{reportsError}</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className="admin-dashboard-btn-retry"
+                    onClick={fetchPendingReports}
+                  >
+                    <RotateCw size={13} />
+                    <span>ลองใหม่อีกครั้ง</span>
+                  </button>
                 </div>
               ) : (
                 <>
@@ -463,64 +579,74 @@ export default function AdminDashboardPage() {
                         <Flag size={18} strokeWidth={2} />
                       </div>
                       <div>
-                        <h3 className="admin-action-card__title">รายงาน / แจ้งลบ</h3>
+                        <h3 className="admin-action-card__title">รายการตรวจสอบ</h3>
                         <div className="admin-action-card__status-hint text-warn">
-                          {reportsCount > 0 || appealCount > 0 ? (
-                            <span>รอตรวจสอบเนื้อหาที่ถูกรายงาน</span>
-                          ) : (
-                            <span>ไม่มีรายงานค้างในระบบ</span>
-                          )}
+                          <span>รายงาน แจ้งลบ และคำขอปลดระงับที่รอดำเนินการ</span>
                         </div>
                       </div>
                     </div>
                     <div className="admin-action-card__count-box">
                       <span className="admin-action-card__count text-warn">
-                        {reportsCount}
+                        {reportsData.length}
                       </span>
-                      <span className="admin-action-card__count-unit">รายงาน</span>
+                      <span className="admin-action-card__count-unit">รายการ</span>
                     </div>
                   </div>
 
                   <div className="admin-action-card__divider admin-action-card__divider--orange" />
 
-                  {/* Recent List (max 3) */}
+                  {/* List of Pending Items */}
                   <div className="admin-action-card__body">
-                    {reportsCount === 0 && appealCount === 0 ? (
+                    {reportsData.length === 0 ? (
                       <div className="admin-action-card__empty">
-                        <Inbox size={14} className="empty-icon" />
-                        <span>ไม่มีรายงานหรือคำขออุทธรณ์ที่รอการตรวจสอบ</span>
+                        <Inbox size={16} className="empty-icon" />
+                        <span>ไม่มีรายการรอตรวจสอบ</span>
                       </div>
                     ) : (
-                      <div className="admin-action-list">
-                        {reportsRecent.map((item) => (
-                          <div key={`report-${item.report_id}`} className="admin-action-item">
-                            <div className="admin-action-item__dot admin-action-item__dot--orange" />
-                            <div className="admin-action-item__main">
-                              <div className="admin-action-item__name" title={item.novel_title}>
-                                {item.novel_title || `นิยาย #${item.novel_id}`}
-                              </div>
-                              <div className="admin-action-item__sub">
-                                รหัสรายงาน: #{item.report_id}
-                              </div>
-                            </div>
-                            <div className="admin-action-item__date">
-                              {formatThaiDate(item.created_at)}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
+                      <div className="admin-review-list">
+                        {reportsData.map((item, idx) => {
+                          const isAppeal = item.report_type === "appeal" || item.status === "appeal_pending" || isAppealReport(item);
+                          const isDelete = !isAppeal && (item.report_type === "delete" || item.report_type === "removal" || (item.reason && (item.reason.includes("แจ้งลบ") || item.reason.includes("ขอลบ"))));
+                          
+                          let badgeText = "รายงาน";
+                          let badgeClass = "admin-review-badge--report";
+                          if (isAppeal) {
+                            badgeText = "คำขอปลดระงับ";
+                            badgeClass = "admin-review-badge--appeal";
+                          } else if (isDelete) {
+                            badgeText = "แจ้งลบ";
+                            badgeClass = "admin-review-badge--delete";
+                          }
 
-                    {/* Appeal Banner Badge */}
-                    {appealCount > 0 && (
-                      <div className="admin-action-appeal-banner">
-                        <div className="admin-action-appeal-banner__left">
-                          <ShieldAlert size={14} />
-                          <span>รอการตรวจสอบ</span>
-                        </div>
-                        <div className="admin-action-appeal-banner__badge">
-                          {appealCount} รายการ
-                        </div>
+                          const reasonText = item.reason || (isAppeal ? "นักเขียนส่งคำขอปลดระงับ" : isDelete ? "รายงานแจ้งลบเนื้อหา" : "รายงานเนื้อหา");
+                          const itemNovelTitle = item.novel_title || item.title || `นิยาย #${item.novel_id}`;
+
+                          return (
+                            <div
+                              key={item.report_id || `item-${item.novel_id}-${idx}`}
+                              className="admin-review-item"
+                              onClick={() => navigate("/admin/reports?tab=reports")}
+                            >
+                              <div className="admin-review-item__header">
+                                <span className={`admin-review-badge ${badgeClass}`}>
+                                  {badgeText}
+                                </span>
+                                <span className="admin-review-item__date">
+                                  {formatThaiDate(item.created_at)}
+                                </span>
+                              </div>
+
+                              <div className="admin-review-item__title" title={itemNovelTitle}>
+                                <span className="admin-review-item__title-label">ชื่อเรื่อง: </span>
+                                <span className="admin-review-item__title-text">{itemNovelTitle}</span>
+                              </div>
+
+                              <div className="admin-review-item__reason" title={reasonText}>
+                                {reasonText}
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
                   </div>

@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
-import { ArrowLeft, ChevronDown, ChevronUp, Trash2, X, Map, Play } from "lucide-react";
+import { ArrowLeft, ChevronDown, ChevronUp, Trash2, X, Map, Play, History } from "lucide-react";
 import LoadingScreen from "../../../components/LoadingScreen/LoadingScreen";
 import "./HistoryPage.css";
 
@@ -153,7 +153,7 @@ const normalizeBook = (item) => {
   };
 };
 
-const HistoryCard = ({ book, onContinue, onViewMap, onRequestDelete }) => {
+const HistoryCard = ({ book, onContinue, onViewMap, onRequestDelete, onCardClick }) => {
   const [expanded, setExpanded] = useState(false);
   const status = STATUS_MAP[book.reading_status] || STATUS_MAP.reading;
   const percent = book.totalRoutes ? Math.round((book.routeFound / book.totalRoutes) * 100) : 0;
@@ -165,7 +165,10 @@ const HistoryCard = ({ book, onContinue, onViewMap, onRequestDelete }) => {
       : `${book.endingCount} ตอนจบ`;
 
   return (
-    <div className="history-card">
+    <div
+      className="history-card"
+      onClick={() => onCardClick?.(book)}
+    >
       <button
         type="button"
         className="history-card__delete-btn"
@@ -226,7 +229,10 @@ const HistoryCard = ({ book, onContinue, onViewMap, onRequestDelete }) => {
           <button
             type="button"
             className="history-card__toggle"
-            onClick={() => setExpanded((prev) => !prev)}
+            onClick={(e) => {
+              e.stopPropagation();
+              setExpanded((prev) => !prev);
+            }}
             aria-expanded={expanded}
           >
             {expanded ? "ซ่อนรายละเอียด" : "ดูรายละเอียดเพิ่มเติม"}
@@ -269,7 +275,10 @@ const HistoryCard = ({ book, onContinue, onViewMap, onRequestDelete }) => {
           <button
             type="button"
             className="history-card__tree-btn"
-            onClick={() => onViewMap(book)}
+            onClick={(e) => {
+              e.stopPropagation();
+              onViewMap(book);
+            }}
           >
             <Map size={15} className="history-card__btn-icon" />
             <span>ดูแผนผังการอ่าน</span>
@@ -277,7 +286,10 @@ const HistoryCard = ({ book, onContinue, onViewMap, onRequestDelete }) => {
           <button
             type="button"
             className="history-card__continue-btn"
-            onClick={() => onContinue(book)}
+            onClick={(e) => {
+              e.stopPropagation();
+              onContinue(book);
+            }}
           >
             <Play size={15} className="history-card__btn-icon" />
             <span>อ่านต่อ</span>
@@ -511,7 +523,9 @@ const HistoryPage = () => {
           <LoadingScreen compact message="กำลังโหลดประวัติการอ่าน..." />
         ) : filteredBooks.length === 0 ? (
           <div className="history-page__empty">
-            <div className="history-page__empty-emoji">📚</div>
+            <div className="history-page__empty-icon">
+              <History size={40} />
+            </div>
             <div className="history-page__empty-title">ยังไม่มีประวัติการอ่าน</div>
             <div>นิยายที่คุณอ่านจะถูกบันทึกไว้ที่นี่</div>
           </div>
@@ -524,6 +538,7 @@ const HistoryPage = () => {
                 onContinue={handleContinue}
                 onViewMap={(b) => navigate(`/storytree/${b.id}`)}
                 onRequestDelete={handleRequestDelete}
+                onCardClick={(b) => navigate(`/novel/${b.id}`)}
               />
             ))}
           </div>

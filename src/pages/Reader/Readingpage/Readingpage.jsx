@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom"; 
+import { GitFork, ArrowLeft, Award, ChevronDown, RotateCcw, Smile, Bookmark } from "lucide-react";
 import "react-quill-new/dist/quill.snow.css";
 import "./Readingpage.css";
 import ReadingBreadcrumb from "../../../components/ReadingBreadcrumb/ReadingBreadcrumb";
@@ -8,7 +9,7 @@ import RestartReadingButton from "../../../components/RestartReadingButton/Resta
 import ReadingSettings from "../../../components/ReadingSettings/ReadingSettings";
 import ActionButtons from "../../../components/ActionButtons/ActionButtons";
 import Comments from "../../../components/Comments/Comments";
-import EndingUnlockedModal from "../../../components/EndingUnlockedModal/EndingUnlockedModal";
+import EndingUnlockedModal, { ENDING_DEFINITIONS } from "../../../components/EndingUnlockedModal/EndingUnlockedModal";
 import AdminModeBanner from "../../../components/AdminModeBanner/AdminModeBanner";
 import LoadingScreen from "../../../components/LoadingScreen/LoadingScreen";
 
@@ -122,6 +123,12 @@ const ReadingPage = ({
   // State สำหรับ Pop-up ยินดีด้วย ค้นพบฉากจบใหม่
   const [showEndingModal, setShowEndingModal] = useState(false);
   const [allNovelEndings, setAllNovelEndings] = useState([]);
+  const [showEndingActionsMenu, setShowEndingActionsMenu] = useState(false);
+
+  // State สำหรับ Pop-up ยืนยันการเริ่มอ่านใหม่
+  const [showRestartConfirm, setShowRestartConfirm] = useState(false);
+  const [restartLoading, setRestartLoading] = useState(false);
+  const [restartError, setRestartError] = useState(null);
 
   // Pop-up ชวนเพิ่มเข้าชั้นหนังสือ ตอนอ่านมาถึงตอนล่าสุดที่ยังไม่จบเรื่อง
   const [bookmarkNudgeDismissed, setBookmarkNudgeDismissed] = useState(false);
@@ -608,9 +615,16 @@ useEffect(() => {
     }
   };
 
-  const handleRestartReading = async () => {
-    if (effectiveUserId) {
-      try {
+  const handleRestartClick = () => {
+    setRestartError(null);
+    setShowRestartConfirm(true);
+  };
+
+  const handleConfirmRestartReading = async () => {
+    setRestartLoading(true);
+    setRestartError(null);
+    try {
+      if (effectiveUserId) {
         const token = localStorage.getItem("token");
         const headers = {};
         if (token) headers["Authorization"] = `Bearer ${token}`;
@@ -623,16 +637,23 @@ useEffect(() => {
         if (!response.ok) {
           const errText = await response.text();
           console.error("Reset progress failed:", response.status, errText);
+          setRestartError("ไม่สามารถเริ่มอ่านใหม่ได้ในขณะนี้");
+          setRestartLoading(false);
           return;
         }
-      } catch (err) {
-        console.error("Error resetting progress:", err);
-        return;
       }
-    }
 
-    setCurrentSceneId(null);
-    navigate(`/reading/${novelId}${previewQueryString}`);
+      setShowRestartConfirm(false);
+      setShowEndingModal(false);
+      endingModalTriggeredRef.current = true;
+      setCurrentSceneId(null);
+      navigate(`/reading/${novelId}${previewQueryString}`);
+    } catch (err) {
+      console.error("Error resetting progress:", err);
+      setRestartError("เกิดข้อผิดพลาดขณะเริ่มอ่านใหม่");
+    } finally {
+      setRestartLoading(false);
+    }
   };
 
   const parsePositiveInt = (value) => {
@@ -731,6 +752,105 @@ useEffect(() => {
     }
   };
 
+  const currentEndingInfo = useMemo(() => {
+    if (!sceneData) return null;
+
+    const rawType = (
+      sceneData?.scene_type ||
+      sceneData?.type ||
+      sceneData?.sceneType ||
+      sceneData?.Type ||
+      sceneData?.scene_type_name ||
+      sceneData?.typeName ||
+      ""
+    ).toString().toLowerCase().trim();
+
+    const choicesList = sceneData?.choices || [];
+    const hasNoChoices = choicesList.length === 0;
+    const isEndingType = rawType === "ending";
+    const isTrueEnding = hasNoChoices && isEndingType;
+
+    if (!isTrueEnding) return null;
+
+    const currentId = sceneData?.scene_id || sceneData?.id;
+    const matchedInList = (allNovelEndings || []).find(
+      (e) => String(e.scene_id || e.id || e.sceneId) === String(currentId)
+    );
+
+    const sTitle = sceneData?.scene_title || sceneData?.sceneTitle || sceneData?.title || sceneData?.Title || "";
+    const cOrder = sceneData?.chapter_order || sceneData?.order || sceneData?.chapter_episode || sceneData?.chapterEpisode || "";
+
+    const rawEndingType = (
+      matchedInList?.ending_type ||
+      matchedInList?.endingType ||
+      matchedInList?.type ||
+      sceneData?.ending_type ||
+      sceneData?.endingType ||
+      sceneData?.ending_category ||
+      sceneData?.endingCategory ||
+      "true"
+    ).toString().toLowerCase().trim();
+
+    let endingKey = "true";
+    if (rawEndingType.includes("good")) endingKey = "good";
+    else if (rawEndingType.includes("bad")) endingKey = "bad";
+    else if (rawEndingType.includes("secret")) endingKey = "secret";
+    else if (rawEndingType.includes("true")) endingKey = "true";
+    else endingKey = "true";
+
+    const def = ENDING_DEFINITIONS[endingKey] || ENDING_DEFINITIONS.true || {
+      key: "true",
+      typeLabel: "TRUE ENDING",
+      emoji: "👑",
+      badgeBg: "#fef3c7",
+      badgeColor: "#b45309",
+      cardBorder: "#fde68a",
+      cardBg: "#fffbeb",
+      defaultTitle: "ฉากจบสมบูรณ์",
+      defaultDesc: "",
+    };
+
+    const endingTitle =
+      matchedInList?.title ||
+      matchedInList?.scene_title ||
+      matchedInList?.ending_title ||
+      sceneData?.ending_title ||
+      sceneData?.title ||
+      sceneData?.scene_title ||
+      sTitle ||
+      def.defaultTitle;
+
+    const endingDesc =
+      matchedInList?.description ||
+      matchedInList?.ending_description ||
+      sceneData?.ending_description ||
+      sceneData?.description ||
+      def.defaultDesc ||
+      "";
+
+    const endingNum =
+      matchedInList?.ending_number ||
+      matchedInList?.order ||
+      sceneData?.ending_number ||
+      cOrder ||
+      "";
+
+    return {
+      key: endingKey,
+      emoji: def.emoji,
+      typeLabelEN: def.typeLabelEN || def.typeLabel || "TRUE ENDING",
+      typeLabelTH: def.typeLabelTH || "ฉากจบแท้จริง",
+      typeLabel: def.typeLabel,
+      badgeBg: def.badgeBg,
+      badgeColor: def.badgeColor,
+      cardBorder: def.cardBorder,
+      cardBg: def.cardBg,
+      title: endingTitle,
+      description: endingDesc,
+      number: endingNum,
+    };
+  }, [sceneData, allNovelEndings]);
+
   if (loading) {
     return <LoadingScreen message="กำลังดึงเนื้อหาฉากจริงจากระบบฐานข้อมูล..." />;
   }
@@ -791,30 +911,67 @@ useEffect(() => {
   const novelTitleUsed = novel_title || sceneNovelTitle || sceneData?.novelTitle || sceneData?.NovelTitle || novelTitle;
   const currentOrder = chapter_order || order || chapter_episode || chapterEpisode || sceneData?.chapterOrder || sceneData?.chapter_order || null;
 
-  const getSceneTagDetails = (sceneType) => {
+  const rawSceneType = (
+    sceneData?.scene_type ||
+    sceneData?.type ||
+    sceneData?.sceneType ||
+    sceneData?.Type ||
+    sceneData?.scene_type_name ||
+    sceneData?.typeName ||
+    type ||
+    "normal"
+  ).toString().toLowerCase().trim();
+
+  const rawSceneTypeLabel =
+    sceneData?.scene_type_label ||
+    sceneData?.type_label ||
+    sceneData?.type_name ||
+    sceneData?.typeName ||
+    sceneData?.scene_type_name ||
+    "";
+
+  const getSceneTagDetails = (sceneType, customLabel) => {
+    if (customLabel && typeof customLabel === "string" && customLabel.trim()) {
+      const lowerCustom = customLabel.toLowerCase().trim();
+      if (lowerCustom.includes("จบ") || lowerCustom.includes("end")) {
+        return { text: customLabel, bg: "var(--tag-ending-bg)", color: "var(--tag-ending-color)", typeClass: "rp__meta-tag--ending" };
+      }
+      if (lowerCustom.includes("เริ่ม") || lowerCustom.includes("start")) {
+        return { text: customLabel, bg: "var(--tag-start-bg)", color: "var(--tag-start-color)", typeClass: "rp__meta-tag--start" };
+      }
+      return { text: customLabel, bg: "var(--tag-normal-bg)", color: "var(--tag-normal-color)", typeClass: "rp__meta-tag--normal" };
+    }
+
     switch (sceneType) {
       case "start":
-        return { text: "🎬 จุดเริ่มต้นเนื้อเรื่อง", bg: "#e3f2fd", color: "#0d47a1" };
-      case "normal":
-        return { text: "📖 เนื้อเรื่องหลัก", bg: "#f1f8e9", color: "#33691e" };
+      case "starting":
+        return { text: "จุดเริ่มต้นเนื้อเรื่อง", bg: "var(--tag-start-bg)", color: "var(--tag-start-color)", typeClass: "rp__meta-tag--start" };
       case "ending":
-        return { text: "🏆 ฉากจบ", bg: "#fff8e1", color: "#ff6f00" };
+      case "end":
+        return { text: "ฉากจบ", bg: "var(--tag-ending-bg)", color: "var(--tag-ending-color)", typeClass: "rp__meta-tag--ending" };
+      case "normal":
       default:
-        return { text: "🌿 เส้นทางดำเนินเรื่อง", bg: "#f5f5f5", color: "#616161" };
+        return { text: "เนื้อเรื่องหลัก", bg: "var(--tag-normal-bg)", color: "var(--tag-normal-color)", typeClass: "rp__meta-tag--normal" };
     }
   };
 
-  const tag = getSceneTagDetails(type);
+  const tag = getSceneTagDetails(rawSceneType, rawSceneTypeLabel);
 
   // 🎯 แยกให้ชัดว่า "ไม่มีตัวเลือกไปต่อ" ไม่ได้แปลว่า "จบเรื่องแล้ว" เสมอไป
   // ต้องเช็ค type จาก backend ควบคู่ไปด้วย ถึงจะถือว่าเป็นฉากจบจริงๆ
   const hasNoChoices = !choices || choices.length === 0;
-  const isEndingType = type === "ending" || type === "Ending";
+  const isEndingType = rawSceneType === "ending";
   const isTrueEnding = hasNoChoices && isEndingType;
   const isUnfinishedDeadEnd = hasNoChoices && !isEndingType;
 
   return (
-    <div className={`rp rp--theme-${theme}`}>
+    <div
+      className={`rp rp--theme-${theme}`}
+      style={{
+        "--reader-font-family": getFontFamilyString(fontFamily),
+        fontFamily: getFontFamilyString(fontFamily),
+      }}
+    >
       <div className="rp__progress-bar" style={{ width: `${readProgress}%` }} role="progressbar" />
 
       {toastMessage && (
@@ -873,22 +1030,30 @@ useEffect(() => {
       <div className="rp__container">
         <ReadingBreadcrumb
             novelTitle={novelTitleUsed}
-            chapterTitle={chapterTitleUsed || (type === "start" ? "บทนำ" : "ตอนอ่านต่อ")}
+            chapterTitle={chapterTitleUsed || (rawSceneType === "start" ? "บทนำ" : "ตอนอ่านต่อ")}
             onBack={() => handleLocalNavigate("novel-detail")}
             onStoryMap={() => handleLocalNavigate("story-tree")}
+            settingsComponent={
+              <ReadingSettings
+                fontFamily={fontFamily}
+                onFontFamilyChange={handleFontFamilyChange}
+                fontSize={fontSize}
+                onDecreaseFont={handleDecreaseFont}
+                onIncreaseFont={handleIncreaseFont}
+                theme={theme}
+                onThemeChange={handleThemeChange}
+              />
+            }
           />
 
-          <article className={`rp__article ${isTransitioning ? "rp__article--out" : "rp__article--in"}`} ref={contentRef}>
-
-            <ReadingSettings
-              fontFamily={fontFamily}
-              onFontFamilyChange={handleFontFamilyChange}
-              fontSize={fontSize}
-              onDecreaseFont={handleDecreaseFont}
-              onIncreaseFont={handleIncreaseFont}
-              theme={theme}
-              onThemeChange={handleThemeChange}
-            />
+          <article
+            className={`rp__article ${isTransitioning ? "rp__article--out" : "rp__article--in"}`}
+            style={{
+              "--reader-font-family": getFontFamilyString(fontFamily),
+              fontFamily: getFontFamilyString(fontFamily),
+            }}
+            ref={contentRef}
+          >
 
             <div className="rp__header-group">
               <div className="rp__novel-subtitle">
@@ -896,17 +1061,17 @@ useEffect(() => {
               </div>
 
               <h1 className="rp__title">
-                {sceneTitle || (type === "start" ? "จุดเริ่มต้นการเดินทาง" : "ดำเนินเรื่องย่อย")}
+                {sceneTitle || (rawSceneType === "start" ? "จุดเริ่มต้นการเดินทาง" : "ดำเนินเรื่องย่อย")}
               </h1>
 
               <div className="rp__meta">
                 <span className="rp__meta-chapter">
-                  📂 {currentOrder ? `ตอนที่ ${currentOrder} : ` : "ตอน : "}
-                  {chapterTitleUsed || (type === "start" ? "บทนำ" : "บททั่วไป")}
+                  {currentOrder ? `ตอนที่ ${currentOrder} : ` : "ตอน : "}
+                  {chapterTitleUsed || (rawSceneType === "start" ? "บทนำ" : "บททั่วไป")}
                 </span>
                 <span className="rp__meta-sep">|</span>
                 <span
-                  className="rp__meta-tag"
+                  className={`rp__meta-tag ${tag.typeClass || ""}`}
                   style={{ backgroundColor: tag.bg, color: tag.color }}
                 >
                   {tag.text}
@@ -925,7 +1090,11 @@ useEffect(() => {
             <div
               className={`rp__body rp__body--${theme} ql-editor`}
               aria-label="เนื้อหา"
-              style={{ fontFamily: getFontFamilyString(fontFamily), fontSize: `${fontSize}px` }}
+              style={{
+                "--reader-font-family": getFontFamilyString(fontFamily),
+                fontFamily: getFontFamilyString(fontFamily),
+                fontSize: `${fontSize}px`,
+              }}
               dangerouslySetInnerHTML={{ __html: content }}
             />
           </div>
@@ -952,66 +1121,174 @@ useEffect(() => {
           )}
 
           {isTrueEnding && (
-            <div className="rp__ending-card">
-              <div className="rp__ending-trophy-wrapper">
-                <span className="rp__ending-sparkle rp__ending-sparkle--left">✨</span>
-                <div className="rp__ending-trophy-icon">🏆</div>
-                <span className="rp__ending-sparkle rp__ending-sparkle--right">🎉</span>
+            <div
+              className={`rp__ending-card rp__ending-card--${currentEndingInfo?.key || "true"}`}
+              data-theme={theme}
+            >
+              {/* 1. Header Row: Badge (2 ภาษา) + Signal Pill (คุณอ่านจบแล้ว) */}
+              <div className="rp__ending-card-header-row">
+                <div className={`rp__ending-badge-pill rp__ending-badge-pill--${currentEndingInfo?.key || "true"}`}>
+                  <div className="rp__ending-badge-icon">
+                    {currentEndingInfo?.emoji || "👑"}
+                  </div>
+                  <div className="rp__ending-badge-text">
+                    <span className="rp__ending-badge-en">{currentEndingInfo?.typeLabelEN || "TRUE ENDING"}</span>
+                    <span className="rp__ending-badge-th">{currentEndingInfo?.typeLabelTH || "ฉากจบแท้จริง"}</span>
+                  </div>
+                </div>
+
+                <div className="rp__ending-read-pill">
+                  <span>คุณอ่านจบแล้ว</span>
+                </div>
               </div>
 
-              <h2 className="rp__ending-title">🎉 ยินดีด้วย! คุณอ่านมาถึงฉากจบแล้ว!</h2>
-              <p className="rp__ending-subtitle">
-                คุณร่วมเดินทางผ่านตัวเลือกมาจนถึงจุดสิ้นสุดของเส้นทางนี้แล้ว <br />
-                มาร่วมสำรวจเส้นทางอื่นในผังเรื่อง หรือเริ่มอ่านใหม่เพื่อปลดล็อกฉากจบแบบอื่นๆ กัน!
-              </p>
-
-              <div className="rp__ending-actions">
-                {!isAdmin && (
-                  <div className="rp__ending-actions-primary">
-                    <button className="rp__ending-btn rp__ending-btn--primary" onClick={() => setShowEndingModal(true)}>
-                      ✨ คลังฉากจบของคุณ
-                    </button>
-                  </div>
-                )}
-                <div className="rp__ending-actions-secondary">
-                  <button className="rp__ending-btn rp__ending-btn--secondary" onClick={() => handleLocalNavigate("story-tree")}>
-                    ดูแผนผังการอ่าน
-                  </button>
-                  {!isAdmin && <RestartReadingButton onRestart={handleRestartReading} />}
+              {/* 2. Content Row: Artwork / Icon + Title & Description */}
+              <div className="rp__ending-content-row">
+                <div className={`rp__ending-art-box rp__ending-art-box--${currentEndingInfo?.key || "true"}`}>
+                  <span className="rp__ending-art-icon">{currentEndingInfo?.emoji || "👑"}</span>
                 </div>
-                <div className="rp__ending-actions-exit">
-                  <button className="rp__ending-btn rp__ending-btn--ghost" onClick={() => handleLocalNavigate("novel-detail")}>
-                    ⭠ กลับหน้ารายละเอียด
+
+                <div className="rp__ending-text-box">
+                  <div className="rp__ending-chapter-eyebrow">
+                    เรื่อง : {novelTitleUsed}
+                  </div>
+                  <h3 className="rp__ending-main-title">
+                    {currentEndingInfo?.number ? `ฉากจบที่ ${currentEndingInfo.number} : ` : ""}
+                    {currentEndingInfo?.title || "ฉากจบสมบูรณ์"}
+                  </h3>
+                  <p className="rp__ending-main-desc">
+                    {currentEndingInfo?.description || "บางเส้นทางไม่ได้มีจุดสิ้นสุดที่สวยงาม แต่มันก็เป็นส่วนหนึ่งของเรื่องราวที่สมบูรณ์..."}
+                  </p>
+                </div>
+              </div>
+
+              <div className="rp__ending-divider" />
+
+              {/* 3. Callout Notice Box */}
+              <div className="rp__ending-notice-box">
+                <div className="rp__ending-notice-text">
+                  <strong className="rp__ending-notice-title">คุณได้พบกับหนึ่งในบทจบของเรื่องนี้</strong>
+                  <span className="rp__ending-notice-sub">ลองย้อนกลับไปเลือกทางอื่น เพื่อค้นพบเส้นทางที่ต่างออกไป</span>
+                </div>
+              </div>
+
+              {/* 4. Action Buttons (Primary: คลังฉากจบ, Dropdown: ตัวเลือกเพิ่มเติม) */}
+              <div className="rp__ending-actions-center">
+                {!isAdmin && (
+                  <button
+                    type="button"
+                    className="rp__ending-btn rp__ending-btn--primary-filled"
+                    onClick={() => setShowEndingModal(true)}
+                  >
+                    <Award size={16} />
+                    <span>คลังฉากจบ</span>
                   </button>
+                )}
+
+                <div className="rp__ending-dropdown-container">
+                  <button
+                    type="button"
+                    className="rp__ending-btn rp__ending-btn--outline"
+                    onClick={() => setShowEndingActionsMenu((prev) => !prev)}
+                  >
+                    <span>ตัวเลือกเพิ่มเติม</span>
+                    <ChevronDown
+                      size={16}
+                      style={{
+                        transform: showEndingActionsMenu ? "rotate(180deg)" : "rotate(0deg)",
+                        transition: "transform 0.2s ease",
+                      }}
+                    />
+                  </button>
+
+                  {showEndingActionsMenu && (
+                    <div className="rp__ending-dropdown-menu">
+                      {!isAdmin && (
+                        <button
+                          type="button"
+                          className="rp__ending-dropdown-item"
+                          onClick={() => {
+                            setShowEndingActionsMenu(false);
+                            handleRestartClick();
+                          }}
+                        >
+                          <RotateCcw size={16} />
+                          <span>เริ่มอ่านใหม่</span>
+                        </button>
+                      )}
+
+                      <button
+                        type="button"
+                        className="rp__ending-dropdown-item"
+                        onClick={() => {
+                          setShowEndingActionsMenu(false);
+                          handleLocalNavigate("story-tree");
+                        }}
+                      >
+                        <GitFork size={16} />
+                        <span>ดูแผนผังการอ่าน</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        className="rp__ending-dropdown-item"
+                        onClick={() => {
+                          setShowEndingActionsMenu(false);
+                          handleLocalNavigate("novel-detail");
+                        }}
+                      >
+                        <ArrowLeft size={16} />
+                        <span>กลับหน้ารายละเอียด</span>
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
           )}
 
           {isUnfinishedDeadEnd && (
-            <div className="rp__ending-card rp__ending-card--tbc">
-              <div className="rp__ending-trophy-wrapper">
-                <span className="rp__ending-sparkle rp__ending-sparkle--left">✏️</span>
-                <div className="rp__ending-trophy-icon">📖</div>
-                <span className="rp__ending-sparkle rp__ending-sparkle--right">⏳</span>
+            <div className="rp__tbc-card">
+              <div className="rp__tbc-icon-wrapper">
+                <div className="rp__tbc-icon-circle">
+                  <span className="rp__tbc-icon-emoji">📖</span>
+                </div>
               </div>
 
-              <h2 className="rp__ending-title">✏️ โปรดติดตามตอนต่อไป</h2>
-              <p className="rp__ending-subtitle">
+              <h2 className="rp__tbc-title">โปรดติดตามตอนต่อไป</h2>
+              <p className="rp__tbc-desc">
                 เนื้อเรื่องส่วนนี้ยังเดินทางมาไม่ถึงฉากจบ <br />
                 ผู้เขียนกำลังรังสรรค์เส้นทางต่อไปอยู่ กลับมาติดตามใหม่ในภายหลังนะ!
               </p>
 
-              <div className="rp__ending-actions">
-                <div className="rp__ending-actions-secondary">
-                  <button className="rp__ending-btn rp__ending-btn--secondary" onClick={() => handleLocalNavigate("story-tree")}>
-                    ดูแผนผังการอ่าน
-                  </button>
-                  {!isAdmin && <RestartReadingButton onRestart={handleRestartReading} />}
-                </div>
-                <div className="rp__ending-actions-exit">
-                  <button className="rp__ending-btn rp__ending-btn--ghost" onClick={() => handleLocalNavigate("novel-detail")}>
-                    ⭠ กลับหน้ารายละเอียด
+              <div className="rp__tbc-actions">
+                <button
+                  type="button"
+                  className="rp__tbc-btn rp__tbc-btn--primary"
+                  onClick={() => handleLocalNavigate("story-tree")}
+                >
+                  <GitFork size={16} />
+                  <span>ดูแผนผังการอ่าน</span>
+                </button>
+
+                <div className="rp__tbc-actions-row">
+                  {!isAdmin && (
+                    <button
+                      type="button"
+                      className="rp__tbc-btn rp__tbc-btn--secondary"
+                      onClick={handleRestartClick}
+                    >
+                      <RotateCcw size={15} />
+                      <span>เริ่มอ่านใหม่</span>
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="rp__tbc-btn rp__tbc-btn--outline"
+                    onClick={() => handleLocalNavigate("novel-detail")}
+                  >
+                    <ArrowLeft size={15} />
+                    <span>กลับหน้ารายละเอียด</span>
                   </button>
                 </div>
               </div>
@@ -1042,13 +1319,50 @@ useEffect(() => {
           novelId={novelId}
           onClose={() => setShowEndingModal(false)}
           onViewStoryTree={() => handleLocalNavigate("story-tree")}
-          onRestartReading={handleRestartReading}
+          onRestartReading={handleRestartClick}
         />
       )}
 
-      {/* 🎯 Pop-up ชวนเพิ่มเข้าชั้นหนังสือ ลอยกลางจอ แสดงเฉพาะตอนอ่านถึงตอนล่าสุด (ยังไม่ใช่ฉากจบ) และยังไม่เคยเพิ่ม
-          หมายเหตุ: ต้องวางนอก .rp__article เพราะ .rp__article มี transform ติดอยู่ (ใช้ทำ animation เปลี่ยนฉาก)
-          ซึ่งจะทำให้ position:fixed ของลูกข้างในอ้างอิงกรอบของ .rp__article แทน viewport จริง ทำให้ popup เพี้ยนไม่กึ่งกลางจอ */}
+      {/* 🎯 Pop-up ยืนยันการเริ่มอ่านใหม่ */}
+      {showRestartConfirm && (
+        <div className="rp__modal-overlay" onClick={() => setShowRestartConfirm(false)}>
+          <div className="rp__restart-modal" onClick={(e) => e.stopPropagation()}>
+            <button
+              type="button"
+              className="rp__modal-close"
+              onClick={() => setShowRestartConfirm(false)}
+              aria-label="ปิด"
+            >
+              ✕
+            </button>
+            <div className="rp__restart-modal-icon">↻</div>
+            <h3 className="rp__restart-modal-title">ยืนยันการเริ่มอ่านใหม่</h3>
+            <p className="rp__restart-modal-text">
+              คุณต้องการเริ่มอ่านใหม่ตั้งแต่จุดเริ่มต้นใช่หรือไม่? <br />
+              ระบบจะพาคุณกลับไปที่ฉากแรก แต่ฉากจบที่คุณเคยปลดล็อกแล้วจะยังอยู่ครบถ้วน
+            </p>
+            {restartError && <div className="rp__restart-modal-error">{restartError}</div>}
+            <div className="rp__restart-modal-actions">
+              <button
+                type="button"
+                className="rp__restart-btn rp__restart-btn--cancel"
+                onClick={() => setShowRestartConfirm(false)}
+              >
+                ยกเลิก
+              </button>
+              <button
+                type="button"
+                className="rp__restart-btn rp__restart-btn--confirm"
+                onClick={handleConfirmRestartReading}
+                disabled={restartLoading}
+              >
+                {restartLoading ? "กำลังเริ่มใหม่..." : "ยืนยันเริ่มอ่านใหม่"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Pop-up ชวนเพิ่มเข้าชั้นหนังสือ — ไม่แสดงสำหรับแอดมิน หรือโหมด preview */}
       {!isAdmin && !isPreviewMode && isUnfinishedDeadEnd && !isBookmarked && !bookmarkNudgeDismissed && (
         <div
@@ -1069,17 +1383,18 @@ useEffect(() => {
             <p className="rp__bookmark-modal-text">
               เพิ่มเรื่องนี้เข้าชั้นหนังสือไว้ จะได้ไม่พลาดตอนใหม่ที่นักเขียนอัปเดต
             </p>
-            <ActionButtons
-              showRead={false}
-              showLike={false}
-              isBookmarked={isBookmarked}
-              bookmarkDisabled={bookmarkProcessing}
-              bookmarkLabel={bookmarkProcessing ? "กำลังบันทึก..." : "เพิ่มเข้าชั้นหนังสือ"}
-              onBookmark={(nextValue) => {
-                handleToggleBookmark(nextValue);
+            <button
+              type="button"
+              className="rp__bookmark-modal-btn"
+              disabled={bookmarkProcessing}
+              onClick={() => {
+                handleToggleBookmark(true);
                 setBookmarkNudgeDismissed(true);
               }}
-            />
+            >
+              <Bookmark size={18} />
+              <span>{bookmarkProcessing ? "กำลังบันทึก..." : "เพิ่มเข้าชั้นหนังสือ"}</span>
+            </button>
             <button
               type="button"
               className="rp__bookmark-modal-skip"

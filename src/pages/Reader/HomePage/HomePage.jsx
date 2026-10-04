@@ -412,7 +412,7 @@ const HomePage = ({ onNavigate }) => {
         <div className="section">
           <div className="sec-head">
             <div>
-              <div className="sec-title">🔥 <span>กำลังเป็นที่นิยม</span></div>
+              <div className="sec-title"><span>กำลังเป็นที่นิยม</span></div>
               <div className="sec-subtitle">อัปเดตแบบเรียลไทม์ตามยอดเข้าชมจริง</div>
             </div>
             <Link to="/categories" className="sec-link">
@@ -494,7 +494,7 @@ const HomePage = ({ onNavigate }) => {
         <div className="section">
           <div className="sec-head">
             <div>
-              <div className="sec-title">✨ นิยาย<span>ใหม่ล่าสุด</span></div>
+              <div className="sec-title">นิยาย<span>ใหม่ล่าสุด</span></div>
               <div className="sec-subtitle">ผลงานเขียนใหม่ล่าสุดที่ลงตีพิมพ์บนเว็บวันนี้</div>
             </div>
             <Link to="/categories" className="sec-link">
@@ -738,7 +738,7 @@ const HomePage = ({ onNavigate }) => {
           <div className="section">
             <div className="sec-head">
               <div>
-                <div className="sec-title">🌟 นักเขียน<span>ประจำเดือน</span></div>
+                <div className="sec-title">นักเขียน<span>ประจำเดือน</span></div>
                 <div className="sec-subtitle">ทำความรู้จักกับนักเขียนและผลงานเรื่องราวยอดนิยมประจำเดือนนี้</div>
               </div>
             </div>

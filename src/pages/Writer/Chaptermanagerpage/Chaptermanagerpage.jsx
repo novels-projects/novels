@@ -1,13 +1,14 @@
+// ⚠️ รอการแก้ไขโค้ดเรื่อง Backend PUT /novels/:id ล้างสถานะการถูกระงับ (suspended) เมื่อผู้เขียนแก้ไขรูปปกหรือข้อมูลนิยาย
 // src/pages/Writer/ChapterManager/ChapterManagerPage.jsx
 
 import React, { useState, useEffect, useRef } from "react";
 import { useParams } from "react-router-dom";
 import "./ChapterManagerPage.css";
-import { getNovelStatusInfo } from "../../../utils/novelStatus";
+import { getNovelStatusInfo, registerBannedNovel, isNovelBannedInRegistry, cleanBanReason, extractBanDetails, getBannedRegistry } from "../../../utils/novelStatus";
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import LoadingScreen from "../../../components/LoadingScreen/LoadingScreen";
 import { getChoiceConnectionBlockReason, getChoiceConnectionMessage } from "../../../utils/choiceValidation";
-import { ShieldAlert, X, AlertCircle, Send } from "lucide-react";
+import { ShieldAlert, X, AlertCircle, Send, ChevronDown, Check, Eye, GitFork, Layers, FileText, Clock } from "lucide-react";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
 const IMAGE_BASE_URL = import.meta.env.VITE_IMAGE_BASE_URL || "http://localhost:9000";
@@ -77,8 +78,8 @@ const ConfirmModal = ({ isOpen, title, message, onConfirm, onCancel, confirmLabe
 
 // ข้อความ default ของแบนเนอร์แจ้งเตือนแบน
 const BAN_NOTICE_DEFAULTS = {
-  reason: "ละเมิดลิขสิทธิ์ / นำผลงานผู้อื่นมาลง",
-  details: "เอาโรบ็อตมาทำปก",
+  reason: "ละเมิดลิขสิทธิ์ / นำผลงานผู้อื่นมาลง (รายละเอียด: หน้าปกละเมิดลิขสิทธิ์)",
+  details: null,
 };
 
 // 🔒 ข้อความแจ้งเตือนเดียว ใช้ร่วมกันทุกจุดที่บล็อกการกระทำเมื่อนิยายถูกแบน
@@ -94,15 +95,103 @@ const blockIfBanned = (novelOrStatusInfo) => {
   return false;
 };
 
-/* 🔴 แถบแจ้งเตือนเรื่องการโดนระงับอยู่ด้านบนรายละเอียดนิยาย (ตามรูปที่ 3) */
+/* 🔴 แถบแจ้งเตือนเรื่องการโดนระงับอยู่ด้านบนรายละเอียดนิยาย */
 const BanWarningBanner = ({
   reason,
   details,
+  hasPendingAppeal = false,
+  isAppealRejected = false,
   onRequestAppeal,
 }) => {
-  const displayReason = reason || BAN_NOTICE_DEFAULTS.reason;
-  const displayDetails = details || BAN_NOTICE_DEFAULTS.details;
+  const [showBanDetails, setShowBanDetails] = useState(false);
+  const displayReason = cleanBanReason(reason || BAN_NOTICE_DEFAULTS.reason);
+  const displayDetails = extractBanDetails(reason, details);
 
+  // 1️⃣ เมื่อยื่นคำขอปลดแบนเรียบร้อยแล้ว (กำลังรอแอดมินพิจารณา) -> แสดงเฉพาะกรอบสีฟ้าเรียบหรู พร้อมปุ่มกดดูรายละเอียด
+  if (hasPendingAppeal) {
+    return (
+      <div className="cm-ban-pending-card" style={{
+        margin: "0 0 20px 0",
+        padding: "16px 20px",
+        backgroundColor: "#f0f9ff",
+        border: "1.5px solid #bae6fd",
+        borderRadius: "18px",
+        color: "#0369a1",
+        boxShadow: "0 4px 15px rgba(3, 105, 161, 0.05)",
+        display: "flex",
+        flexDirection: "column",
+        gap: "12px",
+        fontFamily: "'Sarabun', sans-serif",
+      }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "12px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+            <div style={{
+              width: "40px",
+              height: "40px",
+              borderRadius: "50%",
+              backgroundColor: "#e0f2fe",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              flexShrink: 0
+            }}>
+              <Clock size={22} style={{ color: "#0284c7" }} />
+            </div>
+            <div>
+              <h4 style={{ margin: 0, fontSize: "15px", fontWeight: "700", color: "#0369a1" }}>
+                ยื่นคำขอปลดแบนเรียบร้อยแล้ว
+              </h4>
+              <span style={{ fontSize: "13px", fontWeight: "500", color: "#0284c7" }}>
+                อยู่ในระหว่างรอแอดมินพิจารณาตรวจสอบ
+              </span>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setShowBanDetails((prev) => !prev)}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "6px",
+              padding: "7px 16px",
+              borderRadius: "9999px",
+              border: "1.5px solid #7dd3fc",
+              backgroundColor: "#ffffff",
+              color: "#0284c7",
+              fontSize: "12.5px",
+              fontWeight: "700",
+              cursor: "pointer",
+              transition: "all 0.2s ease",
+              boxShadow: "0 2px 6px rgba(2, 132, 199, 0.08)",
+              outline: "none"
+            }}
+          >
+            <span>{showBanDetails ? "ซ่อนรายละเอียด" : "ดูรายละเอียดเรื่องการโดนแบน"}</span>
+            <ChevronDown size={14} style={{ transform: showBanDetails ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.2s ease" }} />
+          </button>
+        </div>
+
+        {showBanDetails && (
+          <div style={{
+            marginTop: "6px",
+            paddingTop: "14px",
+            borderTop: "1px dashed #bae6fd",
+            fontSize: "13.5px",
+            color: "#1e3a8a",
+            display: "flex",
+            flexDirection: "column",
+            gap: "6px"
+          }}>
+            <p style={{ margin: 0 }}><strong>สาเหตุการระงับ:</strong> <span>{displayReason}</span></p>
+            {displayDetails && <p style={{ margin: 0 }}><strong>เหตุผล/รายละเอียดเพิ่มเติม:</strong> <span>{displayDetails}</span></p>}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // 2️⃣ กรณียังไม่ได้ยื่นคำขอปลดแบน หรือคำขอเดิมถูกปฏิเสธ -> แสดงกรอบเตือนสีแดงพร้อมขั้นตอนยื่นคำขอ
   return (
     <div className="cm-ban-warning-card" role="alert">
       <div className="cm-ban-warning-card__top">
@@ -112,15 +201,34 @@ const BanWarningBanner = ({
         <div className="cm-ban-warning-card__header-info">
           <h3 className="cm-ban-warning-card__title">นิยายเรื่องนี้ถูกระงับการเผยแพร่</h3>
           <p className="cm-ban-warning-card__row">
-            <strong>สาเหตุ:</strong> <span>{displayReason}</span>
+            <strong>สาเหตุการระงับ:</strong> <span>{displayReason}</span>
           </p>
           {displayDetails && (
             <p className="cm-ban-warning-card__row cm-ban-warning-card__row--sub">
-              <strong>รายละเอียด:</strong> <span>{displayDetails}</span>
+              <strong>เหตุผล/รายละเอียดเพิ่มเติม:</strong> <span>{displayDetails}</span>
             </p>
           )}
         </div>
       </div>
+
+      {isAppealRejected && (
+        <div style={{
+          margin: "12px 0 16px 0",
+          padding: "12px 16px",
+          backgroundColor: "#fef2f2",
+          border: "1.5px solid #fca5a5",
+          borderRadius: "12px",
+          color: "#991b1b",
+          fontSize: "13px",
+          fontWeight: "600",
+          display: "flex",
+          alignItems: "center",
+          gap: "8px"
+        }}>
+          <AlertCircle size={16} style={{ color: "#dc2626", flexShrink: 0 }} />
+          <span>คำขอปลดแบนก่อนหน้านี้ถูกปฏิเสธโดยแอดมิน กรุณาตรวจสอบเหตุผล แก้ไขเนื้อหาให้ถูกต้อง และยื่นคำขอปลดแบนอีกครั้ง</span>
+        </div>
+      )}
 
       <div className="cm-ban-warning-card__steps-box">
         <h4 className="cm-ban-warning-card__steps-title">ขั้นตอนการยื่นคำขอปลดแบน</h4>
@@ -154,14 +262,14 @@ const BanWarningBanner = ({
         className="cm-ban-warning-card__btn" 
         onClick={onRequestAppeal}
       >
-        ยื่นคำขอปลดแบน <span>→</span>
+        {isAppealRejected ? "ยื่นคำขอปลดแบนอีกครั้ง" : "ยื่นคำขอปลดแบน"} <span>→</span>
       </button>
     </div>
   );
 };
 
-/* 🔴 Pop up ยื่นคำขอปลดแบน (ตามรูปที่ 4 - ไม่มีช่องยืนยันก่อนยื่นคำขอ) */
-const AppealModal = ({ isOpen, novel, onSubmit, onCancel, isSubmitting = false }) => {
+/* 🔴 Pop up ยื่นคำขอปลดแบน */
+const AppealModal = ({ isOpen, novel, hasPendingAppeal = false, onSubmit, onCancel, isSubmitting = false }) => {
   const [reasonText, setReasonText] = useState("");
 
   useEffect(() => {
@@ -170,8 +278,9 @@ const AppealModal = ({ isOpen, novel, onSubmit, onCancel, isSubmitting = false }
 
   if (!isOpen) return null;
   const trimmedReason = reasonText.trim();
-  const displayReason = novel?.ban_reason || novel?.banReason || novel?.reason || BAN_NOTICE_DEFAULTS.reason;
-  const displayDetails = novel?.ban_details || novel?.banDetails || novel?.details || novel?.report_details || BAN_NOTICE_DEFAULTS.details;
+  const rawReason = novel?.ban_reason || novel?.banReason || novel?.reason || novel?.suspend_reason || novel?.suspension_reason || BAN_NOTICE_DEFAULTS.reason;
+  const displayReason = cleanBanReason(rawReason);
+  const displayDetails = extractBanDetails(rawReason, novel?.ban_details || novel?.banDetails || novel?.details || novel?.report_details);
   const isValidLength = trimmedReason.length >= 10;
 
   return (
@@ -199,12 +308,33 @@ const AppealModal = ({ isOpen, novel, onSubmit, onCancel, isSubmitting = false }
           </button>
         </div>
 
+        {hasPendingAppeal && (
+          <div style={{
+            margin: "0 0 16px 0",
+            padding: "12px 16px",
+            backgroundColor: "#f0f9ff",
+            border: "1px solid #bae6fd",
+            borderRadius: "10px",
+            color: "#0369a1",
+            fontSize: "0.85rem",
+            fontWeight: "700",
+            display: "flex",
+            alignItems: "center",
+            gap: "8px"
+          }}>
+            <span>⏳</span>
+            <span>คุณได้ยื่นคำขอปลดแบนเรื่องนี้ไว้แล้ว กำลังอยู่ในระหว่างรอแอดมินพิจารณา</span>
+          </div>
+        )}
+
         {/* Top Banned Reason Box */}
         <div className="cm-appeal-modal__reason-box">
-          <span className="cm-appeal-modal__reason-label">สาเหตุที่ถูกระงับ</span>
+          <span className="cm-appeal-modal__reason-label">สาเหตุการระงับ</span>
           <strong className="cm-appeal-modal__reason-val">{displayReason}</strong>
           {displayDetails && (
-            <span className="cm-appeal-modal__reason-details">{displayDetails}</span>
+            <span className="cm-appeal-modal__reason-details">
+              <strong>เหตุผล/รายละเอียดเพิ่มเติม:</strong> {displayDetails}
+            </span>
           )}
         </div>
 
@@ -219,7 +349,7 @@ const AppealModal = ({ isOpen, novel, onSubmit, onCancel, isSubmitting = false }
             placeholder="พิมพ์ข้อความชี้แจงของคุณที่นี่..."
             value={reasonText}
             onChange={(e) => setReasonText(e.target.value)}
-            disabled={isSubmitting}
+            disabled={isSubmitting || hasPendingAppeal}
           />
           <div className="cm-appeal-modal__counter">
             {trimmedReason.length}/10 ตัวอักษรขั้นต่ำ
@@ -243,15 +373,185 @@ const AppealModal = ({ isOpen, novel, onSubmit, onCancel, isSubmitting = false }
           </button>
           <button
             type="button"
-            className={`cm-appeal-modal__submit-btn ${isValidLength ? "is-valid" : ""}`}
+            className={`cm-appeal-modal__submit-btn ${(isValidLength && !hasPendingAppeal) ? "is-valid" : ""}`}
             onClick={() => onSubmit(trimmedReason)}
-            disabled={isSubmitting || !isValidLength}
+            disabled={isSubmitting || !isValidLength || hasPendingAppeal}
           >
             <Send size={15} />
-            <span>{isSubmitting ? "กำลังส่ง..." : "ยืนยันส่งเรื่อง"}</span>
+            <span>{isSubmitting ? "กำลังส่ง..." : hasPendingAppeal ? "รอการตรวจสอบ" : "ยืนยันส่งเรื่อง"}</span>
           </button>
         </div>
       </div>
+    </div>
+  );
+};
+
+/* 🎨 Custom Pill Status Dropdown Component (ทรงแคปซูลสำหรับสถานะเผยแพร่) */
+const PillStatusDropdown = ({
+  value,
+  onChange,
+  disabled = false,
+  labelPublished = "เผยแพร่แล้ว",
+  labelDraft = "ฉบับร่าง",
+  size = "md",
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef(null);
+
+  const rawVal = (value || "").toString().toLowerCase();
+  const isPublished = rawVal === "published" || rawVal === "active" || rawVal === "publish";
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setIsOpen(false);
+      }
+    };
+    if (isOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [isOpen]);
+
+  const handleSelect = (newValue) => {
+    if (disabled) return;
+    setIsOpen(false);
+    if (newValue !== value) {
+      onChange(newValue);
+    }
+  };
+
+  const isSm = size === "sm";
+
+  return (
+    <div ref={dropdownRef} style={{ position: "relative", display: "inline-block" }}>
+      <button
+        type="button"
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: "6px",
+          padding: isSm ? "5px 12px" : "7px 16px",
+          borderRadius: "9999px",
+          fontSize: isSm ? "12px" : "13px",
+          fontWeight: "700",
+          fontFamily: "'Sarabun', sans-serif",
+          cursor: disabled ? "not-allowed" : "pointer",
+          border: `1.5px solid ${isPublished ? "#86efac" : "#d1d5db"}`,
+          backgroundColor: isPublished ? "#f0fdf4" : "#f3f4f6",
+          color: isPublished ? "#16a34a" : "#4b5563",
+          boxShadow: isPublished ? "0 2px 6px rgba(22, 163, 74, 0.08)" : "0 2px 6px rgba(75, 85, 99, 0.05)",
+          transition: "all 0.2s ease",
+          userSelect: "none",
+          opacity: disabled ? 0.6 : 1,
+          outline: "none",
+        }}
+        onClick={() => !disabled && setIsOpen(!isOpen)}
+        disabled={disabled}
+      >
+        <span 
+          style={{ 
+            width: "8px", 
+            height: "8px", 
+            borderRadius: "50%", 
+            backgroundColor: isPublished ? "#22c55e" : "#9ca3af",
+            display: "inline-block",
+            flexShrink: 0
+          }} 
+        />
+        <span>{isPublished ? labelPublished : labelDraft}</span>
+        <ChevronDown 
+          size={14} 
+          style={{ 
+            transform: isOpen ? "rotate(180deg)" : "rotate(0deg)", 
+            transition: "transform 0.2s ease",
+            color: isPublished ? "#16a34a" : "#6b7280"
+          }} 
+        />
+      </button>
+
+      {isOpen && (
+        <div style={{
+          position: "absolute",
+          top: "calc(100% + 6px)",
+          right: 0,
+          minWidth: "140px",
+          backgroundColor: "#ffffff",
+          borderRadius: "16px",
+          padding: "6px",
+          border: "1.5px solid #f1f5f9",
+          boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.12), 0 4px 10px -2px rgba(0, 0, 0, 0.05)",
+          zIndex: 100,
+          display: "flex",
+          flexDirection: "column",
+          gap: "4px",
+          animation: "cmDropdownFadeIn 0.15s ease-out",
+        }}>
+          {/* เผยแพร่ Option (Green) */}
+          <div
+            onClick={() => handleSelect("published")}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              padding: "8px 12px",
+              borderRadius: "9999px",
+              fontSize: "13px",
+              fontWeight: "700",
+              fontFamily: "'Sarabun', sans-serif",
+              color: "#16a34a",
+              backgroundColor: isPublished ? "#f0fdf4" : "transparent",
+              cursor: "pointer",
+              transition: "background 0.15s ease",
+            }}
+            onMouseOver={(e) => {
+              if (!isPublished) e.currentTarget.style.backgroundColor = "#f0fdf4";
+            }}
+            onMouseOut={(e) => {
+              if (!isPublished) e.currentTarget.style.backgroundColor = "transparent";
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <span style={{ width: "8px", height: "8px", borderRadius: "50%", backgroundColor: "#22c55e" }} />
+              <span>{labelPublished}</span>
+            </div>
+            {isPublished && <Check size={14} style={{ color: "#16a34a" }} />}
+          </div>
+
+          {/* ฉบับร่าง Option (Gray) */}
+          <div
+            onClick={() => handleSelect("draft")}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              padding: "8px 12px",
+              borderRadius: "9999px",
+              fontSize: "13px",
+              fontWeight: "700",
+              fontFamily: "'Sarabun', sans-serif",
+              color: "#4b5563",
+              backgroundColor: !isPublished ? "#f3f4f6" : "transparent",
+              cursor: "pointer",
+              transition: "background 0.15s ease",
+            }}
+            onMouseOver={(e) => {
+              if (isPublished) e.currentTarget.style.backgroundColor = "#f3f4f6";
+            }}
+            onMouseOut={(e) => {
+              if (isPublished) e.currentTarget.style.backgroundColor = "transparent";
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <span style={{ width: "8px", height: "8px", borderRadius: "50%", backgroundColor: "#9ca3af" }} />
+              <span>{labelDraft}</span>
+            </div>
+            {!isPublished && <Check size={14} style={{ color: "#4b5563" }} />}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -269,7 +569,7 @@ const NovelBanner = ({ novel, chapters, onEdit, onToggleStatus, isUpdatingNovelS
 
   const chapterCount = chapters?.length ?? 0;
   const categoryNames = getNovelCategoryNames(novel);
-  const statusInfo = getNovelStatusInfo(novel);
+  const statusInfo = getNovelStatusInfo({ ...novel, id: novel?.id || novel?.novel_id || novel?.ID || novel?.NovelID });
   const isCompletedNovel = statusInfo.isCompleted;
   const isPublishedNovel = statusInfo.isPublished;
 
@@ -300,21 +600,44 @@ const NovelBanner = ({ novel, chapters, onEdit, onToggleStatus, isUpdatingNovelS
             <p className="cm-banner__synopsis" style={{ marginBottom: '12px' }}>{captions}</p>
 
             {categoryNames.length > 0 && (
-              <div className="cm-banner__categories" style={{ margin: '0 0 12px 0' }}>
+              <div className="cm-banner__categories" style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', margin: '0 0 14px 0' }}>
                 {categoryNames.map((name, idx) => (
-                  <span key={`novel-category-${idx}`} className="cm-banner__category-tag" style={{ color: '#4c1d95', backgroundColor: '#ede9fe', borderColor: '#ddd6fe' }}>
+                  <span
+                    key={`novel-category-${idx}`}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      padding: '5px 14px',
+                      borderRadius: '9999px',
+                      backgroundColor: '#FDF3F8',
+                      border: '1.5px solid #F8D6E5',
+                      color: '#db2777',
+                      fontSize: '12.5px',
+                      fontWeight: '700',
+                      fontFamily: "'Sarabun', 'Prompt', sans-serif",
+                      boxShadow: '0 2px 6px rgba(219, 39, 119, 0.04)',
+                      userSelect: 'none'
+                    }}
+                  >
                     {name}
                   </span>
                 ))}
               </div>
             )}
 
-            <div className="cm-banner__stats flex items-center flex-wrap gap-2" style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
-              <span style={{ fontWeight: 600, color: '#475569' }}>{chapterCount} ตอน</span>
-              <span className="cm-banner__dot">·</span>
-              <span style={{ fontWeight: 600, color: '#475569' }}>{sceneCount} ฉาก</span>
-              <span className="cm-banner__dot">·</span>
-              <span className="text-gray-500" style={{ color: '#64748b' }}>อัปเดตล่าสุด: {formatThaiDate(updatedAt, true)}</span>
+            <div className="cm-banner__stats flex items-center flex-wrap gap-2" style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontWeight: 700, color: '#334155', fontSize: '13.5px', fontFamily: "'Sarabun', sans-serif" }}>
+                <Layers size={15} style={{ color: '#ec4899' }} /> {chapterCount} ตอน
+              </span>
+              <span className="cm-banner__dot" style={{ color: '#cbd5e1' }}>·</span>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontWeight: 700, color: '#334155', fontSize: '13.5px', fontFamily: "'Sarabun', sans-serif" }}>
+                <FileText size={15} style={{ color: '#3b82f6' }} /> {sceneCount} ฉาก
+              </span>
+              <span className="cm-banner__dot" style={{ color: '#cbd5e1' }}>·</span>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontWeight: 600, color: '#64748b', fontSize: '13px', fontFamily: "'Sarabun', sans-serif" }}>
+                <Clock size={14} style={{ color: '#94a3b8' }} /> อัปเดตล่าสุด: {formatThaiDate(updatedAt, true)}
+              </span>
             </div>
           </div>
         </div>
@@ -329,50 +652,23 @@ const NovelBanner = ({ novel, chapters, onEdit, onToggleStatus, isUpdatingNovelS
             opacity: statusInfo.isBanned ? 0.7 : 1
           }}
         >
-          <div style={{ position: 'relative', display: 'inline-block' }}>
-            <select
-              value={isPublishedNovel ? "published" : "draft"}
-              disabled={isUpdatingNovelStatus || statusInfo.isBanned}
-              onChange={(e) => {
-                if (statusInfo.isBanned) {
-                  alert(BAN_ACTION_BLOCKED_MSG);
-                  return;
-                }
-                onToggleStatus(e.target.value);
-              }}
-              style={{
-                fontSize: '12.5px',
-                fontWeight: '700',
-                borderRadius: '20px',
-                padding: '6px 28px 6px 12px',
-                border: `1.5px solid ${isPublishedNovel ? '#86efac' : '#fed7d7'}`,
-                backgroundColor: isPublishedNovel ? '#e6f4ea' : '#fff5f5',
-                color: isPublishedNovel ? '#137333' : '#e53e3e',
-                cursor: (isUpdatingNovelStatus || statusInfo.isBanned) ? 'not-allowed' : 'pointer',
-                outline: 'none',
-                appearance: 'none',
-                WebkitAppearance: 'none',
-                backgroundImage: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path fill='%23${isPublishedNovel ? '137333' : 'e53e3e'}' d='M0 0l5 5 5-5z'/></svg>")`,
-                backgroundRepeat: 'no-repeat',
-                backgroundPosition: 'right 10px center',
-                backgroundSize: '10px',
-                fontFamily: "'Sarabun', sans-serif"
-              }}
-            >
-              <option value="published">เผยแพร่แล้ว</option>
-              <option value="draft">ฉบับร่าง</option>
-            </select>
-          </div>
-          <button 
-            className="cm-btn cm-btn--outline cm-btn--sm" 
-            onClick={(e) => {
+          <PillStatusDropdown
+            value={isPublishedNovel ? "published" : "draft"}
+            disabled={isUpdatingNovelStatus || statusInfo.isBanned}
+            onChange={(newVal) => {
               if (statusInfo.isBanned) {
-                e.preventDefault();
                 alert(BAN_ACTION_BLOCKED_MSG);
                 return;
               }
-              onEdit();
+              onToggleStatus(newVal);
             }}
+            labelPublished="เผยแพร่แล้ว"
+            labelDraft="ฉบับร่าง"
+            size="md"
+          />
+          <button 
+            className="cm-btn cm-btn--outline cm-btn--sm" 
+            onClick={onEdit}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: "4px" }}>
               <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
@@ -1251,34 +1547,20 @@ const SceneCard = ({
         {/* ส่วนปุ่มและคอนโทรลด้านขวา */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
           {/* Dropdown เปลี่ยนสถานะการเผยแพร่ */}
-          <div style={{ position: 'relative', display: 'inline-block' }}>
-            <select
-              value={sceneStatus}
-              disabled={isUpdatingSceneStatus || isNovelBanned}
-              onChange={handleToggleSceneStatus}
-              style={{
-                fontSize: '12.5px',
-                fontWeight: '700',
-                borderRadius: '20px',
-                padding: '6px 28px 6px 12px',
-                border: `1.5px solid ${isPublishedScene ? '#86efac' : '#cbd5e1'}`,
-                backgroundColor: isPublishedScene ? '#e6f4ea' : '#f1f5f9',
-                color: isPublishedScene ? '#137333' : '#475569',
-                cursor: (isUpdatingSceneStatus || isNovelBanned) ? 'not-allowed' : 'pointer',
-                outline: 'none',
-                appearance: 'none',
-                WebkitAppearance: 'none',
-                backgroundImage: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path fill='%23${isPublishedScene ? '137333' : '475569'}' d='M0 0l5 5 5-5z'/></svg>")`,
-                backgroundRepeat: 'no-repeat',
-                backgroundPosition: 'right 10px center',
-                backgroundSize: '10px',
-                fontFamily: "'Sarabun', sans-serif"
-              }}
-            >
-              <option value="published">เผยแพร่แล้ว</option>
-              <option value="draft">ฉบับร่าง</option>
-            </select>
-          </div>
+          <PillStatusDropdown
+            value={sceneStatus}
+            disabled={isUpdatingSceneStatus || isNovelBanned}
+            onChange={(newVal) => {
+              if (isNovelBanned) {
+                alert(BAN_ACTION_BLOCKED_MSG);
+                return;
+              }
+              handleToggleSceneStatus({ target: { value: newVal } });
+            }}
+            labelPublished="เผยแพร่แล้ว"
+            labelDraft="ฉบับร่าง"
+            size="sm"
+          />
 
           {/* ปุ่มเมนูย่อย จุดสามจุด */}
           <div style={{ position: 'relative' }}>
@@ -2008,33 +2290,20 @@ const ChapterPanel = ({
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px' }}>
           <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '10px', flexWrap: 'wrap', position: 'relative' }}>
             {/* 1. Dropdown เปลี่ยนสถานะเผยแพร่/ฉบับร่าง */}
-            <div style={{ position: 'relative', display: 'inline-block' }}>
-              <select
-                value={isChapterDraft ? "draft" : "published"}
-                disabled={isUpdatingStatus || isNovelBanned}
-                onChange={(e) => handleUpdateChapterStatus(e.target.value)}
-                style={{
-                  fontSize: '12.5px',
-                  fontWeight: '700',
-                  borderRadius: '20px',
-                  padding: '6px 28px 6px 12px',
-                  border: `1.5px solid ${!isChapterDraft ? '#86efac' : '#cbd5e1'}`,
-                  backgroundColor: !isChapterDraft ? '#e6f4ea' : '#f1f5f9',
-                  color: !isChapterDraft ? '#15803d' : '#475569',
-                  cursor: (isUpdatingStatus || isNovelBanned) ? 'not-allowed' : 'pointer',
-                  outline: 'none',
-                  appearance: 'none',
-                  backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23${!isChapterDraft ? '15803d' : '475569'}' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`,
-                  backgroundRepeat: 'no-repeat',
-                  backgroundPosition: 'right 10px center',
-                  backgroundSize: '10px',
-                  fontFamily: "'Sarabun', sans-serif"
-                }}
-              >
-                <option value="draft">🔴 ฉบับร่าง</option>
-                <option value="published">🟢 เผยแพร่</option>
-              </select>
-            </div>
+            <PillStatusDropdown
+              value={isChapterDraft ? "draft" : "published"}
+              disabled={isUpdatingStatus || isNovelBanned}
+              onChange={(newVal) => {
+                if (isNovelBanned) {
+                  alert(BAN_ACTION_BLOCKED_MSG);
+                  return;
+                }
+                handleUpdateChapterStatus(newVal);
+              }}
+              labelPublished="เผยแพร่"
+              labelDraft="ฉบับร่าง"
+              size="sm"
+            />
 
             {/* 2. ปุ่มจุดสามจุด (⋮) ของการ์ดตอน */}
             <button
@@ -2253,6 +2522,8 @@ const ChapterManagerPage = ({ onNavigate, novelId }) => {
   const [isAppealModalOpen, setIsAppealModalOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSubmittingAppeal, setIsSubmittingAppeal] = useState(false);
+  const [hasPendingAppeal, setHasPendingAppeal] = useState(false);
+  const [isAppealRejected, setIsAppealRejected] = useState(false);
 
   // Auto-expand the active chapter on load or switch
   useEffect(() => {
@@ -2307,7 +2578,34 @@ const ChapterManagerPage = ({ onNavigate, novelId }) => {
         normalized.status = (normalized.status || normalized.Status || "").toString().toLowerCase();
         normalized.is_published = normalized.is_published ?? normalized.isPublished ?? false;
         normalized.is_completed = normalized.is_completed ?? normalized.isCompleted ?? false;
+        const statusInfo = getNovelStatusInfo({ ...normalized, id: currentNovelId });
+        if (statusInfo.isBanned) {
+          registerBannedNovel(currentNovelId, normalized);
+        }
+        const regInfo = statusInfo.registryData;
+        const isRejected = normalized.appeal_status === "rejected" || normalized.appeal_status === "appeal_rejected" || regInfo?.appeal_status === "rejected";
+        if (isRejected) {
+          setHasPendingAppeal(false);
+          setIsAppealRejected(true);
+        } else if (normalized.appeal_status === "appeal_pending" || normalized.has_pending_appeal || normalized.appeal_pending || regInfo?.appeal_status === "appeal_pending") {
+          setHasPendingAppeal(true);
+          setIsAppealRejected(false);
+        } else {
+          setHasPendingAppeal(false);
+          setIsAppealRejected(false);
+        }
         setNovel(normalized);
+        try {
+          const selObj = {
+            id: currentNovelId,
+            novel_id: currentNovelId,
+            title: normalized.title || normalized.Title || "ไม่ทราบชื่อเรื่อง",
+            cover_image: normalized.cover_image || normalized.coverImage || null,
+          };
+          localStorage.setItem("selectedNovel", JSON.stringify(selObj));
+          window.dispatchEvent(new Event("storage"));
+          window.dispatchEvent(new Event("novel-selected"));
+        } catch (e) {}
       }
     } catch (err) {
       console.error("โหลดข้อมูลนิยายล้มเหลว:", err);
@@ -2677,6 +2975,9 @@ const ChapterManagerPage = ({ onNavigate, novelId }) => {
     setIsSubmittingAppeal(true);
     const authToken = getToken();
     try {
+      let appealSuccess = false;
+
+      // 1. ลองส่งคำขอผ่าน API ปลดแบนโดยตรงก่อน (/api/writer/novels/appeal)
       const res = await fetch(`${API_BASE}/api/writer/novels/appeal`, {
         method: "POST",
         headers: {
@@ -2686,21 +2987,56 @@ const ChapterManagerPage = ({ onNavigate, novelId }) => {
         body: JSON.stringify({ novel_id: currentNovelId, reason: reasonText.trim() })
       });
 
-      if (!res.ok) {
+      if (res.ok) {
+        appealSuccess = true;
+      } else {
         const errData = await res.json().catch(() => ({}));
-        const errMsg = errData.error || errData.message || "";
-        if (errMsg.includes("unauthorized or novel is not currently banned")) {
-          throw new Error("ไม่สามารถยื่นคำขอปลดแบนได้ เนื่องจากนิยายเรื่องนี้ไม่ได้อยู่ในสถานะถูกระงับการเผยแพร่ (suspended) ในระบบ หรือคุณไม่ใช่เจ้าของนิยายเรื่องนี้");
-        } else if (errMsg.includes("appeal already pending")) {
-          throw new Error("คุณได้ยื่นคำขอปลดแบนนิยายเรื่องนี้ไว้แล้ว และกำลังอยู่ในระหว่างรอแอดมินตรวจสอบ");
-        } else if (errMsg.includes("unauthorized")) {
-          throw new Error("เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่อีกครั้ง");
+        const rawErr = errData.error || errData.message || "";
+        const errMsg = typeof rawErr === "object" ? (rawErr?.message || JSON.stringify(rawErr)) : String(rawErr);
+
+        if (errMsg.includes("appeal already pending")) {
+          setHasPendingAppeal(true);
+          registerBannedNovel(currentNovelId, { appeal_status: "appeal_pending" });
+          setIsAppealModalOpen(false);
+          alert("คุณได้ยื่นคำขอปลดแบนนิยายเรื่องนี้ไว้แล้ว และกำลังอยู่ในระหว่างรอแอดมินพิจารณาตรวจสอบ");
+          return;
         }
-        throw new Error(errMsg || `ส่งคำขอไม่สำเร็จ (status ${res.status})`);
+
+        // 🟢 กรณี Backend แจ้งว่าไม่พบสถานะถูกระงับใน DB (เนื่องจากการแก้ไขรูปปกทำให้ DB status reset เป็น draft)
+        // ให้ทำการส่งคำขอปลดแบนผ่าน /api/reports เป็น Fallback เพื่อไม่ให้ระบบบล็อกนักเขียน
+        if (errMsg.includes("unauthorized or novel is not currently banned") || res.status === 400 || res.status === 500) {
+          try {
+            const fallbackRes = await fetch(`${API_BASE}/api/reports`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${authToken}`
+              },
+              body: JSON.stringify({
+                novel_id: currentNovelId,
+                reason: "[คำขอปลดแบน]: " + reasonText.trim()
+              })
+            });
+            if (fallbackRes.ok) {
+              appealSuccess = true;
+            }
+          } catch (fbErr) {
+            console.warn("Fallback appeal via /api/reports error:", fbErr);
+          }
+        }
+
+        if (!appealSuccess) {
+          if (errMsg.includes("unauthorized")) {
+            throw new Error("เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่อีกครั้ง");
+          }
+          throw new Error(errMsg || `ส่งคำขอไม่สำเร็จ (status ${res.status})`);
+        }
       }
 
+      setHasPendingAppeal(true);
+      registerBannedNovel(currentNovelId, { appeal_status: "appeal_pending" });
       setIsAppealModalOpen(false);
-      alert("ส่งเรื่องขอปลดแบนเรียบร้อยแล้ว");
+      alert("ส่งเรื่องขอปลดแบนเรียบร้อยแล้ว ระบบกำลังส่งเรื่องให้แอดมินพิจารณา");
     } catch (err) {
       console.error("ส่งเรื่องขอปลดแบนล้มเหลว:", err);
       alert(err.message || "เกิดข้อผิดพลาด ไม่สามารถส่งเรื่องขอปลดแบนได้ กรุณาลองใหม่อีกครั้ง");
@@ -3117,59 +3453,56 @@ const ChapterManagerPage = ({ onNavigate, novelId }) => {
       {/* 📄 เนื้อหาการแสดงผลตอนย่อยหลัก (Main Content) */}
       <div className="cm-main">
         <div className="cm-topbar">
-          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+          <div className="cm-topbar__left">
             <button
               type="button"
-              className="cm-btn cm-btn--outline cm-sidebar-toggle-btn"
+              className="cm-sidebar-toggle-btn"
               onClick={() => setIsSidebarOpen(true)}
-              style={{
-                display: "none",
-                borderRadius: "20px",
-                padding: "6px 14px",
-                fontSize: "13px",
-                fontWeight: "700",
-                color: "#475569",
-                border: "1.5px solid #e2e8f0",
-                fontFamily: "'Sarabun', sans-serif"
-              }}
             >
               ☰ ตอนทั้งหมด
             </button>
-            <div>
-              <h1 className="cm-topbar__title" style={{ margin: 0 }}>จัดการตอนนิยาย</h1>
-              <p className="cm-topbar__sub" style={{ margin: "4px 0 0 0" }}>จัดการรายการตอนและรายละเอียดฉากของคุณ</p>
+            <div className="cm-topbar__titles">
+              <h1 className="cm-topbar__title">จัดการตอนนิยาย</h1>
+              <p className="cm-topbar__sub">จัดการรายการตอนและรายละเอียดฉากของคุณ</p>
             </div>
           </div>
-          <div style={{ display: 'flex', gap: '12px' }}>
+          <div className="cm-topbar__right">
             <button
-              className="se-header__btn se-header__btn--preview se-header__btn--preview-inline"
               type="button"
+              className="cm-topbar__btn cm-topbar__btn--preview"
               onClick={handleOpenPreview}
-              style={{ padding: "8px 14px", borderRadius: "10px", fontSize: "12px", height: "auto", margin: 0 }}
             >
-              ▶ ทดลองอ่าน
+              <Eye size={16} style={{ color: "#ffffff" }} />
+              <span>ทดลองอ่าน</span>
             </button>
+
             <button
-              className="cm-btn cm-btn--outline"
+              type="button"
+              className="cm-topbar__btn cm-topbar__btn--storytree"
               onClick={() => onNavigate("story-tree", { novelId: currentNovelId })}
             >
-              📊 โครงสร้างเนื้อเรื่อง
+              <GitFork size={16} style={{ color: "#ec4899" }} />
+              <span>โครงสร้างเนื้อเรื่อง</span>
             </button>
           </div>
         </div>
 
-        {(novel?.status === "banned" ||
-          novel?.status === "ban" ||
-          novel?.status === "suspended" ||
-          novel?.status === "ระงับ" ||
-          novel?.is_banned === true ||
-          novel?.isBanned === true) && (
+        {(() => {
+          const statusInfo = getNovelStatusInfo({ ...novel, id: currentNovelId });
+          if (!statusInfo.isBanned) return null;
+          const regData = statusInfo.registryData || {};
+          const isAppPending = hasPendingAppeal || novel?.appeal_status === "appeal_pending" || novel?.has_pending_appeal || (regData.appeal_status === "appeal_pending");
+          const isAppRejected = (!isAppPending) && (isAppealRejected || novel?.appeal_status === "rejected" || regData.appeal_status === "rejected");
+          return (
             <BanWarningBanner
-              reason={novel?.ban_reason || novel?.banReason || novel?.reason}
-              details={novel?.ban_details || novel?.banDetails || novel?.details || novel?.report_details}
+              reason={novel?.ban_reason || novel?.banReason || novel?.reason || novel?.suspend_reason || novel?.suspension_reason || regData.reason}
+              details={novel?.ban_details || novel?.banDetails || novel?.details || novel?.report_details || regData.details}
+              hasPendingAppeal={isAppPending}
+              isAppealRejected={isAppRejected}
               onRequestAppeal={handleOpenAppealModal}
             />
-          )}
+          );
+        })()}
 
         <NovelBanner
           novel={novel}
@@ -3256,7 +3589,7 @@ const ChapterManagerPage = ({ onNavigate, novelId }) => {
           <div className="se-modal-content" style={{ maxWidth: "420px", padding: "28px" }}>
             <div className="se-modal-icon" style={{ background: "#fce7f3", color: "#db2777" }}>📝</div>
             <h3 className="se-modal-title" style={{ fontFamily: "'Sarabun', sans-serif" }}>สร้างตอนใหม่</h3>
-            <p className="se-modal-desc" style={{ fontFamily: "'Sarabun', sans-serif" }}>กรุณากรอกชื่อตอนนิยายที่ต้องการสร้างเพื่อเริ่มต้นเขียนฉากย่อย</p>
+            <p className="se-modal-desc" style={{ fontFamily: "'Sarabun', sans-serif" }}>กรอกชื่อตอนนิยายที่ต้องการสร้างเพื่อเริ่มต้นเขียนฉากย่อย</p>
             
             <div style={{ width: "100%", margin: "16px 0 20px 0", textAlign: "left" }}>
               <label style={{ display: "block", marginBottom: "6px", fontSize: "13px", fontWeight: "700", color: "#475569" }}>ชื่อตอน</label>
@@ -3451,6 +3784,7 @@ const ChapterManagerPage = ({ onNavigate, novelId }) => {
       <AppealModal
         isOpen={isAppealModalOpen}
         isSubmitting={isSubmittingAppeal}
+        hasPendingAppeal={hasPendingAppeal || novel?.appeal_status === "appeal_pending" || novel?.has_pending_appeal}
         novel={novel}
         onSubmit={handleSubmitAppeal}
         onCancel={handleCloseAppealModal}

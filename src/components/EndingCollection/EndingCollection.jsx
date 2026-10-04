@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
+import { GitFork, ArrowLeft } from "lucide-react";
 import "./EndingCollection.css";
 
 const endingTypeMeta = {
   good:    { label: "Good Ending",   icon: "🌸", className: "good" },
-  bad:     { label: "Bad Ending",    icon: "💀", className: "bad" },
+  bad:     { label: "Bad Ending",    icon: "🥀", className: "bad" },
   true:    { label: "True Ending",   icon: "👑", className: "true" },
-  secret:  { label: "Secret Ending", icon: "🌙", className: "secret" },
+  secret:  { label: "Secret Ending", icon: "🔮", className: "secret" },
   unknown: { label: "Ending",        icon: "📖", className: "unknown" },
 };
 
@@ -225,14 +226,16 @@ export default function EndingCollection({ isOpen, endings, onClose, onViewStory
                       className="ending-detail-popup__button ending-detail-popup__button--primary"
                       onClick={() => onViewStoryMap?.(selected.scene_id || selected.id)}
                     >
-                      🗺 แผนผังการอ่าน
+                      <GitFork size={16} style={{ marginRight: 6 }} />
+                      แผนผังการอ่าน
                     </button>
                     <button
                       type="button"
                       className="ending-detail-popup__button ending-detail-popup__button--secondary"
                       onClick={() => setSelected(null)}
                     >
-                      ← กลับคลัง
+                      <ArrowLeft size={16} style={{ marginRight: 6 }} />
+                      กลับคลัง
                     </button>
                   </div>
                 </div>

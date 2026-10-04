@@ -1,8 +1,9 @@
+// ⚠️ รอการแก้ไขโค้ดเรื่อง Backend PUT /novels/:id ล้างสถานะการถูกระงับ (suspended) เมื่อผู้เขียนแก้ไขรูปปกหรือข้อมูลนิยาย
 import React, { useState, useEffect, useCallback } from "react";
 import "./WriterDashboardPage.css";
-import { getNovelStatusInfo } from "../../../utils/novelStatus";
+import { getNovelStatusInfo, registerBannedNovel, cleanBanReason, extractBanDetails, getBannedRegistry, getCardBanReason } from "../../../utils/novelStatus";
 import LoadingScreen from "../../../components/LoadingScreen/LoadingScreen";
-import { ShieldAlert, X, Layers, FileText, Pencil, BarChart2 } from "lucide-react";
+import { ShieldAlert, X, Layers, FileText, Pencil, BarChart2, Library, Book, Heart, Eye, Bookmark } from "lucide-react";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
 
@@ -22,15 +23,15 @@ const formatCoverUrl = (url) => {
 };
 
 const STAT_CARDS = [
-  { key: "totalNovels", label: "นิยายทั้งหมด", icon: "📚", colorClass: "scard--pink" },
-  { key: "totalLikes", label: "จำนวนการกดถูกใจ", icon: "💖", colorClass: "scard--purple" },
-  { key: "totalViews", label: "ยอดเข้าชมทั้งหมด", icon: "📈", colorClass: "scard--blue" },
-  { key: "totalBookmarks", label: "จำนวนเพิ่มเข้าชั้น", icon: "📥", colorClass: "scard--green" },
+  { key: "totalNovels", label: "นิยายทั้งหมด", icon: <Book size={24} strokeWidth={2.2} />, colorClass: "scard--pink" },
+  { key: "totalLikes", label: "จำนวนการกดถูกใจ", icon: <Heart size={24} strokeWidth={2.2} />, colorClass: "scard--purple" },
+  { key: "totalViews", label: "ยอดเข้าชมทั้งหมด", icon: <Eye size={24} strokeWidth={2.2} />, colorClass: "scard--blue" },
+  { key: "totalBookmarks", label: "จำนวนเพิ่มเข้าชั้น", icon: <Bookmark size={24} strokeWidth={2.2} />, colorClass: "scard--green" },
 ];
 
 const isSuspendedNovel = (novel) => {
-  const status = (novel?.status || novel?.Status || "").toLowerCase();
-  return status === "banned" || status === "suspended" || status === "ระงับ" || novel?.is_banned === true || novel?.isBanned === true;
+  if (!novel) return false;
+  return getNovelStatusInfo(novel).isBanned;
 };
 
 const WriterDashboardPage = ({ onNavigate, onSelectNovel }) => {
@@ -83,6 +84,10 @@ const WriterDashboardPage = ({ onNavigate, onSelectNovel }) => {
 
       if (Array.isArray(fetchedNovels)) {
         fetchedNovels.forEach(novel => {
+          const statusInfo = getNovelStatusInfo(novel);
+          if (statusInfo.isBanned) {
+            registerBannedNovel(novel.id || novel.novel_id, novel);
+          }
           calculatedViews += novel.total_views ?? novel.view_count ?? novel.stats?.views ?? novel.views ?? 0;
           calculatedLikes += novel.total_likes ?? novel.like_count ?? novel.stats?.likes ?? novel.likes ?? 0;
           calculatedBookmarks += novel.total_bookmarks ?? novel.bookmark_count ?? novel.bookshelf_count ?? novel.stats?.bookmarks ?? novel.bookmarks ?? 0;
@@ -255,25 +260,47 @@ const WriterDashboardPage = ({ onNavigate, onSelectNovel }) => {
 
       <div className="wdb__grid">
         {filteredNovels.length > 0 ? (
-          filteredNovels.map((novel) => {
-            const id = novel.id || novel.novel_id;
-            return (
-              <NovelCard
-                key={id}
-                novel={novel}
-                onEdit={() => handleEdit(novel)}
-                onTree={() => handleTree(novel)}
-                onAnalytics={() => handleAnalytics(novel)}
-                onDelete={() => handleDeleteNovel(id)}
-              />
-            );
-          })
+          <>
+            {filteredNovels.map((novel) => {
+              const id = novel.id || novel.novel_id;
+              return (
+                <NovelCard
+                  key={id}
+                  novel={novel}
+                  onEdit={() => handleEdit(novel)}
+                  onTree={() => handleTree(novel)}
+                  onAnalytics={() => handleAnalytics(novel)}
+                  onDelete={() => handleDeleteNovel(id)}
+                />
+              );
+            })}
+            {!searchQuery && (
+              <button className="wdb__empty-card" onClick={() => onNavigate("create-novel")} aria-label="สร้างนิยายใหม่">
+                <span className="wdb__empty-icon">✦</span>
+                <span className="wdb__empty-label">สร้างนิยายใหม่</span>
+                <span className="wdb__empty-sub">เริ่มเรื่องราวใหม่ของคุณ</span>
+              </button>
+            )}
+          </>
         ) : (
           novels.length === 0 && !searchQuery ? (
-            <div className="wdb__empty-search" style={{ gridColumn: "1 / -1", textAlign: "center", padding: "40px 20px", color: "var(--gray-500)", display: "flex", flexDirection: "column", alignItems: "center", gap: "8px" }}>
-              <span style={{ fontSize: "2rem" }}>📚</span>
-              <strong style={{ fontSize: "1.1rem", color: "var(--gray-800)", fontFamily: "'Sarabun', sans-serif" }}>ยังไม่มีนิยาย</strong>
-              <span style={{ fontSize: "0.9rem", color: "var(--gray-500)", fontFamily: "'Sarabun', sans-serif" }}>เริ่มสร้างนิยายเรื่องแรกของคุณได้เลย</span>
+            <div className="wdb__empty-container" style={{ gridColumn: "1 / -1" }}>
+              <div className="wdb__empty-icon-box">
+                <Library size={38} strokeWidth={2.2} className="wdb__empty-icon-svg" />
+              </div>
+              <h3 className="wdb__empty-title">ยังไม่มีนิยาย</h3>
+              <p className="wdb__empty-sub">เริ่มสร้างนิยายเรื่องแรกของคุณได้เลย</p>
+              <button 
+                type="button" 
+                className="wdb__empty-create-btn" 
+                onClick={() => onNavigate("create-novel")}
+                aria-label="สร้างนิยายใหม่"
+              >
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                  <path d="M7 1v12M1 7h12" stroke="white" strokeWidth="2" strokeLinecap="round"/>
+                </svg>
+                <span>สร้างนิยายใหม่</span>
+              </button>
             </div>
           ) : (
             <div className="wdb__empty-search" style={{ gridColumn: "1 / -1", textAlign: "center", padding: "40px 20px", color: "var(--gray-500)", display: "flex", flexDirection: "column", alignItems: "center", gap: "8px" }}>
@@ -282,14 +309,6 @@ const WriterDashboardPage = ({ onNavigate, onSelectNovel }) => {
               <span style={{ fontSize: "0.9rem", color: "var(--gray-500)", fontFamily: "'Sarabun', sans-serif" }}>กรุณาลองระบุคำค้นหาใหม่อีกครั้ง</span>
             </div>
           )
-        )}
-
-        {!searchQuery && (
-          <button className="wdb__empty-card" onClick={() => onNavigate("create-novel")} aria-label="สร้างนิยายใหม่">
-            <span className="wdb__empty-icon">✦</span>
-            <span className="wdb__empty-label">สร้างนิยายใหม่</span>
-            <span className="wdb__empty-sub">เริ่มเรื่องราวใหม่ของคุณ</span>
-          </button>
         )}
       </div>
 
@@ -317,8 +336,18 @@ const WriterDashboardPage = ({ onNavigate, onSelectNovel }) => {
                   <div className="wdb-suspended-item__info">
                     <strong className="wdb-suspended-item__title">{sn.title || sn.Title}</strong>
                     <span className="wdb-suspended-item__reason">
-                      สาเหตุ: {sn.ban_reason || sn.banReason || sn.reason || "ละเมิดลิขสิทธิ์ / นำผลงานผู้อื่นมาลง"}
+                      สาเหตุการระงับ: {cleanBanReason(sn.ban_reason || sn.banReason || sn.reason)}
                     </span>
+                    {(() => {
+                      const regData = getBannedRegistry()[String(sn.id || sn.novel_id)] || {};
+                      const adminDetails = extractBanDetails(sn.ban_reason || sn.banReason || sn.reason, sn.ban_details || sn.banDetails || sn.details || regData.details);
+                      if (!adminDetails) return null;
+                      return (
+                        <span className="wdb-suspended-item__details" style={{ display: "block", marginTop: "3px", color: "#64748b", fontSize: "12.5px" }}>
+                          <strong>เหตุผล/รายละเอียดเพิ่มเติมจากแอดมิน:</strong> {adminDetails}
+                        </span>
+                      );
+                    })()}
                   </div>
                   <button 
                     type="button" 
@@ -346,10 +375,9 @@ const NovelCard = ({ novel, onEdit, onTree, onAnalytics, onDelete }) => {
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
 
   const title = novel.title || "";
-  const coverImage = novel.cover_image || novel.coverImage;
-  const isSuspended = novel.status === "banned" || novel.status === "suspended";
-  
+  const coverImage = novel.cover_image || novel.coverImage || novel.cover_url || novel.coverUrl || novel.cover;
   const statusInfo = getNovelStatusInfo(novel);
+  const isSuspended = statusInfo.isBanned;
   const statusVariant = statusInfo.isCompleted ? "completed" : statusInfo.isPublished ? "published" : "draft";
   const status = statusVariant;
   
@@ -461,23 +489,31 @@ const NovelCard = ({ novel, onEdit, onTree, onAnalytics, onDelete }) => {
         </div>
 
         {isSuspended ? (
-          <div className="nvc__banned-actions">
-            <div 
-              className="nvc__banned-reason-box" 
-              title={`สาเหตุ: ${novel.ban_reason || novel.banReason || novel.reason || "ละเมิดลิขสิทธิ์ / นำผลงานผู้อื่นมาลง"}`}
-            >
-              <span className="nvc__banned-reason-text">
-                ⚠️ สาเหตุ: {novel.ban_reason || novel.banReason || novel.reason || "ละเมิดลิขสิทธิ์ / นำผลงานผู้อื่นมาลง"}
-              </span>
-            </div>
-            <button 
-              type="button" 
-              className="nvc__banned-appeal-btn" 
-              onClick={(e) => { e.stopPropagation(); onEdit(); }}
-            >
-              ยื่นคำขอปลดระงับ <span>→</span>
-            </button>
-          </div>
+          (() => {
+            const regData = getBannedRegistry()[String(novel.id || novel.novel_id)] || {};
+            const rawReason = novel.ban_reason || novel.banReason || novel.reason || regData.reason;
+            const explicitDetails = novel.ban_details || novel.banDetails || novel.details || regData.details;
+            const cardReason = getCardBanReason(rawReason, explicitDetails);
+            return (
+              <div className="nvc__banned-actions">
+                <div 
+                  className="nvc__banned-reason-box" 
+                  title={`สาเหตุ: ${cardReason}`}
+                >
+                  <span className="nvc__banned-reason-text">
+                    ⚠️ สาเหตุ: {cardReason}
+                  </span>
+                </div>
+                <button 
+                  type="button" 
+                  className="nvc__banned-appeal-btn" 
+                  onClick={(e) => { e.stopPropagation(); onEdit(); }}
+                >
+                  ยื่นคำขอปลดระงับ <span>→</span>
+                </button>
+              </div>
+            );
+          })()
         ) : (
           <div className="nvc__actions">
             <button className="nvc__btn nvc__btn--edit" onClick={(e) => { e.stopPropagation(); onEdit(); }}>

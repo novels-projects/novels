@@ -5,6 +5,8 @@ import "./EndingUnlockedModal.css";
 export const ENDING_DEFINITIONS = {
   good: {
     key: "good",
+    typeLabelEN: "GOOD ENDING",
+    typeLabelTH: "จบแบบสมหวัง",
     typeLabel: "GOOD ENDING",
     emoji: "🌸",
     badgeBg: "#fce7f3",
@@ -17,18 +19,22 @@ export const ENDING_DEFINITIONS = {
   },
   bad: {
     key: "bad",
+    typeLabelEN: "BAD ENDING",
+    typeLabelTH: "จบแบบเศร้า",
     typeLabel: "BAD ENDING",
-    emoji: "💀",
+    emoji: "🥀",
     badgeBg: "#f1f5f9",
     badgeColor: "#475569",
     accentColor: "#334155",
-    cardBorder: "#e2e8f0",
+    cardBorder: "#cbd5e1",
     cardBg: "#f8fafc",
-    defaultTitle: "ความมืดนิรันดร์",
-    defaultDesc: "โชคชะตานำพาไปสู่บทสรุปอันโศกเศร้าเกินกว่าจะย้อนคืน",
+    defaultTitle: "บทสรุปอันโศกเศร้า",
+    defaultDesc: "บางเส้นทางไม่ได้มีจุดสิ้นสุดที่สวยงาม แต่มันก็เป็นส่วนหนึ่งของเรื่องราวที่สมบูรณ์",
   },
   true: {
     key: "true",
+    typeLabelEN: "TRUE ENDING",
+    typeLabelTH: "ฉากจบแท้จริง",
     typeLabel: "TRUE ENDING",
     emoji: "👑",
     badgeBg: "#fef3c7",
@@ -41,6 +47,8 @@ export const ENDING_DEFINITIONS = {
   },
   secret: {
     key: "secret",
+    typeLabelEN: "SECRET ENDING",
+    typeLabelTH: "ฉากจบลับ",
     typeLabel: "SECRET ENDING",
     emoji: "🔮",
     badgeBg: "#f3e8ff",
@@ -48,7 +56,7 @@ export const ENDING_DEFINITIONS = {
     accentColor: "#7c3aed",
     cardBorder: "#ddd6fe",
     cardBg: "#faf5ff",
-    defaultTitle: "ฉากจบลับ",
+    defaultTitle: "ฉากจบลับซ่อนเร้น",
     defaultDesc: "เส้นทางลับซ่อนเร้นที่น้อยคนนักจะได้ค้นพบ",
   },
 };
@@ -96,6 +104,7 @@ export default function EndingUnlockedModal({
   onRestartReading,
 }) {
   const [isNewUnlock, setIsNewUnlock] = useState(false);
+  const [storageTick, setStorageTick] = useState(0);
   const closeButtonRef = useRef(null);
 
   useEffect(() => {
@@ -109,13 +118,22 @@ export default function EndingUnlockedModal({
     return () => document.removeEventListener("keydown", handleModalKeyDown);
   }, [isOpen, onClose]);
 
-  // ดึงประเภทฉากจบปัจจุบัน (good | bad | true | secret)
-  const rawType = (
-    currentScene?.ending_type ||
-    currentScene?.endingType ||
-    currentScene?.type ||
-    "true"
-  ).toLowerCase();
+  // ดึงประเภทฉากจบปัจจุบัน (good | bad | true | secret) โดยไม่สับสนกับ type = "ending"
+  const rawType = (() => {
+    if (!currentScene) return "true";
+    const candidate = (
+      currentScene.ending_type ||
+      currentScene.endingType ||
+      currentScene.ending_category ||
+      currentScene.endingCategory ||
+      ""
+    ).toString().toLowerCase();
+
+    if (["good", "bad", "true", "secret"].includes(candidate)) {
+      return candidate;
+    }
+    return "true";
+  })();
 
   const currentTheme = ENDING_DEFINITIONS[rawType] || ENDING_DEFINITIONS.true;
 
@@ -161,6 +179,7 @@ export default function EndingUnlockedModal({
         };
         localStorage.setItem(detailsKey, JSON.stringify(savedDetails));
       }
+      setStorageTick((t) => t + 1);
     } catch {
       console.warn("Failed tracking ending history");
       setIsNewUnlock(false);
@@ -188,6 +207,7 @@ export default function EndingUnlockedModal({
       const matchingEnding = allEndingsArr.find((item) => {
         const itemType = (
           item?.ending_type ||
+          item?.endingType ||
           item?.type ||
           item?.scene?.ending_type ||
           item?.scene?.type ||
@@ -230,7 +250,7 @@ export default function EndingUnlockedModal({
         title: resolvedTitle,
       };
     });
-  }, [allNovelEndings, rawType, currentScene, isNewUnlock, novelId]);
+  }, [allNovelEndings, rawType, currentScene, isNewUnlock, novelId, storageTick]);
 
   // คำนวณจำนวนฉากจบที่ปลดล็อกแล้ว
   const unlockedCount = endingSlots.filter((s) => s.isUnlocked).length;
@@ -291,6 +311,7 @@ export default function EndingUnlockedModal({
                       borderColor: slot.def.cardBorder,
                       backgroundColor: slot.def.cardBg,
                     }}
+                    title={slot.title}
                   >
                     <div className="eum-slot-left">
                       <span className="eum-slot-emoji">{slot.def.emoji}</span>
@@ -298,7 +319,7 @@ export default function EndingUnlockedModal({
                         <span className="eum-slot-type" style={{ color: slot.def.accentColor }}>
                           {slot.def.typeLabel}
                         </span>
-                        <span className="eum-slot-title">{slot.title}</span>
+                        <span className="eum-slot-title" title={slot.title}>{slot.title}</span>
                       </div>
                     </div>
 
@@ -311,7 +332,7 @@ export default function EndingUnlockedModal({
 
               // Locked Slot
               return (
-                <div key={slot.key} className="eum-slot eum-slot--locked">
+                <div key={slot.key} className="eum-slot eum-slot--locked" title={slot.def.typeLabel}>
                   <div className="eum-slot-left">
                     <span className="eum-slot-emoji eum-slot-emoji--locked">🔒</span>
                     <div className="eum-slot-info">

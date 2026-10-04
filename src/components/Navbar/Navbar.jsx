@@ -108,6 +108,13 @@ const Navbar = () => {
         }
     };
 
+    // Extract novel ID from URL path if present (e.g. /writer/15/chapters -> "15")
+    const urlNovelMatch = location.pathname.match(/\/writer\/([^/]+)/);
+    const urlNovelId = urlNovelMatch && urlNovelMatch[1] !== "dashboard" && urlNovelMatch[1] !== "profile" ? urlNovelMatch[1] : null;
+
+    const activeNovelId = urlNovelId || (selectedNovel ? String(selectedNovel.id || selectedNovel.novel_id) : null);
+    const hasActiveNovel = Boolean(activeNovelId);
+
     useEffect(() => {
         if (isWriterMode) fetchNovels();
     }, [isWriterMode]);
@@ -128,6 +135,45 @@ const Navbar = () => {
             window.removeEventListener("novel-selected", syncSelectedNovel);
         };
     }, []);
+
+    // Auto-sync selectedNovel with URL novelId if visiting a specific novel page directly
+    useEffect(() => {
+        if (!urlNovelId) return;
+
+        const currentId = selectedNovel ? String(selectedNovel.id || selectedNovel.novel_id) : null;
+        if (currentId === String(urlNovelId)) return;
+
+        const found = novels.find((n) => String(n.id || n.novel_id) === String(urlNovelId));
+        if (found) {
+            setSelectedNovel(found);
+            try {
+                localStorage.setItem("selectedNovel", JSON.stringify(found));
+                window.dispatchEvent(new Event("storage"));
+            } catch (e) {}
+            return;
+        }
+
+        const token = localStorage.getItem("token");
+        const headers = token ? { Authorization: `Bearer ${token}` } : {};
+        fetch(`${API_BASE_URL}/novels/${urlNovelId}`, { headers })
+            .then((res) => (res.ok ? res.json() : null))
+            .then((data) => {
+                if (!data) return;
+                const nData = data.novel || data.data?.novel || data.data || data;
+                const novelObj = {
+                    id: nData.novel_id || nData.id || urlNovelId,
+                    novel_id: nData.novel_id || nData.id || urlNovelId,
+                    title: nData.title || nData.Title || "ไม่ทราบชื่อเรื่อง",
+                    cover_image: nData.cover_image || nData.coverImage || null,
+                };
+                setSelectedNovel(novelObj);
+                try {
+                    localStorage.setItem("selectedNovel", JSON.stringify(novelObj));
+                    window.dispatchEvent(new Event("storage"));
+                } catch (e) {}
+            })
+            .catch((err) => console.warn("Auto-sync novel failed:", err));
+    }, [urlNovelId, novels, selectedNovel]);
 
     // ── click-outside ──────────────────────────────────────────────
     useEffect(() => {
@@ -223,11 +269,12 @@ const Navbar = () => {
     };
 
     const handleNovelMenu = async (target) => {
-        if (!selectedNovel) {
+        const targetId = activeNovelId || (selectedNovel ? (selectedNovel.id || selectedNovel.novel_id) : null);
+        if (!targetId) {
             openNovelPopup(target);
             return;
         }
-        navigateToNovelPage(selectedNovel.id || selectedNovel.novel_id, target);
+        navigateToNovelPage(targetId, target);
     };
 
     const getCurrentNovelSection = () => {
@@ -320,7 +367,7 @@ const Navbar = () => {
                                     </Link>
                                 </li>
 
-                                {selectedNovel && (
+                                {hasActiveNovel && (
                                     <>
                                         <li className="nav-item nav-item-divider-container">
                                             <span className="nav-menu-divider"></span>
@@ -632,7 +679,8 @@ const Navbar = () => {
                                                         navigate("/writer/profile");
                                                     }}
                                                 >
-                                                    👤 โปรไฟล์ของฉัน
+                                                    <User size={16} />
+                                                    <span>โปรไฟล์ของฉัน</span>
                                                 </button>
                                             )}
 
@@ -644,7 +692,8 @@ const Navbar = () => {
                                                     navigate("/settings");
                                                 }}
                                             >
-                                                ⚙️ ตั้งค่า
+                                                <Settings size={16} />
+                                                <span>ตั้งค่า</span>
                                             </button>
 
                                             <hr className="nav-dropdown__divider" />
@@ -653,7 +702,8 @@ const Navbar = () => {
                                                 className="nav-dropdown__logout-btn"
                                                 onClick={() => { setIsDropdownOpen(false); setShowLogoutModal(true); }}
                                             >
-                                                🚪 ออกจากระบบ
+                                                <LogOut size={16} />
+                                                <span>ออกจากระบบ</span>
                                             </button>
                                         </div>
                                     )}
@@ -772,7 +822,7 @@ const Navbar = () => {
                                     <span>แดชบอร์ด</span>
                                 </button>
 
-                                {selectedNovel && (
+                                {hasActiveNovel && (
                                     <>
                                         <button
                                             type="button"
@@ -1018,10 +1068,10 @@ const Navbar = () => {
                         <div className="nav-drawer__footer-guest">
                             <div className="nav-drawer__footer-user">
                                 <div className="nav-drawer__footer-avatar">
-                                    <span>👤</span>
+                                    <User size={20} color="#64748b" />
                                 </div>
                                 <div className="nav-drawer__footer-details">
-                                    <span className="nav-drawer__footer-name">ผู้มาเยือน</span>
+                                    <span className="nav-drawer__footer-name">ผู้เยี่ยมชม</span>
                                     <span className="nav-drawer__footer-role">ยินดีต้อนรับสู่ StoryVerse</span>
                                 </div>
                             </div>
@@ -1096,29 +1146,30 @@ const Navbar = () => {
             {showLogoutModal && ReactDOM.createPortal(
                 <div style={{
                     position: "fixed", top: 0, left: 0, width: "100vw", height: "100vh",
-                    backgroundColor: "rgba(17, 24, 39, 0.45)",
+                    backgroundColor: "rgba(15, 23, 42, 0.45)",
                     backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)",
                     display: "flex", justifyContent: "center", alignItems: "center",
                     zIndex: 999999, padding: "20px",
                 }}>
                     <div style={{
-                        background: "#ffffff", width: "100%", maxWidth: "400px",
+                        background: "#ffffff", width: "100%", maxWidth: "350px",
                         borderRadius: "24px",
-                        boxShadow: "0 20px 50px rgba(0,0,0,0.18), 0 4px 12px rgba(0,0,0,0.08)",
+                        boxShadow: "0 20px 40px -15px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(0, 0, 0, 0.04)",
                         padding: "28px 24px 24px", textAlign: "center",
                         display: "flex", flexDirection: "column", alignItems: "center",
                     }}>
                         <div style={{
-                            width: "60px", height: "60px", borderRadius: "50%",
-                            background: "#fff1f2", color: "#e11d48",
+                            width: "60px", height: "60px", borderRadius: "18px",
+                            background: "#FFF0F6", border: "1px solid #FCE7F3",
                             display: "flex", alignItems: "center", justifyContent: "center",
-                            fontSize: "28px", marginBottom: "16px",
-                            boxShadow: "0 4px 12px rgba(225,29,72,0.15)",
-                        }}>🚪</div>
-                        <h3 style={{ fontSize: "20px", fontWeight: 800, color: "#1e293b", margin: "0 0 8px" }}>
+                            marginBottom: "16px",
+                        }}>
+                            <LogOut size={26} color="#E91E8C" strokeWidth={2.2} />
+                        </div>
+                        <h3 style={{ fontSize: "19px", fontWeight: 800, color: "#0F172A", margin: "0 0 8px" }}>
                             ยืนยันการออกจากระบบ
                         </h3>
-                        <p style={{ fontSize: "14px", color: "#64748b", margin: "0 0 24px", lineHeight: 1.5 }}>
+                        <p style={{ fontSize: "13.5px", color: "#64748b", margin: "0 0 24px", lineHeight: 1.5 }}>
                             คุณต้องการออกจากระบบบัญชีผู้ใช้งานนี้ใช่หรือไม่?
                         </p>
                         <div style={{ display: "flex", gap: "12px", width: "100%" }}>
@@ -1126,9 +1177,10 @@ const Navbar = () => {
                                 type="button"
                                 onClick={() => setShowLogoutModal(false)}
                                 style={{
-                                    flex: 1, padding: "11px", borderRadius: "12px",
-                                    border: "1.5px solid #e2e8f0", background: "#ffffff",
-                                    color: "#475569", fontSize: "14px", fontWeight: 700, cursor: "pointer",
+                                    flex: 1, padding: "11px 16px", borderRadius: "14px",
+                                    border: "1.5px solid #F1F5F9", background: "#ffffff",
+                                    color: "#1E293B", fontSize: "14px", fontWeight: 700, cursor: "pointer",
+                                    transition: "all 0.2s ease",
                                 }}
                             >
                                 ยกเลิก
@@ -1137,11 +1189,12 @@ const Navbar = () => {
                                 type="button"
                                 onClick={(e) => { setShowLogoutModal(false); handleLogout(e); }}
                                 style={{
-                                    flex: 1, padding: "11px", borderRadius: "12px",
+                                    flex: 1.1, padding: "11px 16px", borderRadius: "14px",
                                     border: "none",
-                                    background: "linear-gradient(135deg, #e11d48 0%, #be123c 100%)",
+                                    background: "#E91E8C",
                                     color: "#ffffff", fontSize: "14px", fontWeight: 700,
-                                    cursor: "pointer", boxShadow: "0 4px 14px rgba(225,29,72,0.3)",
+                                    cursor: "pointer", boxShadow: "0 4px 14px rgba(233, 30, 140, 0.35)",
+                                    transition: "all 0.2s ease",
                                 }}
                             >
                                 ยืนยันออกจากระบบ

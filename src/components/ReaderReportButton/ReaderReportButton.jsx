@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Flag, X, Check, Loader2 } from "lucide-react";
+import { Flag, X, Check, Loader2, AlertTriangle } from "lucide-react";
 import "./ReaderReportButton.css";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
@@ -9,11 +9,27 @@ const REASONS = [
   { id: "inappropriate", label: "เนื้อหารุนแรง / ลามกเกินไป" },
   { id: "spam", label: "สแปมหรือโฆษณาแอบแฝง" },
   { id: "copyright", label: "ละเมิดลิขสิทธิ์ / นำผลงานผู้อื่นมาลง" },
-  { id: "other", label: "อื่นๆ (โปรดระบุด้านล่าง)" },
+  { id: "other", label: "อื่นๆ (โปรดระบุข้างล่าง)" },
 ];
 
-export default function ReaderReportButton({ novelId, novelTitle = "นิยายเรื่องนี้" }) {
-  const [open, setOpen] = useState(false);
+export default function ReaderReportButton({
+  novelId,
+  novelTitle = "นิยายเรื่องนี้",
+  isOpen,
+  onClose,
+  showRibbon = true,
+}) {
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = isOpen !== undefined ? isOpen : internalOpen;
+
+  const setOpen = (val) => {
+    if (isOpen !== undefined) {
+      if (!val && onClose) onClose();
+    } else {
+      setInternalOpen(val);
+    }
+  };
+
   const [reason, setReason] = useState("");
   const [description, setDescription] = useState("");
   const [status, setStatus] = useState("idle");
@@ -21,6 +37,7 @@ export default function ReaderReportButton({ novelId, novelTitle = "นิยา
 
   const resetAndClose = () => {
     setOpen(false);
+    if (onClose) onClose();
     setTimeout(() => {
       setReason("");
       setDescription("");
@@ -81,14 +98,16 @@ export default function ReaderReportButton({ novelId, novelTitle = "นิยา
   return (
     <>
       {/* Ribbon ปุ่มลอยข้างจอ */}
-      <button
-        className="report-ribbon-btn"
-        onClick={() => setOpen(true)}
-        aria-label="รายงานนิยาย"
-      >
-        <Flag size={18} strokeWidth={2.5} />
-        <span className="report-ribbon-text">รายงาน</span>
-      </button>
+      {showRibbon && (
+        <button
+          className="report-ribbon-btn"
+          onClick={() => setOpen(true)}
+          aria-label="รายงานนิยาย"
+        >
+          <Flag size={18} strokeWidth={2.5} />
+          <span className="report-ribbon-text">รายงาน</span>
+        </button>
+      )}
 
       {/* Pop-up Modal */}
       {open && (
@@ -99,11 +118,21 @@ export default function ReaderReportButton({ novelId, novelTitle = "นิยา
           <div className="report-modal-card">
             {/* Header */}
             <div className="report-modal-header">
-              <div>
-                <div className="report-modal-subtitle">รายงานเนื้อหา</div>
-                <div className="report-modal-title">{novelTitle}</div>
+              <div className="report-header-left">
+                <div className="report-header-icon-box">
+                  <Flag size={20} strokeWidth={2.2} />
+                </div>
+                <div className="report-header-text">
+                  <div className="report-modal-subtitle">รายงานเนื้อหา</div>
+                  <h3 className="report-modal-title">{novelTitle}</h3>
+                </div>
               </div>
-              <button className="report-close-btn" onClick={resetAndClose}>
+              <button
+                type="button"
+                className="report-close-btn"
+                onClick={resetAndClose}
+                aria-label="ปิด"
+              >
                 <X size={16} />
               </button>
             </div>
@@ -114,45 +143,45 @@ export default function ReaderReportButton({ novelId, novelTitle = "นิยา
                 <div className="report-success-icon">
                   <Check size={28} strokeWidth={3} />
                 </div>
-                <h3 style={{ margin: 0, color: "var(--text-dark)" }}>
+                <h3 style={{ margin: 0, color: "#0f172a", fontWeight: 800 }}>
                   ส่งรายงานเรียบร้อยแล้ว
                 </h3>
-                <p style={{ color: "var(--text-muted)", fontSize: "14px", marginTop: "8px" }}>
+                <p style={{ color: "#64748b", fontSize: "14px", marginTop: "8px", lineHeight: 1.5 }}>
                   ทีมงานจะรีบทำการตรวจสอบข้อมูลโดยเร็วที่สุดครับ
                 </p>
-                <button className="btn-submit" style={{ marginTop: "16px" }} onClick={resetAndClose}>
+                <button className="btn-submit" style={{ marginTop: "18px", width: "100%" }} onClick={resetAndClose}>
                   ตกลง
                 </button>
               </div>
             ) : (
               <div className="report-modal-body">
                 {errorMsg && (
-                  <div style={{ color: "#e53e3e", fontSize: "13px", marginBottom: "12px" }}>
-                    ⚠️ {errorMsg}
+                  <div className="report-error-msg">
+                    <AlertTriangle size={15} />
+                    <span>{errorMsg}</span>
                   </div>
                 )}
 
                 <label className="report-section-label">เลือกสาเหตุที่ต้องการรายงาน</label>
                 <div className="report-options-list">
-                  {REASONS.map((r) => (
-                    <label
-                      key={r.id}
-                      className={`report-option-item ${reason === r.id ? "selected" : ""}`}
-                    >
-                      <input
-                        type="radio"
-                        className="report-radio-input"
-                        name="report-reason"
-                        value={r.id}
-                        checked={reason === r.id}
-                        onChange={() => setReason(r.id)}
-                      />
-                      <span className="report-option-text">{r.label}</span>
-                    </label>
-                  ))}
+                  {REASONS.map((r) => {
+                    const isSelected = reason === r.id;
+                    return (
+                      <div
+                        key={r.id}
+                        className={`report-option-item ${isSelected ? "selected" : ""}`}
+                        onClick={() => setReason(r.id)}
+                      >
+                        <div className="report-radio-circle">
+                          {isSelected && <span className="report-radio-dot" />}
+                        </div>
+                        <span className="report-option-text">{r.label}</span>
+                      </div>
+                    );
+                  })}
                 </div>
 
-                <div style={{ marginTop: "16px" }}>
+                <div className="report-textarea-group">
                   <label className="report-section-label">รายละเอียดเพิ่มเติม (ระบุตอนที่พบปัญหา)</label>
                   <textarea
                     className="report-textarea"
@@ -163,15 +192,17 @@ export default function ReaderReportButton({ novelId, novelTitle = "นิยา
                   />
                 </div>
 
-                <div style={{ marginTop: "12px", fontSize: "12px", color: "#718096" }}>
-                  *การรายงานเท็จหรือกลั่นแกล้งผู้อื่น อาจส่งผลให้บัญชีของคุณถูกระงับการใช้งาน
+                <div className="report-warning-notice">
+                  <AlertTriangle size={15} className="report-warning-icon" />
+                  <span>การรายงานเท็จหรือกลั่นแกล้งผู้อื่น อาจส่งผลให้บัญชีของคุณถูกระงับการใช้งาน</span>
                 </div>
 
-                <div className="report-modal-actions" style={{ marginTop: "20px" }}>
-                  <button className="btn-cancel" onClick={resetAndClose}>
+                <div className="report-modal-actions">
+                  <button type="button" className="btn-cancel" onClick={resetAndClose}>
                     ยกเลิก
                   </button>
                   <button
+                    type="button"
                     className="btn-submit"
                     disabled={
                       !reason ||

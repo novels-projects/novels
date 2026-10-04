@@ -149,6 +149,7 @@
   font-size: 14px;
   font-weight: 700;
   transition: .18s;
+  white-space: nowrap;
 }
 
 .nav-item a:hover,
@@ -572,31 +573,40 @@
 /* ปุ่มลิงก์ในดรอปดาวน์ (โปรไฟล์/ตั้งค่า) — มาจาก Navbar.css เดิม */
 .nav-dropdown__link-btn {
   width: 100%;
-  padding: 8px 12px;
+  padding: 9px 12px;
   text-align: left;
   background: none;
   border: none;
   font-size: 0.9rem;
   color: #374151;
   cursor: pointer;
-  border-radius: 8px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  transition: background-color 0.15s ease, color 0.15s ease;
 }
 
-.nav-dropdown__link-btn:hover { background-color: #f3f4f6; }
+.nav-dropdown__link-btn:hover {
+  background-color: #f8fafc;
+  color: var(--pink-500);
+}
 
 .nav-dropdown__logout-btn {
   width: 100%;
   border: none;
   background: #fff1f2;
   color: #ef4444;
-  padding: 12px;
+  padding: 10px 12px;
   border-radius: 12px;
   cursor: pointer;
+  font-size: 0.9rem;
   font-weight: 700;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 10px;
   margin-top: 4px;
+  transition: background-color 0.15s ease;
 }
 
 .nav-dropdown__logout-btn:hover { background: #ffe1e1; }
@@ -1037,26 +1047,42 @@
    📱 Responsive Media Queries
    ══════════════════════════════════════════ */
 
-@media (max-width: 1200px) {
+@media (max-width: 1280px) {
   .nav-container {
-    gap: 16px;
-    padding: 0 20px;
+    gap: 12px;
+    padding: 0 16px;
   }
   .nav-menu {
-    gap: 16px;
+    gap: 12px;
+  }
+  .nav-item a,
+  .nav-menu-btn,
+  .nav-menu-btn--pink {
+    font-size: 13px;
+    white-space: nowrap;
+  }
+  .mode-toggle__btn {
+    padding: 6px 12px;
+    font-size: 12.5px;
+    white-space: nowrap;
   }
   .navbar__search {
-    width: 180px;
+    width: 165px;
+  }
+  .nav-switch-btn {
+    padding: 6px 12px;
+    font-size: 12px;
+    white-space: nowrap;
   }
   .selected-novel-btn {
-    padding: 0 12px;
+    padding: 0 10px;
   }
   .selected-title {
-    max-width: 130px;
+    max-width: 120px;
   }
 }
 
-@media (max-width: 991px) {
+@media (max-width: 1150px) {
   .nav-container {
     height: 72px;
     padding: 0 16px;

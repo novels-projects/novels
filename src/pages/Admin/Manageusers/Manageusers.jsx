@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { UserCheck, FileClock, Ban, Search, Filter, Edit, Trash2, Eye, Award, Loader2, AlertTriangle, ExternalLink } from 'lucide-react';
+import { UserCheck, FileClock, Ban, Search, Filter, Edit, Trash2, Eye, Award, Loader2, AlertTriangle, ExternalLink, ChevronLeft, ChevronRight, RotateCcw, Calendar, ArrowDown, ArrowUp } from 'lucide-react';
 import axios from 'axios';
 import './Manageusers.css';
 
@@ -12,10 +12,12 @@ const Manageusers = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [writerAppFilter, setWriterAppFilter] = useState("all");
+  const [dateSortOrder, setDateSortOrder] = useState("desc"); // 'desc' = ใหม่ไปเก่า, 'asc' = เก่าไปใหม่
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 8;
+  const [itemsPerPage, setItemsPerPage] = useState(10);
 
   // Modals state
   const [viewUserModal, setViewUserModal] = useState({ isOpen: false, user: null });
@@ -82,17 +84,28 @@ const Manageusers = () => {
 
   // 2. กรองและค้นหารายชื่อผู้ใช้
   const filteredUsers = useMemo(() => {
-    return users.filter(u => {
+    let list = users.filter(u => {
       const matchSearch = searchQuery.trim() === "" ||
         (u.username && u.username.toLowerCase().includes(searchQuery.toLowerCase())) ||
         (u.email && u.email.toLowerCase().includes(searchQuery.toLowerCase()));
 
       const matchRole = roleFilter === "all" || u.role === roleFilter;
       const matchStatus = statusFilter === "all" || u.status === statusFilter;
+      const matchWriterApp = writerAppFilter === "all" || u.writer_application_status === writerAppFilter;
 
-      return matchSearch && matchRole && matchStatus;
+      return matchSearch && matchRole && matchStatus && matchWriterApp;
     });
-  }, [users, searchQuery, roleFilter, statusFilter]);
+
+    if (dateSortOrder) {
+      list = [...list].sort((a, b) => {
+        const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
+        const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
+        return dateSortOrder === 'asc' ? timeA - timeB : timeB - timeA;
+      });
+    }
+
+    return list;
+  }, [users, searchQuery, roleFilter, statusFilter, writerAppFilter, dateSortOrder]);
 
   // 3. จัดการแบ่งหน้า
   const totalPages = Math.max(1, Math.ceil(filteredUsers.length / itemsPerPage));
@@ -103,7 +116,7 @@ const Manageusers = () => {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, roleFilter, statusFilter]);
+  }, [searchQuery, roleFilter, statusFilter, writerAppFilter, dateSortOrder]);
 
   // 3.1 ตัดเลขหน้าให้พอดี (แสดงหน้าแรก/หน้าสุดท้าย/หน้าใกล้ปัจจุบัน + จุดไข่ปลา)
   //     ป้องกันแถวปุ่มยาวเกินหน้าจอเมื่อมีผู้ใช้เยอะ
@@ -234,13 +247,16 @@ const Manageusers = () => {
           </svg>
         </header>
 
-        {/* 📊 การ์ดสถิติ — กดเพื่อกรองตารางด้านล่างได้เลย (เหมือนหน้า Reports / คำขอนักเขียน) */}
+        {/* 📊 การ์ดสถิติ — กดเพื่อกรองตารางด้านล่างได้เลย */}
         <section className="admin-stats-grid">
           <button
             type="button"
-            className={`admin-stat-card card-active ${statusFilter === "active" ? "admin-stat-card--selected" : ""}`}
-            onClick={() => setStatusFilter(statusFilter === "active" ? "all" : "active")}
-            aria-pressed={statusFilter === "active"}
+            className={`admin-stat-card card-active ${statusFilter === "active" && writerAppFilter === "all" ? "admin-stat-card--selected admin-stat-card--active" : ""}`}
+            onClick={() => {
+              setWriterAppFilter("all");
+              setStatusFilter(statusFilter === "active" ? "all" : "active");
+            }}
+            aria-pressed={statusFilter === "active" && writerAppFilter === "all"}
           >
             <div className="stat-card-icon bg-green-light">
               <UserCheck size={20} />
@@ -251,8 +267,16 @@ const Manageusers = () => {
             </div>
           </button>
 
-          {/* คำขอนักเขียนอนุมัติที่หน้า Writers เท่านั้น (ไม่ใช่กรองในหน้านี้) จึงเป็นลิงก์นำทาง ไม่ใช่ตัวกรอง */}
-          <a href="/admin/manage-users" className="admin-stat-card card-pending">
+          <button
+            type="button"
+            className={`admin-stat-card card-pending ${writerAppFilter === "pending" ? "admin-stat-card--selected admin-stat-card--active" : ""}`}
+            onClick={() => {
+              setStatusFilter("all");
+              setRoleFilter("all");
+              setWriterAppFilter(writerAppFilter === "pending" ? "all" : "pending");
+            }}
+            aria-pressed={writerAppFilter === "pending"}
+          >
             <div className="stat-card-icon bg-yellow-light">
               <FileClock size={20} />
             </div>
@@ -260,13 +284,16 @@ const Manageusers = () => {
               <span className="stat-card-title">คำขอนักเขียนรอตรวจสอบ</span>
               <span className="stat-card-number">{stats.pendingWriterApps.toLocaleString()}</span>
             </div>
-          </a>
+          </button>
 
           <button
             type="button"
-            className={`admin-stat-card card-suspended ${statusFilter === "suspended" ? "admin-stat-card--selected" : ""}`}
-            onClick={() => setStatusFilter(statusFilter === "suspended" ? "all" : "suspended")}
-            aria-pressed={statusFilter === "suspended"}
+            className={`admin-stat-card card-suspended ${statusFilter === "suspended" && writerAppFilter === "all" ? "admin-stat-card--selected admin-stat-card--active" : ""}`}
+            onClick={() => {
+              setWriterAppFilter("all");
+              setStatusFilter(statusFilter === "suspended" ? "all" : "suspended");
+            }}
+            aria-pressed={statusFilter === "suspended" && writerAppFilter === "all"}
           >
             <div className="stat-card-icon bg-red-light">
               <Ban size={20} />
@@ -276,49 +303,6 @@ const Manageusers = () => {
               <span className="stat-card-number">{stats.suspended.toLocaleString()}</span>
             </div>
           </button>
-        </section>
-
-        {/* 🔍 ค้นหา & ฟิลเตอร์กรอง */}
-        <section className="search-filter-section">
-          <div className="search-box-wrapper">
-            <Search className="search-icon" size={18} />
-            <input
-              type="text"
-              className="admin-search-input"
-              placeholder="ค้นหาชื่อผู้ใช้ , อีเมล..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-          </div>
-
-          <div className="filter-controls-group">
-            <div className="select-filter-wrapper">
-              <Filter className="select-filter-icon" size={14} />
-              <select
-                className="admin-filter-select"
-                value={roleFilter}
-                onChange={(e) => setRoleFilter(e.target.value)}
-              >
-                <option value="all">บทบาททั้งหมด</option>
-                <option value="reader">นักอ่าน</option>
-                <option value="writer">นักเขียน</option>
-                <option value="admin">ผู้ดูแลระบบ</option>
-              </select>
-            </div>
-
-            <div className="select-filter-wrapper">
-              <Filter className="select-filter-icon" size={14} />
-              <select
-                className="admin-filter-select"
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-              >
-                <option value="all">สถานะทั้งหมด</option>
-                <option value="active">ปกติ</option>
-                <option value="suspended">ระงับแล้ว</option>
-              </select>
-            </div>
-          </div>
         </section>
 
         {/* 📋 ตารางรายชื่อบัญชีผู้ใช้ */}
@@ -336,141 +320,246 @@ const Manageusers = () => {
               <button type="button" className="retry-btn" onClick={loadData}>ลองใหม่อีกครั้ง</button>
             </div>
           </div>
-        ) : filteredUsers.length === 0 ? (
-          <div className="admin-empty-state-panel">
-            <div className="empty-panel-icon">🔍</div>
-            <h3>ไม่พบผู้ใช้งานตรงกับเงื่อนไข</h3>
-            <p>กรุณาตรวจสอบการสะกดคำ หรือเปลี่ยนตัวกรองบทบาท/สถานะ</p>
-          </div>
         ) : (
           <div className="admin-table-container">
-            <table className="users-admin-table">
-              <thead>
-                <tr>
-                  <th>#</th>
-                  <th>ชื่อผู้ใช้</th>
-                  <th>อีเมล</th>
-                  <th>บทบาท</th>
-                  <th>สถานะบัญชี</th>
-                  <th>คำขอนักเขียน</th>
-                  <th>สมัครเมื่อ</th>
-                  <th className="text-center">จัดการ</th>
-                </tr>
-              </thead>
-              <tbody>
-                {paginatedUsers.map((user, idx) => {
-                  const itemIndex = (currentPage - 1) * itemsPerPage + idx + 1;
-                  const isSelf = currentUserId != null && String(user.id) === String(currentUserId);
-                  return (
-                    <tr key={user.id || idx}>
-                      <td className="row-num-col">{itemIndex}</td>
-                      <td className="row-username-col">
-                        {user.pic_profile ? (
-                          <img
-                            src={user.pic_profile}
-                            alt={user.username}
-                            className="user-avatar-img"
-                            onError={(e) => { e.target.style.display = "none"; e.target.nextSibling.style.display = "flex"; }}
-                          />
-                        ) : null}
-                        <div className="user-initial-avatar" style={user.pic_profile ? { display: "none" } : undefined}>
-                          {user.username ? user.username.charAt(0).toUpperCase() : "U"}
-                        </div>
-                        <span className="username-strong" title={user.username}>{user.username}</span>
-                        {isSelf && <span className="self-tag">คุณ</span>}
-                      </td>
-                      <td className="row-email-col" title={user.email}>{user.email}</td>
-                      <td>
-                        <span className={`role-badge role-${(user.role || 'reader').toLowerCase()}`}>
-                          {roleLabel(user.role)}
-                        </span>
-                      </td>
-                      <td>
-                        <span className={`status-badge status-${statusClass(user.status)}`}>
-                          {statusLabel(user.status)}
-                        </span>
-                      </td>
-                      <td>
-                        {user.writer_application_status === "pending" ? (
-                          <span className="status-badge status-pending">รอตรวจสอบ</span>
-                        ) : (
-                          <span className="cell-muted">-</span>
-                        )}
-                      </td>
-                      <td className="date-col">
-                        {user.created_at ? new Date(user.created_at).toLocaleDateString("th-TH") : "-"}
-                      </td>
-                      <td className="actions-cell">
-                        <button
-                          className="btn-icon-action btn-detail"
-                          onClick={() => setViewUserModal({ isOpen: true, user })}
-                          title="ดูข้อมูลรายละเอียด"
-                        >
-                          <Eye size={16} />
-                        </button>
+            {/* 🔍 Search Bar & Filters อยู่ภายใน Container เดียวกับ Table */}
+            {/* 🔍 Search Bar & Filters อยู่ภายใน Container เดียวกับ Table (ตรงตามรูปภาพที่ 1) */}
+            <div className="admin-table-top-bar">
+              <div className="search-box-wrapper">
+                <Search className="search-icon" size={16} />
+                <input
+                  type="text"
+                  className="admin-search-input"
+                  placeholder="ค้นหาชื่อผู้ใช้, อีเมล..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
 
-                        <button
-                          className="btn-icon-action btn-edit-user"
-                          onClick={() => setEditUserModal({ isOpen: true, user, username: user.username || "", role: user.role || "reader", status: user.status || "active", reason: "" })}
-                          title={isSelf ? "ไม่สามารถแก้ไขบัญชีของตัวเองได้" : "แก้ไขบัญชี"}
-                          disabled={isSelf}
-                        >
-                          <Edit size={16} />
-                        </button>
-
-                        <button
-                          className="btn-icon-action btn-delete-user"
-                          onClick={() => setDeleteConfirmModal({ isOpen: true, user })}
-                          title={isSelf ? "ไม่สามารถลบบัญชีของตัวเองได้" : "ลบบัญชีผู้ใช้"}
-                          disabled={isSelf}
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-
-            {/* ส่วนแบ่งหน้า Pagination */}
-            {totalPages > 1 && (
-              <div className="admin-pagination">
-                <button
-                  type="button"
-                  className="page-nav-arrow"
-                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                  disabled={currentPage === 1}
-                >
-                  &larr; ก่อนหน้า
-                </button>
-
-                <div className="page-nums-list">
-                  {pageItems.map((item) =>
-                    item.type === "ellipsis" ? (
-                      <span key={item.key} className="page-ellipsis">…</span>
-                    ) : (
-                      <button
-                        key={item.value}
-                        type="button"
-                        className={`page-num-btn ${currentPage === item.value ? "active" : ""}`}
-                        onClick={() => setCurrentPage(item.value)}
-                      >
-                        {item.value}
-                      </button>
-                    )
-                  )}
+              <div className="filter-controls-group">
+                <div className="select-filter-item">
+                  <span className="filter-label-text">บทบาท:</span>
+                  <div className="select-filter-wrapper">
+                    <select
+                      className="admin-filter-select"
+                      value={roleFilter}
+                      onChange={(e) => setRoleFilter(e.target.value)}
+                    >
+                      <option value="all">บทบาททั้งหมด</option>
+                      <option value="reader">นักอ่าน</option>
+                      <option value="writer">นักเขียน</option>
+                      <option value="admin">ผู้ดูแลระบบ</option>
+                    </select>
+                  </div>
                 </div>
 
-                <button
-                  type="button"
-                  className="page-nav-arrow"
-                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                  disabled={currentPage === totalPages}
-                >
-                  ถัดไป &rarr;
-                </button>
+                <div className="select-filter-item">
+                  <span className="filter-label-text">สถานะ:</span>
+                  <div className="select-filter-wrapper">
+                    <select
+                      className="admin-filter-select"
+                      value={statusFilter}
+                      onChange={(e) => setStatusFilter(e.target.value)}
+                    >
+                      <option value="all">สถานะทั้งหมด</option>
+                      <option value="active">ปกติ</option>
+                      <option value="suspended">ระงับแล้ว</option>
+                    </select>
+                  </div>
+                </div>
+
+                {(searchQuery.trim() !== "" || roleFilter !== "all" || statusFilter !== "all" || writerAppFilter !== "all" || dateSortOrder !== "desc") && (
+                  <button
+                    type="button"
+                    className="clear-filter-btn"
+                    onClick={() => {
+                      setSearchQuery("");
+                      setRoleFilter("all");
+                      setStatusFilter("all");
+                      setWriterAppFilter("all");
+                      setDateSortOrder("desc");
+                    }}
+                    title="ล้างตัวกรองทั้งหมด"
+                  >
+                    <RotateCcw size={13} />
+                    <span>ล้างตัวกรอง</span>
+                  </button>
+                )}
               </div>
+            </div>
+
+            {filteredUsers.length === 0 ? (
+              <div className="admin-empty-state-panel">
+                <div className="empty-panel-icon">🔍</div>
+                <h3>ไม่พบผู้ใช้งานตรงกับเงื่อนไข</h3>
+                <p>กรุณาตรวจสอบการสะกดคำ หรือเปลี่ยนตัวกรองบทบาท/สถานะ</p>
+              </div>
+            ) : (
+              <>
+                <div className="admin-table-scroll-wrapper">
+                  <table className="users-admin-table">
+                    <thead>
+                      <tr>
+                        <th>#</th>
+                        <th>ชื่อผู้ใช้</th>
+                        <th>อีเมล</th>
+                        <th>บทบาท</th>
+                        <th>สถานะบัญชี</th>
+                        <th>คำขอนักเขียน</th>
+                        <th>
+                          <div className="th-date-wrapper">
+                            <span>สมัครเมื่อ</span>
+                            <button
+                              type="button"
+                              className={`btn-date-sort ${dateSortOrder === 'asc' ? 'asc' : 'desc'}`}
+                              onClick={() => setDateSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')}
+                              title={dateSortOrder === 'desc' ? "เรียงจากใหม่อยู่บน (คลิกเพื่อสลับเป็นเก่าอยู่บน)" : "เรียงจากเก่าอยู่บน (คลิกเพื่อสลับเป็นใหม่อยู่บน)"}
+                            >
+                              <Calendar size={12} />
+                              {dateSortOrder === 'desc' ? <ArrowDown size={11} /> : <ArrowUp size={11} />}
+                            </button>
+                          </div>
+                        </th>
+                        <th className="text-center">จัดการ</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {paginatedUsers.map((user, idx) => {
+                        const itemIndex = (currentPage - 1) * itemsPerPage + idx + 1;
+                        const isSelf = currentUserId != null && String(user.id) === String(currentUserId);
+                        return (
+                          <tr key={user.id || idx}>
+                            <td className="row-num-col">{itemIndex}</td>
+                            <td className="row-username-col">
+                              {user.pic_profile ? (
+                                <img
+                                  src={user.pic_profile}
+                                  alt={user.username}
+                                  className="user-avatar-img"
+                                  onError={(e) => { e.target.style.display = "none"; e.target.nextSibling.style.display = "flex"; }}
+                                />
+                              ) : null}
+                              <div className="user-initial-avatar" style={user.pic_profile ? { display: "none" } : undefined}>
+                                {user.username ? user.username.charAt(0).toUpperCase() : "U"}
+                              </div>
+                              <span className="username-strong" title={user.username}>{user.username}</span>
+                              {isSelf && <span className="self-tag">คุณ</span>}
+                            </td>
+                            <td className="row-email-col" title={user.email}>{user.email}</td>
+                            <td>
+                              <span className={`role-badge role-${(user.role || 'reader').toLowerCase()}`}>
+                                {roleLabel(user.role)}
+                              </span>
+                            </td>
+                            <td>
+                              <span className={`status-badge status-${statusClass(user.status)}`}>
+                                <span className="status-dot"></span>
+                                {statusLabel(user.status)}
+                              </span>
+                            </td>
+                            <td>
+                              {user.writer_application_status === "pending" ? (
+                                <span className="status-badge status-pending">
+                                  <span className="status-dot"></span>
+                                  รอตรวจสอบ
+                                </span>
+                              ) : (
+                                <span className="cell-muted">-</span>
+                              )}
+                            </td>
+                            <td className="date-col">
+                              {user.created_at
+                                ? new Date(user.created_at).toLocaleDateString("th-TH", { day: 'numeric', month: 'short', year: 'numeric' })
+                                : "-"}
+                            </td>
+                            <td className="actions-cell text-center align-center">
+                              <div className="action-cell-content">
+                                <button
+                                  className="btn-icon-action btn-detail"
+                                  onClick={() => setViewUserModal({ isOpen: true, user })}
+                                  title="ดูข้อมูลรายละเอียด"
+                                >
+                                  <Eye size={15} />
+                                </button>
+
+                                <button
+                                  className="btn-icon-action btn-edit-user"
+                                  onClick={() => setEditUserModal({ isOpen: true, user, username: user.username || "", role: user.role || "reader", status: user.status || "active", reason: "" })}
+                                  title={isSelf ? "ไม่สามารถแก้ไขบัญชีของตัวเองได้" : "แก้ไขบัญชี"}
+                                  disabled={isSelf}
+                                >
+                                  <Edit size={15} />
+                                </button>
+
+                                <button
+                                  className="btn-icon-action btn-delete-user"
+                                  onClick={() => setDeleteConfirmModal({ isOpen: true, user })}
+                                  title={isSelf ? "ไม่สามารถลบบัญชีของตัวเองได้" : "ลบบัญชีผู้ใช้"}
+                                  disabled={isSelf}
+                                >
+                                  <Trash2 size={15} />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* ── Table Footer & Pagination (ตรงตามรูปภาพที่ 2) ── */}
+                <div className="admin-table-footer">
+                  <div className="admin-table-footer-left">
+                    <span className="admin-table-info-text">
+                      แสดง <strong>{filteredUsers.length === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1}–{Math.min(currentPage * itemsPerPage, filteredUsers.length)}</strong> จาก <strong>{filteredUsers.length}</strong> รายการ
+                    </span>
+
+                    <div className="admin-table-per-page">
+                      <span>แสดงต่อหน้า</span>
+                      <select
+                        className="admin-per-page-select"
+                        value={itemsPerPage}
+                        onChange={(e) => {
+                          setItemsPerPage(Number(e.target.value));
+                          setCurrentPage(1);
+                        }}
+                      >
+                        <option value={10}>10</option>
+                        <option value={20}>20</option>
+                        <option value={50}>50</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* 🎯 ปุ่มกดหน้าแบบในรูปภาพที่ 2 */}
+                  <div className="admin-pagination-img2">
+                    <button
+                      type="button"
+                      className="page-btn-box"
+                      onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                      disabled={currentPage === 1}
+                    >
+                      <ChevronLeft size={16} />
+                      <span>ก่อนหน้า</span>
+                    </button>
+
+                    <span className="page-indicator-text">
+                      หน้า <strong>{currentPage}</strong> จาก <strong>{totalPages}</strong>
+                    </span>
+
+                    <button
+                      type="button"
+                      className="page-btn-box"
+                      onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                      disabled={currentPage === totalPages}
+                    >
+                      <span>ถัดไป</span>
+                      <ChevronRight size={16} />
+                    </button>
+                  </div>
+                </div>
+              </>
             )}
           </div>
         )}
@@ -571,7 +660,7 @@ const Manageusers = () => {
                   );
                 })()}
                 <button type="button" className="admin-modal-btn cancel-btn" onClick={() => setViewUserModal({ isOpen: false, user: null })}>
-                  ปิดหน้าต่าง
+                  ปิด
                 </button>
               </div>
             </div>
@@ -783,32 +872,38 @@ const Manageusers = () => {
                   onClick={handleUpdateUser}
                   disabled={isUpdating}
                 >
-                  {isUpdating ? "กำลังบันทึก..." : "บันทึกการเปลี่ยนแปลง"}
+                  {isUpdating ? "กำลังบันทึก..." : "บันทึก"}
                 </button>
               </div>
             </div>
           </div>
         )}
 
-        {/* ── 4. Modal ยืนยันการลบผู้ใช้ ── */}
+        {/* ── 4. Modal ยืนยันการลบผู้ใช้ (ปรับให้กระชับและแยก Reader/Writer) ── */}
         {deleteConfirmModal.isOpen && deleteConfirmModal.user && (
           <div className="admin-modal-overlay" onClick={() => setDeleteConfirmModal({ isOpen: false, user: null })}>
-            <div className="admin-modal-content" onClick={e => e.stopPropagation()}>
+            <div className="admin-modal-content modal-content-sm modal-delete-compact" onClick={e => e.stopPropagation()}>
               <div className="modal-header-sec">
-                <h2>ยืนยันการลบบัญชีผู้ใช้งาน</h2>
+                <h2>ยืนยันการลบบัญชี</h2>
                 <button className="close-modal-x" onClick={() => setDeleteConfirmModal({ isOpen: false, user: null })}>×</button>
               </div>
 
-              <div className="modal-body-content">
-                <p className="delete-warning-text">
-                  คุณต้องการที่จะทำการลบบัญชีผู้ใช้งาน <strong className="delete-warning-username">"{deleteConfirmModal.user.username}"</strong> ออกจากระบบอย่างถาวรหรือไม่?
-                  <br />
-                  <span className="delete-warning-critical">⚠️ การดำเนินการนี้ไม่สามารถยกเลิกได้ในภายหลัง</span>
-                  <br />
-                  <span className="delete-warning-note">
-                    หมายเหตุ: ถ้าบัญชีนี้เป็นนักเขียนที่มีนิยายอยู่ในระบบ ระบบจะไม่อนุญาตให้ลบ กรุณาระงับบัญชีแทน
-                  </span>
+              <div className="modal-body-content modal-body-delete">
+                <p className="delete-confirm-question">
+                  ต้องการลบบัญชี “<span className="delete-warning-username">{deleteConfirmModal.user.username}</span>” อย่างถาวรหรือไม่?
                 </p>
+
+                <p className="delete-critical-warning">
+                  ⚠️ การลบบัญชีนี้ไม่สามารถยกเลิกภายหลังได้
+                </p>
+
+                {/* หมายเหตุสำหรับนักเขียน (แสดงเฉพาะนักเขียนเท่านั้น นักอ่านจะไม่เห็น) */}
+                {deleteConfirmModal.user.role === "writer" && (
+                  <div className="writer-delete-note-box">
+                    <span className="writer-note-title">หมายเหตุสำหรับนักเขียน</span>
+                    <p className="writer-note-text">นิยายที่สร้างไว้จะยังคงอยู่ในระบบตามเงื่อนไขของระบบ</p>
+                  </div>
+                )}
               </div>
 
               <div className="modal-footer-sec">

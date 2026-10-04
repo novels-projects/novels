@@ -3,15 +3,29 @@ import { useParams, useNavigate } from "react-router-dom";
 import ReactQuill from "react-quill-new";
 import "react-quill-new/dist/quill.snow.css";
 import DOMPurify from "dompurify";
+import {
+  Pencil,
+  Share2,
+  BookOpen,
+  Users,
+  Eye,
+  Bookmark,
+  Calendar,
+  Mail,
+  Link as LinkIcon,
+  Globe,
+  ExternalLink,
+  Heart
+} from "lucide-react";
 import FollowButton from "../../../components/FollowButton/FollowButton";
-import NovelCard from "../../../components/NovelCard/NovelCard";
+import GenreTag from "../../../components/GenreTag/GenreTag";
 import AdminModeBanner from "../../../components/AdminModeBanner/AdminModeBanner";
 import LoadingScreen from "../../../components/LoadingScreen/LoadingScreen";
 import "./WriterProfile.css";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
 
-// ฟังก์ชันแปลง Date เป็นแบบอ่านง่าย (เช่น "12 ม.ค. 2026")
+// ฟังก์ชันแปลง Date เป็นแบบอ่านง่าย (เช่น "4 ต.ค. 2569")
 function formatDate(dateString) {
   if (!dateString) return "";
   try {
@@ -39,9 +53,7 @@ const formatMinioUrl = (url) => {
  */
 function parseContactInfo(raw) {
   if (!raw) return {};
-
   if (typeof raw === "object" && !Array.isArray(raw)) return raw;
-
   if (typeof raw !== "string") return {};
 
   const s = raw.trim();
@@ -109,7 +121,6 @@ export default function WriterProfile() {
   };
   const isAdmin = checkIsAdmin();
 
-  // ดึง ID ผู้ใช้ปัจจุบันจาก LocalStorage
   const getLoggedInUser = () => {
     try {
       const userJson = localStorage.getItem("user");
@@ -132,8 +143,6 @@ export default function WriterProfile() {
 
       try {
         let targetWriterId = id;
-        // เก็บ writer_id ของ "ตัวเอง" ไว้ใช้เทียบความเป็นเจ้าของโปรไฟล์แบบแม่นยำ
-        // (แม่นกว่าการเทียบ user_id ที่ /writer/{id} อาจไม่ส่งมาด้วยเสมอไป)
         let myWriterId = null;
 
         if (token) {
@@ -146,12 +155,10 @@ export default function WriterProfile() {
           } catch (_) { }
         }
 
-        // ถ้าไม่มี id ใน URL (เจ้าของโปรไฟล์เปิดหน้า /profile เอง) ให้ใช้ writer_id ของตัวเอง
         if (!targetWriterId) {
           targetWriterId = myWriterId;
         }
 
-        // Fallback สุดท้ายถ้ายังไม่มี
         if (!targetWriterId) {
           targetWriterId = currentUser?.id || currentUser?.user_id;
         }
@@ -162,7 +169,6 @@ export default function WriterProfile() {
           return;
         }
 
-        // 🎯 1. ดึงรายละเอียดนักเขียนและสถิติจาก Backend (GET /writer/{id} - Single API Aggregation)
         const writerRes = await fetch(`${API_BASE_URL}/writer/${targetWriterId}`, { headers });
         let writerData = null;
         if (writerRes.ok) {
@@ -174,7 +180,6 @@ export default function WriterProfile() {
           throw new Error("ไม่พบข้อมูลนักเขียน");
         }
 
-        // ตรวจสอบ Ownership: เทียบ writer_id ของตัวเองก่อน (แม่นยำสุด) แล้วค่อย fallback ไปเทียบ user_id
         let computedIsOwner = Boolean(
           myWriterId && String(myWriterId) === String(targetWriterId)
         );
@@ -187,7 +192,6 @@ export default function WriterProfile() {
         }
         setIsOwner(computedIsOwner);
 
-        // 2. ดึงรายการนิยายของนักเขียน
         let novelsArr = [];
         try {
           const novelsRes = await fetch(`${API_BASE_URL}/novels`, { headers });
@@ -202,7 +206,6 @@ export default function WriterProfile() {
           console.warn("ดึงรายการนิยายล้มเหลว:", e);
         }
 
-        // 3. ดึงสถานะการติดตาม (ถ้ามี Token และไม่ใช่เจ้าของโปรไฟล์เอง)
         let followingState = false;
         if (token && !computedIsOwner) {
           try {
@@ -243,7 +246,6 @@ export default function WriterProfile() {
           categories: Array.isArray(writerData.categories) ? writerData.categories : [],
         });
 
-        // กำหนดสถิติต่างๆ จาก Aggregated Data ของ Backend
         setTotalViews(writerData.total_view_count || 0);
         setBookshelfCount(writerData.total_bookshelf_count || 0);
         setFollowersCount(writerData.follower_count || 0);
@@ -310,12 +312,13 @@ export default function WriterProfile() {
   const contactReq = contactObj.contact_required || contactObj.primary_contact || "";
   const contactOpt = contactObj.contact_optional || contactObj.secondary_contact || "";
   const hasContactInfo = Boolean(writerInfo.emailWriter || contactReq || contactOpt);
-return (
+
+  return (
     <div className="profile-wrapper" style={{ paddingTop: isAdmin ? 0 : undefined }}>
       {isAdmin && <AdminModeBanner page="โปรไฟล์นักเขียน" />}
       <div className="profile-container">
         {/* Back Button */}
-        <div style={{ marginBottom: "16px", display: "flex", justifyContent: "flex-start" }}>
+        <div style={{ marginBottom: "12px", display: "flex", justifyContent: "flex-start" }}>
           <button
             type="button"
             className="profile-back-button"
@@ -327,7 +330,7 @@ return (
         </div>
 
         {/* ============================================================== */}
-        {/* 1. Header Card (Dek-D / ReadAWrite Style - Compact & Clean) */}
+        {/* 1. Header Card (Dek-D / ReadAWrite Style) */}
         {/* ============================================================== */}
         <div className="profile-header-card">
           {(() => {
@@ -349,146 +352,205 @@ return (
 
             <div className="profile-details">
               <div className="profile-title-row">
-                <h1 className="profile-writer-name">{writerInfo.name}</h1>
-                <span className="profile-role-tag">✍️ นักเขียน</span>
+                <div className="profile-title-left">
+                  <h1 className="profile-writer-name">{writerInfo.name}</h1>
+                </div>
+
+                <div className="profile-title-actions">
+                  {isOwner ? (
+                    <>
+                      <button
+                        type="button"
+                        className="btn-edit-profile-pill"
+                        onClick={() => setShowEditModal(true)}
+                      >
+                        <Pencil size={14} />
+                        <span>แก้ไขโปรไฟล์</span>
+                      </button>
+                      <button
+                        type="button"
+                        className="btn-share-profile-pill"
+                        onClick={() => {
+                          navigator.clipboard.writeText(window.location.href);
+                          alert("คัดลอกลิงก์โปรไฟล์เรียบร้อยแล้วค่ะ! 🔗");
+                        }}
+                      >
+                        <Share2 size={14} />
+                        <span>แชร์</span>
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      {!isAdmin && (
+                        <FollowButton
+                          writerId={writerInfo.id}
+                          writerName={writerInfo.name}
+                          isFollowing={isFollowing}
+                          onFollowChange={handleFollowChange}
+                          size="small"
+                        />
+                      )}
+                      <button
+                        type="button"
+                        className="btn-share-profile-pill"
+                        onClick={() => {
+                          navigator.clipboard.writeText(window.location.href);
+                          alert("คัดลอกลิงก์โปรไฟล์เรียบร้อยแล้วค่ะ! 🔗");
+                        }}
+                      >
+                        <Share2 size={14} />
+                        <span>แชร์</span>
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
 
               {writerInfo.username && (
                 <p className="profile-writer-handle">@{writerInfo.username}</p>
               )}
 
-              {/* หมวดหมู่ที่ถนัด */}
+              {/* หมวดหมู่ที่ถนัด (ข้อ 7: เพิ่มข้อความ "ประเภทนิยายที่แต่ง :" + ใช้สีเดียวกันหมด) */}
               {writerInfo.categories && writerInfo.categories.length > 0 && (
                 <div className="profile-categories-row">
-                  <span className="categories-label">🏷️ หมวดหมู่:</span>
+                  <span className="categories-prefix-label">ประเภทนิยายที่แต่ง :</span>
                   <div className="categories-tags">
-                    {writerInfo.categories.map((cat, idx) => (
-                      <span key={cat.category_id || idx} className="profile-category-tag">
-                        {typeof cat === "object" ? cat.name : cat}
-                      </span>
-                    ))}
+                    {writerInfo.categories.map((cat, idx) => {
+                      const catLabel = typeof cat === "object" ? cat.name : cat;
+                      return (
+                        <GenreTag
+                          key={cat.category_id || idx}
+                          label={catLabel}
+                          colorByCategory={false}
+                        />
+                      );
+                    })}
                   </div>
                 </div>
               )}
 
-              {/* Bio (Render Rich Text HTML ที่ผ่าน DOMPurify Sanitize) */}
+              {/* Bio (ประวัตินักเขียน) */}
               {writerInfo.bio && (
                 <div
                   className="profile-writer-bio-rich"
                   dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(writerInfo.bio) }}
                 />
               )}
-
-              {/* Action Buttons (มีเฉพาะ แก้ไขโปรไฟล์ และ แชร์โปรไฟล์) */}
-              <div className="profile-actions-row">
-                {isOwner ? (
-                  <button
-                    type="button"
-                    className="btn-edit-profile"
-                    onClick={() => setShowEditModal(true)}
-                  >
-                    ✏️ แก้ไขโปรไฟล์
-                  </button>
-                ) : !isAdmin ? (
-                  <FollowButton
-                    writerId={writerInfo.id}
-                    writerName={writerInfo.name}
-                    isFollowing={isFollowing}
-                    onFollowChange={handleFollowChange}
-                    size="medium"
-                  />
-                ) : null}
-
-                <button
-                  type="button"
-                  className="btn-share-profile"
-                  onClick={() => {
-                    navigator.clipboard.writeText(window.location.href);
-                    alert("คัดลอกลิงก์โปรไฟล์เรียบร้อยแล้วค่ะ! 🔗");
-                  }}
-                >
-                  🔗 แชร์โปรไฟล์
-                </button>
-              </div>
             </div>
           </div>
         </div>
 
         {/* ============================================================== */}
-        {/* 2. Statistics Section (แยกเป็นอีก Card ด้านล่าง Header) */}
+        {/* 2. Statistics Section (การ์ดสถิติ ตามรูปที่ 1 เป้ะๆ) */}
         {/* ============================================================== */}
-        <div className="profile-stats-card">
-          <h3 className="stats-card-title">📊 สถิตินักเขียน</h3>
-          <div className="profile-stats-grid">
-            <div className="profile-stat-box">
-              <span className="profile-stat-icon">📖</span>
-              <span className="profile-stat-value">{novelCount}</span>
-              <span className="profile-stat-label">นิยายเผยแพร่</span>
+        <div className="profile-stats-grid">
+          <div className="profile-stat-card stat-card--pink">
+            <div className="stat-card-icon-badge stat-icon--pink">
+              <BookOpen size={16} />
             </div>
-            <div className="profile-stat-box">
-              <span className="profile-stat-icon">👥</span>
-              <span className="profile-stat-value">{formatNumber(followersCount)}</span>
-              <span className="profile-stat-label">ผู้ติดตาม</span>
+            <div className="stat-card-body">
+              <span className="stat-card-value">{novelCount}</span>
+              <span className="stat-card-label">นิยายเผยแพร่</span>
             </div>
-            <div className="profile-stat-box">
-              <span className="profile-stat-icon">👁️</span>
-              <span className="profile-stat-value">{formatNumber(totalViews)}</span>
-              <span className="profile-stat-label">ยอดชมรวม</span>
-            </div>
-            <div className="profile-stat-box">
-              <span className="profile-stat-icon">📚</span>
-              <span className="profile-stat-value">{formatNumber(bookshelfCount)}</span>
-              <span className="profile-stat-label">ถูกเก็บเข้าชั้นรวม</span>
-            </div>
-            {writerInfo.joinedAt && (
-              <div className="profile-stat-box">
-                <span className="profile-stat-icon">🗓️</span>
-                <span className="profile-stat-value">{formatDate(writerInfo.joinedAt)}</span>
-                <span className="profile-stat-label">วันที่เป็นนักเขียน</span>
-              </div>
-            )}
           </div>
+
+          <div className="profile-stat-card stat-card--purple">
+            <div className="stat-card-icon-badge stat-icon--purple">
+              <Users size={16} />
+            </div>
+            <div className="stat-card-body">
+              <span className="stat-card-value">{formatNumber(followersCount)}</span>
+              <span className="stat-card-label">ผู้ติดตาม</span>
+            </div>
+          </div>
+
+          <div className="profile-stat-card stat-card--blue">
+            <div className="stat-card-icon-badge stat-icon--blue">
+              <Eye size={16} />
+            </div>
+            <div className="stat-card-body">
+              <span className="stat-card-value">{formatNumber(totalViews)}</span>
+              <span className="stat-card-label">ยอดชมรวม</span>
+            </div>
+          </div>
+
+          <div className="profile-stat-card stat-card--green">
+            <div className="stat-card-icon-badge stat-icon--green">
+              <Bookmark size={16} />
+            </div>
+            <div className="stat-card-body">
+              <span className="stat-card-value">{formatNumber(bookshelfCount)}</span>
+              <span className="stat-card-label">ถูกเก็บเข้าชั้น</span>
+            </div>
+          </div>
+
+          {writerInfo.joinedAt && (
+            <div className="profile-stat-card stat-card--amber">
+              <div className="stat-card-icon-badge stat-icon--amber">
+                <Calendar size={16} />
+              </div>
+              <div className="stat-card-body">
+                <span className="stat-card-value">{formatDate(writerInfo.joinedAt)}</span>
+                <span className="stat-card-label">เป็นนักเขียนเมื่อ</span>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* ============================================================== */}
-        {/* 3. Contact Information Section (แยกเป็น Card ด้านล่าง) */}
+        {/* 3. Contact Information Section (ช่องทางติดต่อแบบกะทัดรัด) */}
         {/* ============================================================== */}
         {hasContactInfo && (
-          <div className="profile-contact-card">
-            <h3 className="contact-card-title">📬 ช่องทางติดต่อ</h3>
-            <div className="profile-contact-items">
+          <div className="profile-contact-compact">
+            <span className="contact-compact-label">ช่องทางติดต่อ :</span>
+            <div className="contact-compact-items">
               {writerInfo.emailWriter && (
-                <div className="profile-contact-item">
-                  <span className="contact-icon">📧</span>
-                  <span className="contact-label">อีเมลติดต่อ:</span>
-                  <a href={`mailto:${writerInfo.emailWriter}`} className="contact-value">{writerInfo.emailWriter}</a>
-                </div>
+                <a href={`mailto:${writerInfo.emailWriter}`} className="contact-compact-chip">
+                  <Mail size={13} />
+                  <span>{writerInfo.emailWriter}</span>
+                </a>
               )}
+
               {contactReq && (
-                <div className="profile-contact-item">
-                  <span className="contact-icon">🔗</span>
-                  <span className="contact-label">ช่องทางติดต่อหลัก:</span>
-                  <span className="contact-value">{contactReq}</span>
-                </div>
+                contactReq.startsWith("http") ? (
+                  <a href={contactReq} target="_blank" rel="noopener noreferrer" className="contact-compact-chip">
+                    <LinkIcon size={13} />
+                    <span>{contactReq}</span>
+                    <ExternalLink size={11} />
+                  </a>
+                ) : (
+                  <span className="contact-compact-chip text">
+                    <LinkIcon size={13} />
+                    <span>{contactReq}</span>
+                  </span>
+                )
               )}
+
               {contactOpt && (
-                <div className="profile-contact-item">
-                  <span className="contact-icon">🌐</span>
-                  <span className="contact-label">ช่องทางติดต่อเพิ่มเติม:</span>
-                  <span className="contact-value">{contactOpt}</span>
-                </div>
+                contactOpt.startsWith("http") ? (
+                  <a href={contactOpt} target="_blank" rel="noopener noreferrer" className="contact-compact-chip">
+                    <Globe size={13} />
+                    <span>{contactOpt}</span>
+                    <ExternalLink size={11} />
+                  </a>
+                ) : (
+                  <span className="contact-compact-chip text">
+                    <Globe size={13} />
+                    <span>{contactOpt}</span>
+                  </span>
+                )
               )}
             </div>
           </div>
         )}
 
         {/* ============================================================== */}
-        {/* 4. Works Section (ผลงานนิยายทั้งหมด) */}
+        {/* 4. Works Section (ผลงานนิยาย รูปแบบการ์ดหมวดหมู่เป้ะๆ) */}
         {/* ============================================================== */}
         <div className="works-section">
           <div className="works-section-header">
             <div className="works-title-group">
-              <h2 className="works-title">📚 ผลงานนิยายทั้งหมด</h2>
+              <h2 className="works-title">ผลงานนิยายทั้งหมด</h2>
               <span className="works-count-badge">{filteredNovels.length} เรื่อง</span>
             </div>
 
@@ -524,25 +586,80 @@ return (
           </div>
 
           {filteredNovels.length > 0 ? (
-            <div className="profile-novels-grid">
-              {filteredNovels.map((rawNovel) => {
-                const normalizedNovel = {
-                  ...rawNovel,
-                  id: rawNovel.novel_id || rawNovel.id,
-                  coverImage: formatMinioUrl(rawNovel.cover_image) || rawNovel.coverImage || rawNovel.cover,
-                  synopsis: rawNovel.captions || rawNovel.introduction || rawNovel.synopsis || "",
-                  author: {
-                    displayName: rawNovel.pen_name || rawNovel.author_name || writerInfo.name,
-                    avatarEmoji: "✍️",
-                  },
-                };
+            <div className="novel-grid-layout">
+              {filteredNovels.map((novel) => {
+                const isCompleted = novel.status === "completed" || novel.is_completed === true;
+                const coverUrl = formatMinioUrl(novel.cover_image || novel.coverImage || novel.cover);
+                const novelTitle = novel.title || "ไม่มีชื่อเรื่อง";
+                const authorName = novel.pen_name || novel.author_name || novel.authorName || writerInfo.name;
+                const synopsisText = novel.captions || novel.introduction || novel.synopsis || "";
+
+                const rawCats = novel.categories || novel.Categories || [];
+                const catList = Array.isArray(rawCats)
+                  ? rawCats.map(c => (typeof c === "object" ? c.name : c)).filter(Boolean)
+                  : [];
+
+                const views = novel.views || novel.view_count || novel.total_views || 0;
+                const likes = novel.like_count || novel.likes || novel.total_likes || 0;
+                const bookshelf = novel.bookshelf_count || novel.bookshelfCount || novel.saved_count || 0;
+
                 return (
-                  <NovelCard
-                    key={normalizedNovel.id}
-                    novel={normalizedNovel}
-                    showLike={false}
-                    onClick={() => navigate(`/novel/${normalizedNovel.id}`)}
-                  />
+                  <div
+                    key={novel.novel_id || novel.id}
+                    className="novel-grid-card"
+                    onClick={() => navigate(`/novel/${novel.novel_id || novel.id}`)}
+                    role="link"
+                    tabIndex={0}
+                  >
+                    <div className="novel-grid-cover">
+                      {coverUrl ? (
+                        <img src={coverUrl} alt={novelTitle} loading="lazy" />
+                      ) : (
+                        <div className="grid-cover-placeholder">📘</div>
+                      )}
+                      {isCompleted && (
+                        <span className="card-status-tag finished">
+                          จบแล้ว
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="novel-grid-body">
+                      <div className="novel-grid-tags">
+                        {catList.slice(0, 2).map((cat, cIdx) => (
+                          <span key={cIdx} className="grid-tag-item">{cat}</span>
+                        ))}
+                        {catList.length > 2 && (
+                          <span className="grid-tag-item grid-tag-overflow">+{catList.length - 2}</span>
+                        )}
+                      </div>
+
+                      <h3 className="novel-grid-title" title={novelTitle}>{novelTitle}</h3>
+
+                      <div className="novel-grid-author">
+                        <Pencil size={12} className="novel-author-icon" /> <span>{authorName}</span>
+                      </div>
+
+                      <p className="novel-grid-synopsis" title={synopsisText}>
+                        {synopsisText}
+                      </p>
+
+                      <div className="novel-grid-stats">
+                        <div className="novel-grid-stat-item" title="เพิ่มเข้าชั้น">
+                          <Bookmark size={13} />
+                          <span>{formatNumber(bookshelf)}</span>
+                        </div>
+                        <div className="novel-grid-stat-item" title="ยอดเข้าชม">
+                          <Eye size={13} />
+                          <span>{formatNumber(views)}</span>
+                        </div>
+                        <div className="novel-grid-stat-item" title="ยอดถูกใจ">
+                          <Heart size={13} />
+                          <span>{formatNumber(likes)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 );
               })}
             </div>
@@ -773,7 +890,7 @@ function EditProfileModal({ writerInfo, onClose, onSuccess }) {
 
         {/* Header */}
         <div className="modal-header">
-          <h2>✏️ แก้ไขโปรไฟล์</h2>
+          <h2>แก้ไขโปรไฟล์</h2>
           <button className="modal-close-btn" onClick={onClose} aria-label="ปิด">✕</button>
         </div>
 
@@ -782,7 +899,7 @@ function EditProfileModal({ writerInfo, onClose, onSuccess }) {
 
           {/* 1. รูปโปรไฟล์ */}
           <section className="form-section">
-            <p className="form-section-label">📷 รูปโปรไฟล์</p>
+            <p className="form-section-label">รูปโปรไฟล์</p>
             <div className="avatar-edit-row">
               <img src={currentAvatarSrc} alt="รูปโปรไฟล์" className="avatar-preview-img" />
               <label className={`avatar-upload-label ${uploadingImage ? "loading" : ""}`}>
@@ -802,7 +919,7 @@ function EditProfileModal({ writerInfo, onClose, onSuccess }) {
 
           {/* 2. ข้อมูลพื้นฐาน */}
           <section className="form-section">
-            <p className="form-section-label">✍️ ข้อมูลพื้นฐาน</p>
+            <p className="form-section-label">ข้อมูลพื้นฐาน</p>
             <div className="form-group">
               <label className="form-label">
                 นามปากกา <span className="required-mark">*</span>
@@ -817,7 +934,7 @@ function EditProfileModal({ writerInfo, onClose, onSuccess }) {
               />
             </div>
             <div className="form-group" style={{ marginTop: "0.75rem" }}>
-              <label className="form-label">📧 อีเมลสำหรับติดต่อ</label>
+              <label className="form-label">อีเมลสำหรับติดต่อ</label>
               <input
                 type="email"
                 value={emailWriter}
@@ -832,7 +949,7 @@ function EditProfileModal({ writerInfo, onClose, onSuccess }) {
 
           {/* 3. แนะนำตัว (Bio) — ReactQuill Toolbar สมบูรณ์ */}
           <section className="form-section">
-            <p className="form-section-label">📝 แนะนำตัว (Bio)</p>
+            <p className="form-section-label">แนะนำตัว (Bio)</p>
             <div className="quill-wrapper">
               <ReactQuill
                 theme="snow"
@@ -850,7 +967,7 @@ function EditProfileModal({ writerInfo, onClose, onSuccess }) {
           {/* 4. หมวดหมู่ที่ถนัด */}
           {allCategories.length > 0 && (
             <section className="form-section">
-              <p className="form-section-label">🏷️ หมวดหมู่ที่ถนัด</p>
+              <p className="form-section-label">หมวดหมู่ที่ถนัด</p>
               <div className="category-chips">
                 {allCategories.map((cat) => {
                   const id = cat.category_id || cat.id;
@@ -874,7 +991,7 @@ function EditProfileModal({ writerInfo, onClose, onSuccess }) {
 
           {/* 5. ธีมสีแบนเนอร์ — Color Swatches */}
           <section className="form-section">
-            <p className="form-section-label">🎨 ธีมสีแบนเนอร์</p>
+            <p className="form-section-label">ธีมสีแบนเนอร์</p>
             <div className="theme-swatches">
               {BANNER_THEMES.map((t) => (
                 <button
@@ -896,19 +1013,19 @@ function EditProfileModal({ writerInfo, onClose, onSuccess }) {
 
           {/* 6. ช่องทางติดต่อ — 2 ฟิลด์ตาม DB Schema เดิม */}
           <section className="form-section">
-            <p className="form-section-label">📬 ช่องทางติดต่อ</p>
+            <p className="form-section-label">ช่องทางติดต่อ</p>
             <div className="form-group">
-              <label className="form-label">🔗 ช่องทางติดต่อหลัก</label>
+              <label className="form-label">ช่องทางติดต่อหลัก</label>
               <input
                 type="text"
                 value={contactRequired}
                 onChange={(e) => setContactRequired(e.target.value)}
                 placeholder="เช่น facebook.com/yourpage หรือ @yourhandle"
                 className="form-control-input"
-              />
+                />
             </div>
             <div className="form-group" style={{ marginTop: "0.75rem" }}>
-              <label className="form-label">🌐 ช่องทางติดต่อเพิ่มเติม</label>
+              <label className="form-label">ช่องทางติดต่อเพิ่มเติม</label>
               <input
                 type="text"
                 value={contactOptional}
@@ -925,7 +1042,7 @@ function EditProfileModal({ writerInfo, onClose, onSuccess }) {
               ยกเลิก
             </button>
             <button type="submit" className="btn-save-profile" disabled={saving}>
-              {saving ? "กำลังบันทึก..." : "💾 บันทึกการเปลี่ยนแปลง"}
+              {saving ? "กำลังบันทึก..." : "บันทึกการเปลี่ยนแปลง"}
             </button>
           </div>
         </form>

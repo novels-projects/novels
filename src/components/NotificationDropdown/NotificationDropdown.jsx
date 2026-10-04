@@ -104,12 +104,34 @@ export default function NotificationDropdown({ unreadCount = 0 }) {
     }
 
     setOpen(false);
-    if (notification.referenceType === "novel" && notification.referenceId) {
-      navigate(`/novel/${notification.referenceId}`);
-    } else if (notification.referenceType === "chapter" && notification.referenceId) {
-      navigate(`/novel/${notification.referenceId}`);
-    } else if (notification.referenceType === "user" && notification.referenceId) {
-      navigate(`/writer/${notification.referenceId}/profile`);
+
+    const userObj = JSON.parse(localStorage.getItem("user") || "{}");
+    const userRole = (userObj.role || userObj.user_role || "").toLowerCase();
+    const isWriter = userRole === "writer" || userRole === "admin";
+    const refId = notification.referenceId;
+    const refType = notification.referenceType;
+
+    if (isWriter && refId && (refType === "novel" || refType === "chapter" || refType === "report" || refType === "ban" || refType === "system")) {
+      navigate(`/writer/${refId}/chapters`);
+      return;
+    }
+
+    if (refType === "novel" && refId) {
+      if (isWriter) {
+        navigate(`/writer/${refId}/chapters`);
+      } else {
+        navigate(`/novel/${refId}`);
+      }
+    } else if (refType === "chapter" && refId) {
+      if (isWriter) {
+        navigate(`/writer/${refId}/chapters`);
+      } else {
+        navigate(`/novel/${refId}`);
+      }
+    } else if (refType === "user" && refId) {
+      navigate(`/writer/${refId}/profile`);
+    } else if (refId && isWriter) {
+      navigate(`/writer/${refId}/chapters`);
     }
   };
 

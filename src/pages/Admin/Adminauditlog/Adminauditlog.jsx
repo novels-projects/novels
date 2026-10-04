@@ -1353,7 +1353,7 @@ export default function Adminauditlog() {
                   <th style={{ width: "20%", minWidth: "150px" }}>เป้าหมาย</th>
                   <th style={{ width: "11%", minWidth: "100px" }}>สถานะ</th>
                   <th style={{ width: "10%", minWidth: "100px" }}>ไอพี</th>
-                  <th style={{ width: "8%", minWidth: "100px", textAlign: "center" }}></th>
+                  <th style={{ width: "8%", minWidth: "100px", textAlign: "center" }} className="text-center">การจัดการ</th>
                 </tr>
               </thead>
               <tbody>
@@ -1452,17 +1452,19 @@ export default function Adminauditlog() {
                         </td>
 
                         {/* ดูรายละเอียด */}
-                        <td style={{ textAlign: "center" }}>
-                          <button
-                            type="button"
-                            className="btn-view-detail"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              fetchLogDetail(log.log_id);
-                            }}
-                          >
-                            ดูรายละเอียด
-                          </button>
+                        <td style={{ textAlign: "center" }} className="text-center">
+                          <div className="action-cell-content">
+                            <button
+                              type="button"
+                              className="btn-view-detail"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                fetchLogDetail(log.log_id);
+                              }}
+                            >
+                              ดูรายละเอียด
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );

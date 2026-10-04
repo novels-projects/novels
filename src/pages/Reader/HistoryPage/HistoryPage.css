@@ -174,9 +174,17 @@
   color: var(--muted);
 }
 
-.history-page__empty-emoji {
-  font-size: 34px;
-  margin-bottom: 14px;
+.history-page__empty-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: var(--pink-pale);
+  color: var(--pink);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 16px;
+  box-shadow: 0 4px 14px rgba(245, 38, 162, 0.12);
 }
 
 .history-page__empty-title {
@@ -202,6 +210,7 @@
   padding: 14px 16px;
   align-items: flex-start;
   transition: all 0.2s ease;
+  cursor: pointer;
 }
 
 .history-card:hover {

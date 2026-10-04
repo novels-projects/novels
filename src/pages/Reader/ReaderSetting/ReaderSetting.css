@@ -907,6 +907,30 @@
   font-size: 15px;
 }
 
+@media(max-width: 860px) {
+  .wst-page-container .layout {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+
+  .wst-page-container .side-nav {
+    position: static;
+    flex-direction: row;
+    overflow-x: auto;
+    padding-bottom: 8px;
+    max-width: 100%;
+  }
+
+  .wst-page-container .side-nav-item {
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .wst-page-container .side-nav-sep {
+    display: none;
+  }
+}
+
 @media(max-width: 540px) {
   .wst-page-container .page-wrap {
     padding: 24px 16px 80px;

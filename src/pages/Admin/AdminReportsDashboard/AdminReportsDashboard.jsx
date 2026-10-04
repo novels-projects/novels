@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import {
     Search,
     X,
@@ -20,7 +20,11 @@ import {
     FileText,
     Undo2,
     Clock,
-    ShieldCheck
+    ShieldCheck,
+    RotateCcw,
+    Calendar,
+    ArrowDown,
+    ArrowUp
 } from "lucide-react";
 import "./AdminReportsDashboard.css";
 
@@ -59,6 +63,99 @@ const getApiErrorMessage = async (res, fallback) => {
     }
 };
 
+// 🟢 Component for displaying Category Tags in Table (Explicit 2-Row Grid: Line 1 = Cats 1-2, Line 2 = Cats 3-4 + [+N หมวด])
+function CategoryTagsWithPopover({ categories }) {
+    const [isOpen, setIsOpen] = useState(false);
+    const [isHovered, setIsHovered] = useState(false);
+    const containerRef = useRef(null);
+
+    const catList = Array.isArray(categories) ? categories : [];
+
+    useEffect(() => {
+        if (!isOpen) return;
+        const handleClickOutside = (e) => {
+            if (containerRef.current && !containerRef.current.contains(e.target)) {
+                setIsOpen(false);
+            }
+        };
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, [isOpen]);
+
+    const showPopover = isOpen || isHovered;
+
+    if (catList.length === 0) {
+        return <span className="admin-text-subtle">-</span>;
+    }
+
+    const line1 = catList.slice(0, 2);
+    const line2 = catList.slice(2, 4);
+    const remainingCount = catList.length > 4 ? catList.length - 4 : 0;
+    const hasMore = remainingCount > 0;
+
+    return (
+        <div 
+            ref={containerRef}
+            className={`admin-cat-2row-container ${showPopover ? "is-popover-open" : ""}`}
+        >
+            {/* Line 1: หมวดหมู่ 1-2 */}
+            <div className="admin-cat-row">
+                {line1.map((cat, idx) => (
+                    <span key={idx} className="category-badge-unified" title={cat}>
+                        {cat}
+                    </span>
+                ))}
+            </div>
+
+            {/* Line 2: หมวดหมู่ 3-4 + [+N หมวด] */}
+            {(line2.length > 0 || hasMore) && (
+                <div className="admin-cat-row">
+                    {line2.map((cat, idx) => (
+                        <span key={idx} className="category-badge-unified" title={cat}>
+                            {cat}
+                        </span>
+                    ))}
+
+                    {hasMore && (
+                        <div 
+                            className="category-more-badge-container"
+                            onMouseEnter={() => setIsHovered(true)}
+                            onMouseLeave={() => setIsHovered(false)}
+                        >
+                            <button
+                                type="button"
+                                className={`category-badge-more ${showPopover ? "is-active" : ""}`}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setIsOpen((prev) => !prev);
+                                }}
+                                title="คลิกหรือชี้เพื่อดูหมวดหมู่ทั้งหมด"
+                            >
+                                +{remainingCount} หมวด
+                            </button>
+
+                            {showPopover && (
+                                <div className="category-popover-card" onClick={(e) => e.stopPropagation()}>
+                                    <div className="category-popover-header">
+                                        <span>หมวดหมู่ทั้งหมด ({catList.length})</span>
+                                    </div>
+                                    <div className="category-popover-body">
+                                        {catList.map((cat, idx) => (
+                                            <span key={idx} className="category-badge-unified" title={cat}>
+                                                {cat}
+                                            </span>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+            )}
+        </div>
+    );
+}
+
 export default function AdminReportsDashboard() {
     // -------------------------------------------------------------
     // Tab Navigation State: "stories" (จัดการเรื่อง) | "reports" (รายงาน / แจ้งลบ)
@@ -90,6 +187,7 @@ export default function AdminReportsDashboard() {
     const [debouncedStorySearch, setDebouncedStorySearch] = useState("");
     const [storyStatusFilter, setStoryStatusFilter] = useState("all"); // all, published, suspended
     const [storyCategoryFilter, setStoryCategoryFilter] = useState("all");
+    const [storySortOrder, setStorySortOrder] = useState("desc"); // 'desc' = ใหม่ไปเก่า, 'asc' = เก่าไปใหม่
     const [storyPage, setStoryPage] = useState(1);
     const [storyPageSize, setStoryPageSize] = useState(20);
 
@@ -270,6 +368,7 @@ export default function AdminReportsDashboard() {
     }, [fetchCategories]);
 
     useEffect(() => {
+        void fetchReportStats();
         if (activeTab === "stories") {
             // eslint-disable-next-line react-hooks/set-state-in-effect
             void fetchStories();
@@ -277,7 +376,6 @@ export default function AdminReportsDashboard() {
         }
 
         void fetchReports();
-        void fetchReportStats();
     }, [activeTab, fetchReportStats, fetchReports, fetchStories]);
 
     // Refresh Handler
@@ -382,15 +480,25 @@ export default function AdminReportsDashboard() {
         return ["ทั่วไป"];
     };
 
-    const paginatedStories = novels;
+    const sortedStories = useMemo(() => {
+        if (!novels || novels.length === 0) return [];
+        if (!storySortOrder) return novels;
+        return [...novels].sort((a, b) => {
+            const timeA = new Date(a.published_at || a.created_at || a.CreatedAt || 0).getTime();
+            const timeB = new Date(b.published_at || b.created_at || b.CreatedAt || 0).getTime();
+            return storySortOrder === "asc" ? timeA - timeB : timeB - timeA;
+        });
+    }, [novels, storySortOrder]);
+
+    const paginatedStories = sortedStories;
     const totalStoryPages = Math.ceil(storyTotal / storyPageSize) || 1;
     const paginatedReports = reports;
     const totalReportPages = Math.ceil(reportTotal / reportPageSize) || 1;
 
     // Pending Reports Count
     const pendingReportsCount = useMemo(() => {
-        return reports.filter((r) => r.status === "pending").length;
-    }, [reports]);
+        return reportStats.pending || reports.filter((r) => r.status === "pending" || r.status === "appeal_pending").length || 0;
+    }, [reportStats.pending, reports]);
 
     // -------------------------------------------------------------
     // Story Action Handlers
@@ -671,98 +779,6 @@ export default function AdminReportsDashboard() {
                    ------------------------------------------------------------- */}
                 {activeTab === "stories" && (
                     <div className="admin-tab-pane" role="tabpanel">
-                        {/* Filters Bar */}
-                        <div className="admin-filter-card">
-                            <div className="admin-filter-grid">
-                                {/* Search */}
-                                <div className="admin-search-box">
-                                    <Search size={17} className="admin-search-icon" />
-                                    <input
-                                        type="text"
-                                        className="admin-search-input"
-                                        placeholder="ค้นหาชื่อเรื่อง หรือชื่อผู้เขียน..."
-                                        value={storySearch}
-                                        onChange={(e) => setStorySearch(e.target.value)}
-                                    />
-                                    {storySearch && (
-                                        <button
-                                            type="button"
-                                            className="admin-search-clear"
-                                            onClick={() => setStorySearch("")}
-                                            aria-label="ล้างการค้นหา"
-                                        >
-                                            <X size={14} />
-                                        </button>
-                                    )}
-                                </div>
-
-                                {/* Status Filter */}
-                                <div className="admin-select-wrapper">
-                                    <label htmlFor="story-status-select" className="admin-filter-label">
-                                        สถานะ:
-                                    </label>
-                                    <select
-                                        id="story-status-select"
-                                        className="admin-select"
-                                        value={storyStatusFilter}
-                                        onChange={(e) => {
-                                            setStoryStatusFilter(e.target.value);
-                                            setStoryPage(1);
-                                        }}
-                                    >
-                                        <option value="all">ทุกสถานะ</option>
-                                        <option value="published">เผยแพร่</option>
-                                            <option value="suspended">ระงับ</option>
-                                    </select>
-                                </div>
-
-                                {/* Category Filter */}
-                                <div className="admin-select-wrapper">
-                                    <label htmlFor="story-cat-select" className="admin-filter-label">
-                                        หมวดหมู่:
-                                    </label>
-                                    <select
-                                        id="story-cat-select"
-                                        className="admin-select"
-                                        value={storyCategoryFilter}
-                                        onChange={(e) => {
-                                            setStoryCategoryFilter(e.target.value);
-                                            setStoryPage(1);
-                                        }}
-                                    >
-                                        <option value="all">ทุกหมวดหมู่</option>
-                                        {categories.map((cat) => (
-                                            <option
-                                                key={cat.category_id || cat.id || cat.name}
-                                                value={cat.category_id ?? cat.id}
-                                            >
-                                                {cat.name}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-
-                                {/* Reset Filter Button (if active) */}
-                                {(storySearch ||
-                                    storyStatusFilter !== "all" ||
-                                    storyCategoryFilter !== "all") && (
-                                    <button
-                                        type="button"
-                                        className="admin-btn admin-btn--reset"
-                                        onClick={() => {
-                                            setStorySearch("");
-                                            setStoryStatusFilter("all");
-                                            setStoryCategoryFilter("all");
-                                            setStoryPage(1);
-                                        }}
-                                    >
-                                        <Undo2 size={15} />
-                                        <span>ล้างตัวกรอง</span>
-                                    </button>
-                                )}
-                            </div>
-                        </div>
-
                         {/* Error Banner */}
                         {storiesError && (
                             <div className="admin-error-banner" role="alert">
@@ -782,6 +798,85 @@ export default function AdminReportsDashboard() {
 
                         {/* Stories Table Card */}
                         <div className="admin-table-card">
+                            {/* 🔍 Search Bar & Filters อยู่ภายใน Container เดียวกับ Table */}
+                            <div className="admin-table-top-bar">
+                                <div className="search-box-wrapper">
+                                    <Search className="search-icon" size={16} />
+                                    <input
+                                        type="text"
+                                        className="admin-search-input"
+                                        placeholder="ค้นหาชื่อเรื่อง หรือชื่อผู้เขียน..."
+                                        value={storySearch}
+                                        onChange={(e) => setStorySearch(e.target.value)}
+                                    />
+                                </div>
+
+                                <div className="filter-controls-group">
+                                    <div className="select-filter-item">
+                                        <span className="filter-label-text">สถานะ:</span>
+                                        <div className="select-filter-wrapper">
+                                            <select
+                                                className="admin-filter-select"
+                                                value={storyStatusFilter}
+                                                onChange={(e) => {
+                                                    setStoryStatusFilter(e.target.value);
+                                                    setStoryPage(1);
+                                                }}
+                                            >
+                                                <option value="all">ทุกสถานะ</option>
+                                                <option value="published">เผยแพร่</option>
+                                                <option value="suspended">ระงับ</option>
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <div className="select-filter-item">
+                                        <span className="filter-label-text">หมวดหมู่:</span>
+                                        <div className="select-filter-wrapper">
+                                            <select
+                                                className="admin-filter-select"
+                                                value={storyCategoryFilter}
+                                                onChange={(e) => {
+                                                    setStoryCategoryFilter(e.target.value);
+                                                    setStoryPage(1);
+                                                }}
+                                            >
+                                                <option value="all">ทุกหมวดหมู่</option>
+                                                {categories.map((cat) => (
+                                                    <option
+                                                        key={cat.category_id || cat.id || cat.name}
+                                                        value={cat.category_id ?? cat.id}
+                                                    >
+                                                        {cat.name}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    {(storySearch.trim() !== "" ||
+                                        storyStatusFilter !== "all" ||
+                                        storyCategoryFilter !== "all" ||
+                                        storySortOrder !== "desc") && (
+                                        <button
+                                            type="button"
+                                            className="clear-filter-btn"
+                                            onClick={() => {
+                                                setStorySearch("");
+                                                setStoryStatusFilter("all");
+                                                setStoryCategoryFilter("all");
+                                                setStorySortOrder("desc");
+                                                setStoryPage(1);
+                                            }}
+                                            title="ล้างตัวกรองทั้งหมด"
+                                        >
+                                            <RotateCcw size={13} />
+                                            <span>ล้างตัวกรอง</span>
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+
                             {loadingStories ? (
                                 /* Skeleton Rows */
                                 <div className="admin-skeleton-table">
@@ -842,12 +937,25 @@ export default function AdminReportsDashboard() {
                                         <table className="admin-table">
                                              <thead>
                                                  <tr>
-                                                     <th style={{ width: "22%" }}>เรื่อง</th>
-                                                     <th style={{ width: "14%" }}>ผู้เขียน</th>
-                                                     <th style={{ width: "11%" }}>หมวดหมู่</th>
+                                                     <th style={{ width: "18%" }}>เรื่อง</th>
+                                                     <th style={{ width: "12%" }}>ผู้เขียน</th>
+                                                     <th style={{ width: "22%" }}>หมวดหมู่</th>
                                                      <th style={{ width: "9%" }}>สถานะ</th>
-                                                     <th style={{ width: "14%" }}>วันที่เผยแพร่</th>
-                                                     <th style={{ width: "30%", textAlign: "right" }}>การจัดการ</th>
+                                                     <th style={{ width: "13%" }}>
+                                                         <div className="th-date-wrapper">
+                                                             <span>วันที่เผยแพร่</span>
+                                                             <button
+                                                                 type="button"
+                                                                 className={`btn-date-sort ${storySortOrder === 'asc' ? 'asc' : 'desc'}`}
+                                                                 onClick={() => setStorySortOrder(prev => prev === 'desc' ? 'asc' : 'desc')}
+                                                                 title={storySortOrder === 'desc' ? "เรียงจากใหม่อยู่บน (คลิกเพื่อสลับเป็นเก่าอยู่บน)" : "เรียงจากเก่าอยู่บน (คลิกเพื่อสลับเป็นใหม่อยู่บน)"}
+                                                             >
+                                                                 <Calendar size={12} />
+                                                                 {storySortOrder === 'desc' ? <ArrowDown size={11} /> : <ArrowUp size={11} />}
+                                                             </button>
+                                                         </div>
+                                                     </th>
+                                                     <th style={{ width: "26%" }} className="text-center">การจัดการ</th>
                                                  </tr>
                                              </thead>
                                              <tbody>
@@ -892,15 +1000,9 @@ export default function AdminReportsDashboard() {
                                                                  <span className="admin-text-medium" title={authorName}>{authorName}</span>
                                                              </td>
 
-                                                            {/* Categories (Deduplicated) */}
+                                                            {/* Categories (Deduplicated, Max 2 lines with +N Popover) */}
                                                             <td>
-                                                                <div className="admin-cat-tags">
-                                                                    {catNames.map((cat, idx) => (
-                                                                        <span key={idx} className="category-badge-unified">
-                                                                            {cat}
-                                                                        </span>
-                                                                    ))}
-                                                                </div>
+                                                                <CategoryTagsWithPopover categories={catNames} />
                                                             </td>
 
                                                             {/* Status */}
@@ -917,9 +1019,9 @@ export default function AdminReportsDashboard() {
                                                                 </span>
                                                             </td>
 
-                                                            {/* Actions - Equal size, unified height, single-line text */}
-                                                            <td style={{ textAlign: "right" }}>
-                                                                <div className="admin-action-group">
+                                                            {/* Actions */}
+                                                            <td className="text-center align-center">
+                                                                <div className="action-cell-content admin-action-group">
                                                                     {/* ดูเรื่อง -> เปิด Admin View หน้ารายละเอียดเรื่อง */}
                                                                     <button
                                                                         type="button"
@@ -1075,20 +1177,16 @@ export default function AdminReportsDashboard() {
                                     </div>
 
                                     {/* Pagination */}
-                                    <div className="admin-pagination-bar">
-                                        <div className="admin-pagination-info">
-                                            แสดง{" "}
-                                            <strong>
-                                                {(storyPage - 1) * storyPageSize + 1} -{" "}
-                                                {Math.min(storyPage * storyPageSize, storyTotal)}
-                                            </strong>{" "}
-                                            จาก <strong>{storyTotal.toLocaleString()}</strong> รายการ
-                                        </div>
+                                    <div className="admin-table-footer">
+                                        <div className="admin-table-footer-left">
+                                            <span className="admin-table-info-text">
+                                                แสดง <strong>{storyTotal === 0 ? 0 : (storyPage - 1) * storyPageSize + 1}–{Math.min(storyPage * storyPageSize, storyTotal)}</strong> จาก <strong>{storyTotal.toLocaleString()}</strong> รายการ
+                                            </span>
 
-                                        <div className="admin-pagination-controls">
-                                            <div className="admin-page-size-selector">
-                                                <span>แถวต่อหน้า:</span>
+                                            <div className="admin-table-per-page">
+                                                <span>แสดงต่อหน้า</span>
                                                 <select
+                                                    className="admin-per-page-select"
                                                     value={storyPageSize}
                                                     onChange={(e) => {
                                                         setStoryPageSize(Number(e.target.value));
@@ -1100,29 +1198,28 @@ export default function AdminReportsDashboard() {
                                                     <option value={100}>100</option>
                                                 </select>
                                             </div>
+                                        </div>
 
+                                        <div className="admin-pagination-img2">
                                             <button
                                                 type="button"
-                                                className="admin-page-btn"
-                                                onClick={() => setStoryPage((p) => Math.max(1, p - 1))}
+                                                className="page-btn-box"
+                                                onClick={() => setStoryPage((prev) => Math.max(1, prev - 1))}
                                                 disabled={storyPage === 1}
-                                                aria-label="หน้าก่อนหน้า"
                                             >
                                                 <ChevronLeft size={16} />
                                                 <span>ก่อนหน้า</span>
                                             </button>
 
-                                            <span className="admin-page-indicator">
-                                                หน้า <strong>{storyPage}</strong> จาก{" "}
-                                                <strong>{totalStoryPages}</strong>
+                                            <span className="page-indicator-text">
+                                                หน้า <strong>{storyPage}</strong> จาก <strong>{totalStoryPages}</strong>
                                             </span>
 
                                             <button
                                                 type="button"
-                                                className="admin-page-btn"
-                                                onClick={() => setStoryPage((p) => Math.min(totalStoryPages, p + 1))}
+                                                className="page-btn-box"
+                                                onClick={() => setStoryPage((prev) => Math.min(totalStoryPages, prev + 1))}
                                                 disabled={storyPage === totalStoryPages}
-                                                aria-label="หน้าถัดไป"
                                             >
                                                 <span>ถัดไป</span>
                                                 <ChevronRight size={16} />
@@ -1190,94 +1287,6 @@ export default function AdminReportsDashboard() {
                             </button>
                         </div>
 
-                        {/* Filters Bar */}
-                        <div className="admin-filter-card">
-                            <div className="admin-filter-grid">
-                                {/* Search */}
-                                <div className="admin-search-box">
-                                    <Search size={17} className="admin-search-icon" />
-                                    <input
-                                        type="text"
-                                        className="admin-search-input"
-                                        placeholder="ค้นหาชื่อเรื่อง, ผู้รายงาน หรือเหตุผล..."
-                                        value={reportSearch}
-                                        onChange={(e) => setReportSearch(e.target.value)}
-                                    />
-                                    {reportSearch && (
-                                        <button
-                                            type="button"
-                                            className="admin-search-clear"
-                                            onClick={() => setReportSearch("")}
-                                            aria-label="ล้างการค้นหา"
-                                        >
-                                            <X size={14} />
-                                        </button>
-                                    )}
-                                </div>
-
-                                {/* Status Filter */}
-                                <div className="admin-select-wrapper">
-                                    <label htmlFor="report-status-select" className="admin-filter-label">
-                                        สถานะรายงาน:
-                                    </label>
-                                    <select
-                                        id="report-status-select"
-                                        className="admin-select"
-                                        value={reportStatusFilter}
-                                        onChange={(e) => {
-                                            setReportStatusFilter(e.target.value);
-                                            setReportPage(1);
-                                        }}
-                                    >
-                                        <option value="all">ทุกสถานะ</option>
-                                        <option value="pending">รอตรวจสอบ</option>
-                                        <option value="appeal_pending">คำขอปลดแบนรอตรวจสอบ</option>
-                                        <option value="resolved">ดำเนินการแล้ว (อนุมัติ)</option>
-                                        <option value="rejected">ไม่พบการละเมิด (ปฏิเสธ)</option>
-                                    </select>
-                                </div>
-
-                                {/* Type Filter */}
-                                <div className="admin-select-wrapper">
-                                    <label htmlFor="report-type-select" className="admin-filter-label">
-                                        ประเภท:
-                                    </label>
-                                    <select
-                                        id="report-type-select"
-                                        className="admin-select"
-                                        value={reportTypeFilter}
-                                        onChange={(e) => {
-                                            setReportTypeFilter(e.target.value);
-                                            setReportPage(1);
-                                        }}
-                                    >
-                                        <option value="all">ทุกประเภท</option>
-                                        <option value="report">รายงานเนื้อหา</option>
-                                        <option value="appeal">คำขอปลดแบน</option>
-                                    </select>
-                                </div>
-
-                                {/* Reset Filter Button */}
-                                {(reportSearch ||
-                                    reportStatusFilter !== "all" ||
-                                    reportTypeFilter !== "all") && (
-                                    <button
-                                        type="button"
-                                        className="admin-btn admin-btn--reset"
-                                        onClick={() => {
-                                            setReportSearch("");
-                                            setReportStatusFilter("all");
-                                            setReportTypeFilter("all");
-                                            setReportPage(1);
-                                        }}
-                                    >
-                                        <Undo2 size={15} />
-                                        <span>ล้างตัวกรอง</span>
-                                    </button>
-                                )}
-                            </div>
-                        </div>
-
                         {/* Error Banner */}
                         {reportsError && (
                             <div className="admin-error-banner" role="alert">
@@ -1297,6 +1306,78 @@ export default function AdminReportsDashboard() {
 
                         {/* Reports Table Card */}
                         <div className="admin-table-card">
+                            {/* 🔍 Search Bar & Filters อยู่ภายใน Container เดียวกับ Table */}
+                            <div className="admin-table-top-bar">
+                                <div className="search-box-wrapper">
+                                    <Search className="search-icon" size={16} />
+                                    <input
+                                        type="text"
+                                        className="admin-search-input"
+                                        placeholder="ค้นหาชื่อเรื่อง, ผู้รายงาน หรือเหตุผล..."
+                                        value={reportSearch}
+                                        onChange={(e) => setReportSearch(e.target.value)}
+                                    />
+                                </div>
+
+                                <div className="filter-controls-group">
+                                    <div className="select-filter-item">
+                                        <span className="filter-label-text">สถานะรายงาน:</span>
+                                        <div className="select-filter-wrapper">
+                                            <select
+                                                className="admin-filter-select"
+                                                value={reportStatusFilter}
+                                                onChange={(e) => {
+                                                    setReportStatusFilter(e.target.value);
+                                                    setReportPage(1);
+                                                }}
+                                            >
+                                                <option value="all">ทุกสถานะ</option>
+                                                <option value="pending">รอตรวจสอบ</option>
+                                                <option value="appeal_pending">คำขอปลดแบนรอตรวจสอบ</option>
+                                                <option value="resolved">ดำเนินการแล้ว (อนุมัติ)</option>
+                                                <option value="rejected">ไม่พบการละเมิด (ปฏิเสธ)</option>
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <div className="select-filter-item">
+                                        <span className="filter-label-text">ประเภท:</span>
+                                        <div className="select-filter-wrapper">
+                                            <select
+                                                className="admin-filter-select"
+                                                value={reportTypeFilter}
+                                                onChange={(e) => {
+                                                    setReportTypeFilter(e.target.value);
+                                                    setReportPage(1);
+                                                }}
+                                            >
+                                                <option value="all">ทุกประเภท</option>
+                                                <option value="report">รายงานเนื้อหา</option>
+                                                <option value="appeal">คำขอปลดแบน</option>
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    {(reportSearch.trim() !== "" ||
+                                        reportStatusFilter !== "all" ||
+                                        reportTypeFilter !== "all") && (
+                                        <button
+                                            type="button"
+                                            className="clear-filter-btn"
+                                            onClick={() => {
+                                                setReportSearch("");
+                                                setReportStatusFilter("all");
+                                                setReportTypeFilter("all");
+                                                setReportPage(1);
+                                            }}
+                                            title="ล้างตัวกรองทั้งหมด"
+                                        >
+                                            <RotateCcw size={13} />
+                                            <span>ล้างตัวกรอง</span>
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
                             {loadingReports ? (
                                 /* Skeleton Rows */
                                 <div className="admin-skeleton-table">
@@ -1357,7 +1438,7 @@ export default function AdminReportsDashboard() {
                                                      <th style={{ width: "19%" }}>เหตุผล</th>
                                                      <th style={{ width: "13%" }}>วันที่รายงาน</th>
                                                      <th style={{ width: "8%" }}>สถานะ</th>
-                                                     <th style={{ width: "24%", textAlign: "right" }}>การจัดการ</th>
+                                                     <th style={{ width: "24%" }} className="text-center">การจัดการ</th>
                                                  </tr>
                                             </thead>
                                             <tbody>
@@ -1425,19 +1506,21 @@ export default function AdminReportsDashboard() {
                                                             </td>
 
                                                             {/* Actions */}
-                                                            <td style={{ textAlign: "right" }}>
-                                                                <button
-                                                                    type="button"
-                                                                    className="admin-action-btn admin-action-btn--inspect"
-                                                                    onClick={() => {
-                                                                        setSelectedReport(report);
-                                                                        setReportDecisionReason("");
-                                                                    }}
-                                                                    title="ตรวจสอบรายละเอียดรายงาน"
-                                                                >
-                                                                    <FileText size={14} />
-                                                                    <span>ตรวจสอบ</span>
-                                                                </button>
+                                                            <td className="text-center align-center">
+                                                                <div className="action-cell-content">
+                                                                    <button
+                                                                        type="button"
+                                                                        className="admin-action-btn admin-action-btn--inspect"
+                                                                        onClick={() => {
+                                                                            setSelectedReport(report);
+                                                                            setReportDecisionReason("");
+                                                                        }}
+                                                                        title="ตรวจสอบรายละเอียดรายงาน"
+                                                                    >
+                                                                        <FileText size={14} />
+                                                                        <span>ตรวจสอบ</span>
+                                                                    </button>
+                                                                </div>
                                                             </td>
                                                         </tr>
                                                     );
@@ -1494,20 +1577,16 @@ export default function AdminReportsDashboard() {
                                     </div>
 
                                     {/* Pagination */}
-                                    <div className="admin-pagination-bar">
-                                        <div className="admin-pagination-info">
-                                            แสดง{" "}
-                                            <strong>
-                                                {(reportPage - 1) * reportPageSize + 1} -{" "}
-                                                {Math.min(reportPage * reportPageSize, reportTotal)}
-                                            </strong>{" "}
-                                            จาก <strong>{reportTotal.toLocaleString()}</strong> รายการ
-                                        </div>
+                                    <div className="admin-table-footer">
+                                        <div className="admin-table-footer-left">
+                                            <span className="admin-table-info-text">
+                                                แสดง <strong>{reportTotal === 0 ? 0 : (reportPage - 1) * reportPageSize + 1}–{Math.min(reportPage * reportPageSize, reportTotal)}</strong> จาก <strong>{reportTotal.toLocaleString()}</strong> รายการ
+                                            </span>
 
-                                        <div className="admin-pagination-controls">
-                                            <div className="admin-page-size-selector">
-                                                <span>แถวต่อหน้า:</span>
+                                            <div className="admin-table-per-page">
+                                                <span>แสดงต่อหน้า</span>
                                                 <select
+                                                    className="admin-per-page-select"
                                                     value={reportPageSize}
                                                     onChange={(e) => {
                                                         setReportPageSize(Number(e.target.value));
@@ -1519,29 +1598,28 @@ export default function AdminReportsDashboard() {
                                                     <option value={100}>100</option>
                                                 </select>
                                             </div>
+                                        </div>
 
+                                        <div className="admin-pagination-img2">
                                             <button
                                                 type="button"
-                                                className="admin-page-btn"
-                                                onClick={() => setReportPage((p) => Math.max(1, p - 1))}
+                                                className="page-btn-box"
+                                                onClick={() => setReportPage((prev) => Math.max(1, prev - 1))}
                                                 disabled={reportPage === 1}
-                                                aria-label="หน้าก่อนหน้า"
                                             >
                                                 <ChevronLeft size={16} />
                                                 <span>ก่อนหน้า</span>
                                             </button>
 
-                                            <span className="admin-page-indicator">
-                                                หน้า <strong>{reportPage}</strong> จาก{" "}
-                                                <strong>{totalReportPages}</strong>
+                                            <span className="page-indicator-text">
+                                                หน้า <strong>{reportPage}</strong> จาก <strong>{totalReportPages}</strong>
                                             </span>
 
                                             <button
                                                 type="button"
-                                                className="admin-page-btn"
-                                                onClick={() => setReportPage((p) => Math.min(totalReportPages, p + 1))}
+                                                className="page-btn-box"
+                                                onClick={() => setReportPage((prev) => Math.min(totalReportPages, prev + 1))}
                                                 disabled={reportPage === totalReportPages}
-                                                aria-label="หน้าถัดไป"
                                             >
                                                 <span>ถัดไป</span>
                                                 <ChevronRight size={16} />
@@ -1964,4 +2042,25 @@ export default function AdminReportsDashboard() {
             )}
         </div>
     );
+}
+export function getPendingAppealsList() {
+  try {
+    const reg = JSON.parse(localStorage.getItem('banned_novels_registry') || '{}');
+    const appeals = [];
+    Object.keys(reg).forEach((novelId) => {
+      const item = reg[novelId];
+      if (item && item.appeal_status === 'pending') {
+        appeals.push({
+          novel_id: novelId,
+          novel_title: item.title || item.novel_title || item.Title || ('นิยาย #' + novelId),
+          reason: item.appeal_reason || item.reason || 'คำขอปลดระงับจากนักเขียน',
+          created_at: item.appeal_at || item.bannedAt || new Date().toISOString(),
+          ...item,
+        });
+      }
+    });
+    return appeals;
+  } catch {
+    return [];
+  }
 }

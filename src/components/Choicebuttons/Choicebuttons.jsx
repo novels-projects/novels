@@ -1,6 +1,14 @@
 // src/components/ChoiceButtons/ChoiceButtons.jsx
 import React, { useState } from "react";
+import { ChevronRight, Check } from "lucide-react";
 import "./ChoiceButtons.css";
+
+const stripLeadingEmoji = (str) => {
+  if (!str) return "";
+  return str
+    .replace(/^[\p{Extended_Pictographic}\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\s]+/gu, "")
+    .trim();
+};
 
 const ChoiceButtons = ({ prompt, choices = [], onChoose, disabled = false }) => {
   const [selected, setSelected] = useState(null);
@@ -35,6 +43,7 @@ const ChoiceButtons = ({ prompt, choices = [], onChoose, disabled = false }) => 
         {choices.map((choice) => {
           const isSelected = selected === choice.id;
           const isUnavailable = choice.is_unavailable === true;
+          const cleanText = stripLeadingEmoji(choice.text);
 
           return (
             <button
@@ -42,13 +51,18 @@ const ChoiceButtons = ({ prompt, choices = [], onChoose, disabled = false }) => 
               type="button"
               className={`choices__btn${isSelected ? " choices__btn--selected" : ""}${isUnavailable ? " choices__btn--unavailable" : ""}`}
               onClick={() => handleChoose(choice)}
-              aria-label={`${choice.text}${isUnavailable ? " กำลังเขียน" : ""}`}
+              aria-label={`${cleanText}${isUnavailable ? " กำลังเขียน" : ""}`}
               disabled={selected !== null || disabled}
             >
+              <span className="choices__btn-circle" aria-hidden="true">
+                <ChevronRight size={16} />
+              </span>
+
               <span className="choices__btn-content">
                 <span className="choices__btn-text">
-                  {isSelected && !isUnavailable ? "กำลังเปิดฉาก..." : choice.text}
+                  {isSelected && !isUnavailable ? "กำลังเปิดฉาก..." : cleanText}
                 </span>
+
                 {isUnavailable && (
                   <span className="choices__status" aria-label="ปลายทางกำลังเขียน">
                     <span className="choices__status-dot" aria-hidden="true" />
@@ -58,7 +72,9 @@ const ChoiceButtons = ({ prompt, choices = [], onChoose, disabled = false }) => 
               </span>
 
               {isSelected && !isUnavailable && (
-                <span className="choices__btn-check" aria-hidden="true">✓</span>
+                <span className="choices__btn-check" aria-hidden="true">
+                  <Check size={16} />
+                </span>
               )}
             </button>
           );

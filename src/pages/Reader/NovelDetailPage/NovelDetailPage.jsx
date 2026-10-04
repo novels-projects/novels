@@ -1,10 +1,9 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import "./NovelDetailPage.css";
 
 import NovelCoverCard from "../../../components/NovelCoverCard/NovelCoverCard";
 import GenreTag from "../../../components/GenreTag/GenreTag";
-import ActionButtons from "../../../components/ActionButtons/ActionButtons";
 import FollowButton from "../../../components/FollowButton/FollowButton";
 import NovelProgressBar from "../../../components/NovelProgressBar/NovelProgressBar";
 import EndingCollection from "../../../components/EndingCollection/EndingCollection";
@@ -12,6 +11,8 @@ import Comments from "../../../components/Comments/Comments";
 import ReaderReportButton from "../../../components/ReaderReportButton/ReaderReportButton";
 import AdminModeBanner from "../../../components/AdminModeBanner/AdminModeBanner";
 import LoadingScreen from "../../../components/LoadingScreen/LoadingScreen";
+import { ShieldAlert, ChevronDown, Pencil, Map, Bookmark, Heart, MoreVertical, RotateCcw, Flag, Play, CheckCircle2, MapPin, Trophy } from "lucide-react";
+import { getBannedRegistry, cleanBanReason, extractBanDetails } from "../../../utils/novelStatus";
 // Removed authUtils import per user request
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
@@ -76,6 +77,106 @@ const SimpleModal = ({ onClose, maxWidth = 400, children }) => (
   </div>
 );
 
+// 🟢 Component แสดงหน้านิยายโดนระงับแบบละเอียดสำหรับผู้อ่าน/นักเขียน
+const BannedNovelView = ({ novel, novelId, navigate }) => {
+  const [showSteps, setShowSteps] = useState(false);
+
+  const bannedReg = getBannedRegistry();
+  const regInfo = bannedReg[String(novelId)] || {};
+
+  const rawReason =
+    novel?.banReason ||
+    novel?.ban_reason ||
+    novel?.suspend_reason ||
+    novel?.reason ||
+    regInfo.reason ||
+    "ละเมิดลิขสิทธิ์ / นำผลงานผู้อื่นมาลง";
+
+  const mainReason = cleanBanReason(rawReason);
+
+  const adminDetails = extractBanDetails(
+    rawReason,
+    novel?.banDetails ||
+    novel?.ban_details ||
+    novel?.suspend_details ||
+    novel?.details ||
+    regInfo.details ||
+    regInfo.ban_details
+  );
+
+  return (
+    <div className="novel-detail">
+      <div className="novel-detail__container novel-detail__banned-screen">
+        <div className="novel-detail__banned-card">
+          <div className="novel-detail__banned-header">
+            <ShieldAlert className="novel-detail__banned-shield-icon" size={48} color="#ef4444" />
+            <h2 className="novel-detail__banned-title">
+              นิยายเรื่อง "{novel?.title || "ไม่ทราบชื่อเรื่อง"}" ถูกระงับการเผยแพร่ชั่วคราว
+            </h2>
+            <span className="novel-detail__banned-badge">สถานะ: ถูกระงับการเผยแพร่</span>
+          </div>
+
+          <div className="novel-detail__banned-reason-box">
+            <div>
+              <strong style={{ color: "#b91c1c", fontSize: "14.5px" }}>สาเหตุการระงับ:</strong>
+              <p style={{ marginTop: "4px", color: "#1e293b", fontWeight: 600 }}>{mainReason}</p>
+            </div>
+            {adminDetails && (
+              <div style={{ marginTop: "12px", paddingTop: "10px", borderTop: "1.5px dashed #fca5a5" }}>
+                <strong style={{ color: "#991b1b", fontSize: "14px" }}>เหตุผล/รายละเอียดเพิ่มเติมจากแอดมิน:</strong>
+                <p style={{ marginTop: "4px", color: "#334155", fontWeight: 500 }}>{adminDetails}</p>
+              </div>
+            )}
+          </div>
+
+          <div className="novel-detail__banned-steps-accordion">
+            <button
+              type="button"
+              className="novel-detail__banned-steps-toggle"
+              onClick={() => setShowSteps((prev) => !prev)}
+            >
+              <span>ขั้นตอนการยื่นขอปลดแบน</span>
+              <ChevronDown
+                size={18}
+                style={{
+                  transform: showSteps ? "rotate(180deg)" : "rotate(0deg)",
+                  transition: "transform 0.2s ease"
+                }}
+              />
+            </button>
+
+            {showSteps && (
+              <ol className="novel-detail__banned-steps-list">
+                <li>1. แก้ไขเนื้อหาหรือภาพปกนิยายที่ขัดต่อกฎระเบียบ</li>
+                <li>2. กดยื่นคำขอปลดแบนในหน้าจัดการตอนของนักเขียน</li>
+                <li>3. รอผู้ดูแลระบบ (Admin) ตรวจสอบและพิจารณาอนุมัติคำขอ</li>
+              </ol>
+            )}
+          </div>
+
+          <div className="novel-detail__banned-actions">
+            <button
+              type="button"
+              className="novel-detail__banned-btn novel-detail__banned-btn--primary"
+              onClick={() => navigate(`/writer/${novelId}/chapters`)}
+            >
+              <Pencil size={16} style={{ marginRight: 6 }} />
+              ไปที่หน้าจัดการตอนและแก้ไขเนื้อหา
+            </button>
+            <button
+              type="button"
+              className="novel-detail__banned-btn novel-detail__banned-btn--secondary"
+              onClick={() => navigate("/")}
+            >
+              กลับหน้าหลัก
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const NovelDetailPage = () => {
   const { id } = useParams();
   const location = useLocation();
@@ -128,6 +229,74 @@ const NovelDetailPage = () => {
   // ถ้าไม่มี state นี้ ปุ่ม "อ่านเลย/อ่านต่อ" จะดูนิ่งเฉยๆ ระหว่างรอ ทำให้ผู้ใช้กดซ้ำหรืองงว่าใช้งานได้ไหม
   const [readLoading, setReadLoading] = useState(false);
   const [isFollowingAuthor, setIsFollowingAuthor] = useState(false);
+
+  // 🟢 ข้อมูลการอ่านล่าสุด + เส้นทางที่ค้นพบของผู้ใช้ที่เคยอ่านแล้ว
+  const [visitedNodes, setVisitedNodes] = useState([]);
+  const [latestNode, setLatestNode] = useState(null);
+  const [totalTreeNodes, setTotalTreeNodes] = useState(0);
+  const [hasReadBefore, setHasReadBefore] = useState(false);
+  const [showMoreMenu, setShowMoreMenu] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [discoveredPage, setDiscoveredPage] = useState(1);
+  const moreMenuRef = useRef(null);
+
+  useEffect(() => {
+    if (!showMoreMenu) return;
+    const handleClickOutside = (e) => {
+      if (moreMenuRef.current && !moreMenuRef.current.contains(e.target)) {
+        setShowMoreMenu(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showMoreMenu]);
+
+  const formatRelativeTime = (isoString) => {
+    if (!isoString) return null;
+    const timestamp = Date.parse(isoString);
+    if (Number.isNaN(timestamp)) return null;
+    const diff = (Date.now() - timestamp) / 1000;
+    if (diff < 60) return "เมื่อสักครู่";
+    if (diff < 3600) return `${Math.max(1, Math.floor(diff / 60))} นาทีที่แล้ว`;
+    if (diff < 86400) return `${Math.max(1, Math.floor(diff / 3600))} ชั่วโมงที่แล้ว`;
+    if (diff < 604800) return `${Math.max(1, Math.floor(diff / 86400))} วันที่แล้ว`;
+    return new Date(timestamp).toLocaleDateString("th-TH", { day: "numeric", month: "short", year: "numeric" });
+  };
+
+  const getLatestReadInfo = (node) => {
+    if (!node) return { chapter: "ไม่มีข้อมูลฉาก", scene: "" };
+    const epNum = node.chapter_episode || node.chapterEpisode || node.episode || node.chapter_order || node.chapterOrder || 1;
+    const chapterName = stripHtml(node.chapter_title || node.chapterTitle || node.chapter_name || node.chapterName || "").trim();
+    const rawSceneName = stripHtml(node.title || node.scene_name || node.name || "เนื้อเรื่อง").trim();
+    const cleanSceneName = rawSceneName.replace(/^(ตอนที่|ฉากที่)\s*\d+[\s:•-]*/i, "").trim() || rawSceneName;
+
+    if (node.type === "start") {
+      return {
+        chapter: "จุดเริ่มต้น",
+        scene: `ฉาก : ${cleanSceneName}`
+      };
+    }
+
+    const chapterText = chapterName ? `ตอนที่ ${epNum} : ${chapterName}` : `ตอนที่ ${epNum}`;
+    const sceneText = `ฉาก : ${cleanSceneName}`;
+
+    return {
+      chapter: chapterText,
+      scene: sceneText
+    };
+  };
+
+  const getLatestReadLabel = (node) => {
+    const info = getLatestReadInfo(node);
+    return info.scene ? `${info.chapter} • ${info.scene}` : info.chapter;
+  };
+
+  const DISCOVERED_ITEMS_PER_PAGE = 5;
+  const discoveredTotalPages = Math.max(1, Math.ceil((visitedNodes || []).length / DISCOVERED_ITEMS_PER_PAGE));
+  const paginatedDiscoveredNodes = (visitedNodes || []).slice(
+    (discoveredPage - 1) * DISCOVERED_ITEMS_PER_PAGE,
+    discoveredPage * DISCOVERED_ITEMS_PER_PAGE
+  );
 
   const getCurrentUser = () => {
     const userJson = localStorage.getItem("user");
@@ -334,6 +503,53 @@ const NovelDetailPage = () => {
             return plain.length > 150 ? `${plain.slice(0, 150)}…` : plain;
           })();
 
+        let realWriterId =
+          nData.writer_id ||
+          nData.author_writer_id ||
+          nData.author_writerId ||
+          nData.author_id ||
+          nData.author?.writer_id ||
+          nData.author?.id ||
+          null;
+        let realUserId = nData.user_id || nData.author?.user_id || null;
+        let queryId = realWriterId || realUserId || nData.id;
+
+        let resolvedAuthorAvatar = formatMinioUrl(
+          nData.author_avatar ||
+          nData.author_avatar_url ||
+          nData.authorAvatar ||
+          nData.writer_avatar ||
+          nData.user_avatar ||
+          nData.pic_profile ||
+          nData.avatar_url ||
+          nData.avatarUrl ||
+          nData.author?.avatar_url ||
+          nData.author?.avatarUrl ||
+          nData.author?.avatar
+        ) || null;
+
+        if (queryId) {
+          try {
+            const wRes = await fetch(`${API_BASE_URL}/writer/${queryId}`, { headers });
+            if (wRes.ok) {
+              const wJson = await wRes.json().catch(() => null);
+              const wData = wJson?.data || wJson?.writer || wJson || {};
+              const rawWAvatar = wData.avatar_url || wData.pic_profile || wData.avatarUrl || wData.author_avatar || null;
+              if (rawWAvatar && !resolvedAuthorAvatar) {
+                resolvedAuthorAvatar = formatMinioUrl(rawWAvatar);
+              }
+              const fetchedWriterId = wData.writer_id || wData.id;
+              if (fetchedWriterId) {
+                realWriterId = fetchedWriterId;
+              }
+            }
+          } catch (e) {
+            console.warn("Failed to fetch author info from writer endpoint:", e);
+          }
+        }
+
+        const finalWriterId = realWriterId || queryId;
+
         setNovel({
           id: nData.novel_id || nData.id || id,
           title: nData.title || "ไม่พบชื่อเรื่อง",
@@ -351,10 +567,10 @@ const NovelDetailPage = () => {
           author: {
             displayName: authorDisplayName,
             penName: nData.pen_name || nData.penName || nData.author_pen_name || nData.author_penName || null,
-            avatarUrl: formatMinioUrl(nData.author_avatar) || null,
-            writer_id: nData.author_writer_id || nData.author_writerId || nData.author_id || null,
-            user_id: nData.user_id || null,
-            id: nData.author_writer_id || nData.author_writerId || nData.author_id || null,
+            avatarUrl: resolvedAuthorAvatar,
+            writer_id: finalWriterId,
+            user_id: realUserId,
+            id: finalWriterId,
           },
           synopsis: shortSynopsis || "ไม่มีเรื่องย่อ",
 
@@ -380,13 +596,74 @@ const NovelDetailPage = () => {
           isBookmarked: isBookmarked,
         });
 
-        try {
-          const isFollowing = Boolean(data.is_following || data.isFollowing || nData.is_following || nData.isFollowing);
-          setIsFollowingAuthor(isFollowing);
-        } catch (e) {
-          setIsFollowingAuthor(false);
+        let isFollowing = Boolean(data.is_following || data.isFollowing || nData.is_following || nData.isFollowing);
+
+        if (token && finalWriterId) {
+          try {
+            const followCheckRes = await fetch(`${API_BASE_URL}/api/users/following-writers`, { headers });
+            if (followCheckRes.ok) {
+              const followPayload = await followCheckRes.json().catch(() => null);
+              const followBody = followPayload?.data ?? followPayload ?? {};
+              const followList = Array.isArray(followBody) ? followBody : (followBody.following || followBody.writers || []);
+              if (Array.isArray(followList) && followList.some((w) => Number(w.writer_id ?? w.id) === Number(finalWriterId))) {
+                isFollowing = true;
+              }
+            }
+          } catch (e) {
+            console.warn("Failed to check following writers status:", e);
+          }
         }
+
+        if (!isFollowing && finalWriterId) {
+          try {
+            const localSaved = localStorage.getItem("local_following_writers");
+            const list = localSaved ? JSON.parse(localSaved) : [];
+            if (Array.isArray(list) && list.some(w => Number(w.id || w.writer_id) === Number(finalWriterId))) {
+              isFollowing = true;
+            }
+          } catch (e) {}
+        }
+
+        setIsFollowingAuthor(isFollowing);
         setEndings(data.endings || []);
+
+        // 🟢 ดึงข้อมูลความคืบหน้าการอ่านและเส้นทางที่ค้นพบจริงจาก Backend
+        let discoveredNodesList = [];
+        let currentLatestNode = null;
+        let readerHasReadBefore = false;
+
+        if (userId > 0 && !isCurrentUserAdmin() && !isPreview) {
+          try {
+            const treeRes = await fetch(`${API_BASE_URL}/novels/${id}/story-tree?user_id=${userId}`, { headers });
+            if (treeRes.ok) {
+              const treePayload = await treeRes.json().catch(() => null);
+              const treeData = treePayload?.data || treePayload || {};
+              const rawNodes = treeData?.nodes || [];
+              setTotalTreeNodes(rawNodes.length);
+              const currentSceneIdStr = treeData.current_scene_id ? String(treeData.current_scene_id) : null;
+              const hasBackendCurrent = rawNodes.some((n) => n.is_current === true);
+              const hasRealProgress = Boolean(currentSceneIdStr) || hasBackendCurrent || rawNodes.some((n) => n.is_unlocked && n.type !== "start");
+
+              if (hasRealProgress) {
+                discoveredNodesList = rawNodes.filter((n) => {
+                  return n.is_current === true || n.is_unlocked === true || (currentSceneIdStr && String(n.id) === currentSceneIdStr);
+                });
+
+                currentLatestNode = rawNodes.find((n) => n.is_current === true || (currentSceneIdStr && String(n.id) === currentSceneIdStr)) ||
+                  discoveredNodesList[discoveredNodesList.length - 1] || null;
+
+                readerHasReadBefore = discoveredNodesList.length > 0 && currentLatestNode !== null;
+              }
+            }
+          } catch (treeErr) {
+            console.warn("Failed to fetch story tree progress:", treeErr);
+          }
+        }
+
+        setVisitedNodes(discoveredNodesList);
+        setLatestNode(currentLatestNode);
+        setHasReadBefore(readerHasReadBefore);
+
         fetchNovelComments();
       } catch (err) {
         console.error("Fetch error:", err);
@@ -714,6 +991,11 @@ const fetchFirstSceneAndNavigate = async (previewSuffix) => {
     if (authorId) navigate(`/writer/profile/${authorId}`);
   };
 
+  // คำนวณ % ความคืบหน้าการอ่านจากฉากที่ค้นพบ เหมือนกับในหน้าประวัติการอ่าน (HistoryPage)
+  const readingPercent = totalTreeNodes > 0
+    ? Math.round((visitedNodes.length / totalTreeNodes) * 100)
+    : (novel.userProgress?.percentage || 0);
+
   if (loading) {
     return <LoadingScreen />;
   }
@@ -737,22 +1019,7 @@ const fetchFirstSceneAndNavigate = async (previewSuffix) => {
   // 🟢 หากนิยายถูกระงับ ให้แสดงหน้าแจ้งเตือนและซ่อนเนื้อหา
   // ยกเว้นแอดมิน ซึ่งต้องเห็นเนื้อหาเต็มเพื่อตรวจสอบ/จัดการรายงานที่เกี่ยวข้อง
   if ((novel.status === "banned" || novel.status === "suspended") && !isAdmin) {
-    return (
-      <div className="novel-detail">
-        <div className="novel-detail__container novel-detail__banned-screen">
-          <div className="novel-detail__banned-icon" aria-hidden="true">⚠️</div>
-          <h2 className="novel-detail__banned-title">
-            นิยายเรื่องนี้ถูกระงับการเผยแพร่ชั่วคราว
-          </h2>
-          <p className="novel-detail__banned-text">
-            เนื้อหานี้อยู่ระหว่างการตรวจสอบโดยผู้ดูแลระบบ เนื่องจากได้รับการรายงานว่าอาจขัดต่อเงื่อนไขการใช้งาน
-          </p>
-          <button className="novel-detail__banned-btn" onClick={() => navigate("/")}>
-            กลับหน้าหลัก
-          </button>
-        </div>
-      </div>
-    );
+    return <BannedNovelView novel={novel} novelId={id} navigate={navigate} />;
   }
 
   return (
@@ -805,7 +1072,7 @@ const fetchFirstSceneAndNavigate = async (previewSuffix) => {
               <div className="novel-detail__tags" role="list" aria-label="หมวดหมู่">
                 {novel.categories.map((cat) => (
                   <div role="listitem" key={cat}>
-                    <GenreTag label={cat} colorByCategory />
+                    <GenreTag label={cat} />
                   </div>
                 ))}
               </div>
@@ -843,6 +1110,8 @@ const fetchFirstSceneAndNavigate = async (previewSuffix) => {
                 <FollowButton
                   writerId={authorId}
                   writerName={novel.author.displayName}
+                  avatarUrl={novel.author.avatarUrl}
+                  novels={[{ id: novel.id, title: novel.title, cover: novel.coverImage }]}
                   isFollowing={isFollowingAuthor}
                   onFollowChange={setIsFollowingAuthor}
                   size="small"
@@ -854,47 +1123,195 @@ const fetchFirstSceneAndNavigate = async (previewSuffix) => {
             </div>
 
             {!isAdmin && (
-              <div className="novel-detail__action-group">
-                <div className="novel-detail__primary-actions">
-                  <ActionButtons
-                    isBookmarked={novel.isBookmarked}
-                    isLiked={novel.isLiked}
-                    readLabel={
-                      readLoading
-                        ? "กำลังเปิด..."
-                        : (nextSceneId || novel.userProgress.discoveredChoices > 0) ? "อ่านต่อ" : "อ่านเลย"
-                    }
-                    readAriaLabel={(nextSceneId || novel.userProgress.discoveredChoices > 0) ? "อ่านต่อ" : "อ่านเลย"}
-                    onRead={handleRead}
-                    readDisabled={readLoading}
-                    bookmarkDisabled={bookmarkProcessing}
-                    likeDisabled={likeProcessing}
-                    bookmarkLabel={bookmarkProcessing ? "กำลังบันทึก..." : "เพิ่มเข้าชั้นหนังสือ"}
-                    likeLabel={likeProcessing ? "กำลังบันทึก..." : "ถูกใจ"}
-                    onBookmark={isPreview ? undefined : handleBookmark}
-                    onLike={isPreview ? undefined : handleLike}
-                    showBookmark={!isPreview}
-                    showLike={!isPreview}
-                  />
-                </div>
-                {!isPreview && isLoggedIn && (
-                  <div className="novel-detail__secondary-actions">
+              <div className="novel-detail__action-bar-container">
+                <div className="novel-detail__action-bar" role="group" aria-label="การกระทำสำหรับนิยาย">
+                  {/* 1. ปุ่มอ่านต่อ / อ่านเลย */}
+                  <button
+                    type="button"
+                    className="action-bar-btn action-bar-btn--primary"
+                    onClick={handleRead}
+                    disabled={readLoading}
+                    aria-label={hasReadBefore ? "อ่านต่อ" : "อ่านเลย"}
+                  >
+                    <Play size={14} fill="currentColor" />
+                    <span>{readLoading ? "กำลังเปิด..." : (hasReadBefore ? "อ่านต่อ" : "อ่านเลย")}</span>
+                  </button>
+
+                  {/* 🟢 ปุ่มคลังฉากจบ (แสดงเมื่อเคยอ่านแล้ว) */}
+                  {hasReadBefore && (
                     <button
-                      className="novel-detail__restart-button"
                       type="button"
-                      onClick={handleRestartConfirmOpen}
-                      title="รีเซ็ตเส้นทางและความคืบหน้าการอ่านเพื่อเริ่มอ่านใหม่"
+                      className="action-bar-btn action-bar-btn--ending"
+                      onClick={handleEndingCollection}
+                      title="ดูคลังฉากจบที่ค้นพบ"
                     >
-                      ⭮ เริ่มอ่านใหม่
+                      <Trophy size={15} />
+                      <span>คลังฉากจบ</span>
                     </button>
-                  </div>
-                )}
+                  )}
+
+                  {/* 2. ปุ่มดูแผนผังการอ่าน */}
+                  <button
+                    type="button"
+                    className="action-bar-btn action-bar-btn--map"
+                    onClick={() => handleStoryMap()}
+                    title="ดูผังเรื่องราวและเส้นทางคำเลือก"
+                  >
+                    <Map size={15} />
+                    <span>ดูแผนผังการอ่าน</span>
+                  </button>
+
+                  {/* 3. ปุ่มเพิ่มเข้าชั้นหนังสือ */}
+                  {!isPreview && (
+                    <button
+                      type="button"
+                      className={`action-bar-btn action-bar-btn--bookmark ${novel.isBookmarked ? "is-active" : ""}`}
+                      onClick={() => handleBookmark(!novel.isBookmarked)}
+                      disabled={bookmarkProcessing}
+                      aria-pressed={novel.isBookmarked}
+                    >
+                      <Bookmark size={15} fill={novel.isBookmarked ? "currentColor" : "none"} />
+                      <span>{bookmarkProcessing ? "กำลังบันทึก..." : (novel.isBookmarked ? "อยู่ในชั้นหนังสือ" : "เพิ่มเข้าชั้นหนังสือ")}</span>
+                    </button>
+                  )}
+
+                  {/* 4. ปุ่มถูกใจ ♡ */}
+                  {!isPreview && (
+                    <button
+                      type="button"
+                      className={`action-bar-btn action-bar-btn--icon-only action-bar-btn--like ${novel.isLiked ? "is-active" : ""}`}
+                      onClick={() => handleLike(!novel.isLiked)}
+                      disabled={likeProcessing}
+                      title={novel.isLiked ? "ยกเลิกถูกใจ" : "กดถูกใจ"}
+                      aria-label={novel.isLiked ? "ยกเลิกถูกใจ" : "กดถูกใจ"}
+                      aria-pressed={novel.isLiked}
+                    >
+                      <Heart size={18} fill={novel.isLiked ? "currentColor" : "none"} />
+                    </button>
+                  )}
+
+                  {/* 5. ปุ่ม ⋮ (Menu: เริ่มอ่านใหม่ / รายงานเรื่อง) */}
+                  {!isPreview && (
+                    <div className="action-bar-more-wrap" ref={moreMenuRef}>
+                      <button
+                        type="button"
+                        className={`action-bar-btn action-bar-btn--icon-only action-bar-btn--more ${showMoreMenu ? "is-active" : ""}`}
+                        onClick={() => setShowMoreMenu((prev) => !prev)}
+                        title="เมนูเพิ่มเติม"
+                        aria-label="เมนูเพิ่มเติม"
+                        aria-expanded={showMoreMenu}
+                      >
+                        <MoreVertical size={18} />
+                      </button>
+
+                      {showMoreMenu && (
+                        <div className="action-bar-dropdown-menu" role="menu">
+                          {isLoggedIn && (
+                            <button
+                              type="button"
+                              className="dropdown-menu-item"
+                              onClick={() => {
+                                setShowMoreMenu(false);
+                                handleRestartConfirmOpen();
+                              }}
+                              role="menuitem"
+                            >
+                              <RotateCcw size={15} />
+                              <span>เริ่มอ่านใหม่</span>
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            className="dropdown-menu-item dropdown-menu-item--report"
+                            onClick={() => {
+                              setShowMoreMenu(false);
+                              if (!isLoggedIn) {
+                                navigate("/login-register");
+                              } else {
+                                setShowReportModal(true);
+                              }
+                            }}
+                            role="menuitem"
+                          >
+                            <Flag size={15} />
+                            <span>รายงานเรื่อง</span>
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Card "อ่านล่าสุด" สำหรับนักอ่านที่เคยอ่านแล้ว */}
+                {hasReadBefore && latestNode && (() => {
+                  const readInfo = getLatestReadInfo(latestNode);
+                  const relTime = formatRelativeTime(latestNode.visited_at || latestNode.last_read_at || latestNode.updated_at);
+                  return (
+                    <div className="novel-detail__latest-read-card" onClick={handleRead} role="button" tabIndex={0}>
+                      <div className="latest-read-card__top">
+                        <div className="latest-read-card__left">
+                          <div className="latest-read-card__header-row">
+                            <span className="latest-read-card__label">📍 อ่านล่าสุดที่</span>
+                            {relTime && (
+                              <span className="latest-read-card__time">
+                                • อ่านเมื่อ {relTime}
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="latest-read-card__chapter-info">
+                            <span className="latest-read-card__chapter-title">
+                              {readInfo.chapter}
+                            </span>
+                          </div>
+
+                          {readInfo.scene && (
+                            <div className="latest-read-card__scene-info">
+                              <span className="latest-read-card__scene-chip">
+                                {readInfo.scene}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="latest-read-card__right">
+                          <span className="latest-read-card__count">
+                            {visitedNodes.length}{totalTreeNodes > 0 ? `/${totalTreeNodes}` : ""} ฉากที่ค้นพบ
+                          </span>
+                          <button
+                            type="button"
+                            className="latest-read-card__btn"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRead();
+                            }}
+                          >
+                            อ่านต่อ →
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* หลอด % ความคืบหน้าการอ่าน (คำนวณเหมือนหน้าประวัติการอ่าน) */}
+                      <div className="latest-read-card__progress-container">
+                        <div className="latest-read-card__progress-header">
+                          <span className="latest-read-card__progress-text">ความคืบหน้าการอ่าน</span>
+                          <span className="latest-read-card__progress-percent">
+                            {readingPercent}%
+                          </span>
+                        </div>
+                        <div className="latest-read-card__progress-track">
+                          <div
+                            className="latest-read-card__progress-fill"
+                            style={{ width: `${Math.min(100, Math.max(0, readingPercent))}%` }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
             )}
 
-            {/* 🟢 แอดมินไม่มี "ความคืบหน้าการอ่าน" ส่วนตัว จึงสลับไปแสดงแผงจัดการแทน
-                ผู้อ่านที่ล็อกอินแล้วเห็นแถบความคืบหน้าตามเดิม
-                ผู้เยี่ยมชมที่ยังไม่ล็อกอินเห็นการ์ดชวนเข้าสู่ระบบ แทนที่จะเป็นพื้นที่ว่างเปล่า */}
             {isAdmin ? (
               <div className="novel-detail__progress">
                 <NovelProgressBar
@@ -909,8 +1326,6 @@ const fetchFirstSceneAndNavigate = async (previewSuffix) => {
                 />
               </div>
             ) : isPreview ? (
-              // 👁️ โหมดทดลองอ่านของนักเขียนเจ้าของนิยาย: แสดงเป็นสารบัญทุกฉาก (รวมฉบับร่าง)
-              // ให้กดเข้าอ่านจากตรงนี้ได้เลย โดยไม่มีการบันทึกความคืบหน้าใดๆ
               <div className="novel-detail__progress">
                 <NovelProgressBar
                   novelId={novel.id}
@@ -918,41 +1333,85 @@ const fetchFirstSceneAndNavigate = async (previewSuffix) => {
                   onSceneClick={(sceneId) => navigate(`/reading/${novel.id}/${sceneId}?preview=true`)}
                 />
               </div>
-            ) : !isPreview && isLoggedIn ? (
-              <div className="novel-detail__progress">
-                <NovelProgressBar
-                  novelId={novel.id}
-                  autoFetch={true}
-                  isPreview={isPreview}
-                  onStoryMapClick={handleStoryMap}
-                  onEndingCollectionClick={handleEndingCollection}
-                  onContinueRead={handleRead}
-                  onSceneClick={(sceneId) => navigate(`/reading/${novel.id}/${sceneId}`)}
-                />
-              </div>
-            ) : (
-              !isPreview && (
-                <div className="novel-detail__guest-cta">
-                  <div className="novel-detail__guest-cta-icon" aria-hidden="true">🔖</div>
-                  <div className="novel-detail__guest-cta-body">
-                    <p className="novel-detail__guest-cta-title">เข้าสู่ระบบเพื่อไม่พลาดทุกความคืบหน้า</p>
-                    <p className="novel-detail__guest-cta-text">
-                      บันทึกจุดที่อ่านถึง กดถูกใจ และบุ๊กมาร์กนิยายเรื่องนี้ไว้อ่านต่อภายหลัง
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    className="novel-detail__guest-cta-btn"
-                    onClick={() => navigate("/login-register")}
-                  >
-                    เข้าสู่ระบบ
-                  </button>
-                </div>
-              )
-            )}
+            ) : null}
 
           </main>
         </div>
+
+        {/* 🟢 Card "จุดที่ค้นพบ" สำหรับนักอ่านที่เคยอ่านแล้ว */}
+        {hasReadBefore && visitedNodes.length > 0 && (
+          <section className="novel-detail__discovered-section">
+            <div className="discovered-card">
+              <div className="discovered-card__header">
+                <div>
+                  <h2 className="discovered-card__title">จุดที่ค้นพบ</h2>
+                  <p className="discovered-card__subtitle">เรื่องราวที่เปิดเผยในเส้นทางของคุณ</p>
+                </div>
+                <span className="discovered-card__badge">
+                  ค้นพบ {visitedNodes.length}{totalTreeNodes > 0 ? ` จากทั้งหมด ${totalTreeNodes}` : ""} ฉาก
+                </span>
+              </div>
+
+              <div className="discovered-card__list">
+                {paginatedDiscoveredNodes.map((node) => {
+                  const isCurrent = latestNode && String(node.id) === String(latestNode.id);
+                  const epNum = node.chapter_episode || node.chapterEpisode || node.episode || node.chapter_order || node.chapterOrder;
+                  const chapterLabel = node.type === "start"
+                    ? "จุดเริ่มต้น"
+                    : epNum
+                    ? `ตอนที่ ${epNum}`
+                    : node.chapter_title || "ฉากเนื้อเรื่อง";
+                  const sceneTitle = stripHtml(node.title || node.scene_name || node.name || "เนื้อเรื่อง");
+
+                  return (
+                    <div
+                      key={node.id}
+                      className={`discovered-item ${isCurrent ? "discovered-item--current" : ""}`}
+                      onClick={() => navigate(`/reading/${novel.id}/${node.id}`)}
+                      role="button"
+                      tabIndex={0}
+                    >
+                      <div className="discovered-item__icon">
+                        {isCurrent ? <MapPin size={16} /> : <CheckCircle2 size={16} />}
+                      </div>
+                      <div className="discovered-item__content">
+                        <span className="discovered-item__chapter">{chapterLabel}</span>
+                        <span className="discovered-item__scene">{sceneTitle}</span>
+                      </div>
+                      {isCurrent && (
+                        <span className="discovered-item__current-badge">ฉากปัจจุบัน</span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {discoveredTotalPages > 1 && (
+                <div className="discovered-card__pagination">
+                  <button
+                    type="button"
+                    className="discovered-page-btn"
+                    disabled={discoveredPage === 1}
+                    onClick={() => setDiscoveredPage((p) => Math.max(1, p - 1))}
+                  >
+                    ‹ ก่อนหน้า
+                  </button>
+                  <span className="discovered-page-info">
+                    หน้า {discoveredPage} จาก {discoveredTotalPages}
+                  </span>
+                  <button
+                    type="button"
+                    className="discovered-page-btn"
+                    disabled={discoveredPage === discoveredTotalPages}
+                    onClick={() => setDiscoveredPage((p) => Math.min(discoveredTotalPages, p + 1))}
+                  >
+                    ถัดไป ›
+                  </button>
+                </div>
+              )}
+            </div>
+          </section>
+        )}
 
         <section className="novel-detail__synopsis-section" aria-labelledby="synopsis-heading">
           <h2 id="synopsis-heading" className="novel-detail__section-title">
@@ -964,8 +1423,7 @@ const fetchFirstSceneAndNavigate = async (previewSuffix) => {
           />
         </section>
 
-        {/* 🟢 โหมดทดลองอ่านของนักเขียนเจ้าของนิยายก็ยังต้องเห็นคอมเมนต์เพื่อจำลองมุมมองนักอ่าน
-            แต่ห้ามโพสต์/ลบคอมเมนต์ใดๆ เพราะเป็นแค่การพรีวิว ไม่ใช่การกระทำจริง */}
+        {/* 🟢 โหมดทดลองอ่านของนักเขียนเจ้าของนิยายก็ยังต้องเห็นคอมเมนต์เพื่อจำลองมุมมองนักอ่าน */}
         <Comments
           comments={comments}
           currentUserId={getCurrentUserId()}
@@ -1061,13 +1519,13 @@ const fetchFirstSceneAndNavigate = async (previewSuffix) => {
 
       </div>
 
-      {!isPreview && isLoggedIn && !isAdmin && (
-        <ReaderReportButton
-          novelId={novel.id}
-          novelTitle={novel.title}
-          userId={currentUserId}
-        />
-      )}
+      <ReaderReportButton
+        novelId={novel.id}
+        novelTitle={novel.title}
+        isOpen={showReportModal}
+        onClose={() => setShowReportModal(false)}
+        showRibbon={false}
+      />
     </div>
   );
 };

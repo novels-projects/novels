@@ -476,12 +476,12 @@ const CategoriesPage = () => {
                   </div>
 
                   <div className="novel-horiz-details">
-                    <div className="novel-tags">
+                    <div className="novel-grid-tags">
                       {novel.categories.slice(0, 2).map((cat, cIdx) => (
-                        <span key={cIdx} className="novel-tag-item">{cat}</span>
+                        <span key={cIdx} className="grid-tag-item">{cat}</span>
                       ))}
                       {novel.categories.length > 2 && (
-                        <span className="novel-tag-item">+{novel.categories.length - 2}</span>
+                        <span className="grid-tag-item grid-tag-overflow">+{novel.categories.length - 2}</span>
                       )}
                     </div>
 

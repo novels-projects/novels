@@ -9,7 +9,11 @@ import {
     X,
     Check,
     Inbox,
-    Search
+    Search,
+    ChevronLeft,
+    ChevronRight,
+    RotateCcw,
+    Tag
 } from "lucide-react";
 import "./AdminCategoryPage.css";
 
@@ -248,6 +252,8 @@ export default function AdminCategoryPage() {
     };
 
     const [sortOrder, setSortOrder] = useState(null); // null | "asc" | "desc"
+    const [currentPage, setCurrentPage] = useState(1);
+    const [itemsPerPage, setItemsPerPage] = useState(10);
 
     const filteredCategories = useMemo(() => {
         const query = searchQuery.toLowerCase().trim();
@@ -267,6 +273,16 @@ export default function AdminCategoryPage() {
 
         return list;
     }, [categories, searchQuery, sortOrder]);
+
+    const totalPages = Math.max(1, Math.ceil(filteredCategories.length / itemsPerPage));
+    const paginatedCategories = useMemo(() => {
+        const startIdx = (currentPage - 1) * itemsPerPage;
+        return filteredCategories.slice(startIdx, startIdx + itemsPerPage);
+    }, [filteredCategories, currentPage, itemsPerPage]);
+
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchQuery, sortOrder]);
 
     const toggleSort = () => {
         setSortOrder(prev => {
@@ -316,24 +332,33 @@ export default function AdminCategoryPage() {
                 {/* Subheader with Count & Search */}
                 <div className="admin-categories-subheader">
                     <div className="categories-count-pill">
+                        <Tag size={18} className="count-pill-icon" />
                         <span>ทั้งหมด {categories.length} หมวดหมู่</span>
                     </div>
-                    <div className="categories-search-box">
-                        <Search size={16} className="search-icon" />
-                        <input 
-                            type="text" 
-                            placeholder="ค้นหาหมวดหมู่..." 
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                        />
-                        {searchQuery && (
+                    <div className="categories-search-and-clear">
+                        <div className="categories-search-box">
+                            <Search size={16} className="search-icon" />
+                            <input 
+                                type="text" 
+                                placeholder="ค้นหาหมวดหมู่..." 
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                            />
+                        </div>
+
+                        {(searchQuery.trim() !== "" || sortOrder !== null) && (
                             <button
                                 type="button"
-                                className="search-clear-btn"
-                                onClick={() => setSearchQuery("")}
-                                aria-label="ล้างคำค้นหา"
+                                className="clear-filter-btn"
+                                onClick={() => {
+                                    setSearchQuery("");
+                                    setSortOrder(null);
+                                    setCurrentPage(1);
+                                }}
+                                title="ล้างตัวกรองทั้งหมด"
                             >
-                                <X size={14} />
+                                <RotateCcw size={13} />
+                                <span>ล้างตัวกรอง</span>
                             </button>
                         )}
                     </div>
@@ -357,59 +382,115 @@ export default function AdminCategoryPage() {
                             <span>ไม่พบหมวดหมู่ที่ตรงกับการค้นหา "{searchQuery}"</span>
                         </div>
                     ) : (
-                        <table className="admin-table">
-                            <thead>
-                                <tr>
-                                    <th>ID</th>
-                                    <th>ชื่อหมวดหมู่</th>
-                                    <th 
-                                        className="sortable-col" 
-                                        onClick={toggleSort}
-                                        title="คลิกเพื่อเรียงลำดับ"
-                                    >
-                                        จำนวนนิยาย
-                                        {sortOrder === "desc" && <span className="sort-indicator">▼</span>}
-                                        {sortOrder === "asc" && <span className="sort-indicator">▲</span>}
-                                    </th>
-                                    <th className="align-center">การจัดการ</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {filteredCategories.map((item) => (
-                                    <tr key={item.category_id}>
-                                        <td className="id-col">{item.category_id}</td>
-                                        <td className="name-col">
-                                            <span className="category-tag-badge">
-                                                {item.name}
-                                            </span>
-                                        </td>
-                                        <td className="count-col">
-                                            <span className={`novel-count-text${(item.novelCount ?? 0) === 0 ? " is-empty" : ""}`}>
-                                                {item.novelCount ?? 0} เรื่อง
-                                            </span>
-                                        </td>
-                                        <td className="actions-col align-center">
-                                            <button 
-                                                className="btn-action-edit"
-                                                onClick={() => openMutationModal("edit", item)}
-                                                title="แก้ไขหมวดหมู่"
-                                            >
-                                                <Edit size={13} />
-                                                <span>แก้ไข</span>
-                                            </button>
-                                            <button 
-                                                className="btn-action-delete"
-                                                onClick={() => openDeleteModal(item)}
-                                                title="ลบหมวดหมู่"
-                                            >
-                                                <Trash2 size={13} />
-                                                <span>ลบ</span>
-                                            </button>
-                                        </td>
+                        <>
+                            <table className="admin-table">
+                                <thead>
+                                    <tr>
+                                        <th style={{ width: "12%" }}># ID</th>
+                                        <th style={{ width: "45%" }}>ชื่อหมวดหมู่</th>
+                                        <th 
+                                            className="sortable-col" 
+                                            onClick={toggleSort}
+                                            title="คลิกเพื่อเรียงลำดับตามจำนวนนิยาย"
+                                            style={{ width: "23%" }}
+                                        >
+                                            จำนวนนิยาย
+                                            {sortOrder === "desc" && <span className="sort-indicator"> ▼</span>}
+                                            {sortOrder === "asc" && <span className="sort-indicator"> ▲</span>}
+                                        </th>
+                                        <th className="text-center align-center" style={{ width: "20%" }}>การจัดการ</th>
                                     </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                                </thead>
+                                <tbody>
+                                    {paginatedCategories.map((item) => (
+                                        <tr key={item.category_id}>
+                                            <td className="id-col">{item.category_id}</td>
+                                            <td className="name-col">
+                                                <span className="category-tag-badge">
+                                                    {item.name}
+                                                </span>
+                                            </td>
+                                            <td className="count-col">
+                                                <span className={`novel-count-text${(item.novelCount ?? 0) === 0 ? " is-empty" : ""}`}>
+                                                    {item.novelCount ?? 0} เรื่อง
+                                                </span>
+                                            </td>
+                                            <td className="actions-col text-center align-center">
+                                                <div className="actions-cell action-cell-content">
+                                                    <button 
+                                                        className="btn-icon-action btn-edit-user"
+                                                        onClick={() => openMutationModal("edit", item)}
+                                                        title="แก้ไขหมวดหมู่"
+                                                    >
+                                                        <Edit size={14} />
+                                                        <span>แก้ไข</span>
+                                                    </button>
+                                                    <button 
+                                                        className="btn-icon-action btn-delete-user"
+                                                        onClick={() => openDeleteModal(item)}
+                                                        title="ลบหมวดหมู่"
+                                                    >
+                                                        <Trash2 size={14} />
+                                                        <span>ลบ</span>
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+
+                            {/* Footer Pagination Template (Image 2 style) */}
+                            <div className="admin-table-footer">
+                                <div className="admin-table-footer-left">
+                                    <span className="admin-table-info-text">
+                                        แสดง <strong>{filteredCategories.length === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1}–{Math.min(currentPage * itemsPerPage, filteredCategories.length)}</strong> จาก <strong>{filteredCategories.length}</strong> รายการ
+                                    </span>
+
+                                    <div className="admin-table-per-page">
+                                        <span>แสดงต่อหน้า</span>
+                                        <select
+                                            className="admin-per-page-select"
+                                            value={itemsPerPage}
+                                            onChange={(e) => {
+                                                setItemsPerPage(Number(e.target.value));
+                                                setCurrentPage(1);
+                                            }}
+                                        >
+                                            <option value={10}>10</option>
+                                            <option value={20}>20</option>
+                                            <option value={50}>50</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div className="admin-pagination-img2">
+                                    <button
+                                        type="button"
+                                        className="page-btn-box"
+                                        onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                                        disabled={currentPage === 1}
+                                    >
+                                        <ChevronLeft size={16} />
+                                        <span>ก่อนหน้า</span>
+                                    </button>
+
+                                    <span className="page-indicator-text">
+                                        หน้า <strong>{currentPage}</strong> จาก <strong>{totalPages}</strong>
+                                    </span>
+
+                                    <button
+                                        type="button"
+                                        className="page-btn-box"
+                                        onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                                        disabled={currentPage === totalPages}
+                                    >
+                                        <span>ถัดไป</span>
+                                        <ChevronRight size={16} />
+                                    </button>
+                                </div>
+                            </div>
+                        </>
                     )}
                 </div>
             </div>
@@ -522,7 +603,7 @@ export default function AdminCategoryPage() {
                                     </p>
                                     <div className="delete-modal-warning">
                                         <AlertTriangle size={15} />
-                                        <span>กรุณาลบนิยายในหมวดหมู่นี้ออกก่อน จึงจะสามารถลบหมวดหมู่ได้</span>
+                                        <span>สามารถลบได้เฉพาะหมวดหมู่ที่ไม่มีนิยายอยู่ในหมวดหมู่เท่านั้น</span>
                                     </div>
                                 </div>
                             ) : (

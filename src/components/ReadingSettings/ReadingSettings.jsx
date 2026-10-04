@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import { SlidersHorizontal } from "lucide-react";
 import "./ReadingSettings.css";
 
 const fontOptions = [
@@ -58,10 +59,10 @@ const ReadingSettings = ({
         className="reading-settings__toggle"
         onClick={() => setIsOpen((prev) => !prev)}
         aria-expanded={isOpen}
-        aria-label="เปิดเมนูตั้งค่าการอ่านและธีม"
+        aria-label="เปิดเมนูเลือกธีมและการตั้งค่าการอ่าน"
       >
-        <span className="reading-settings__toggle-icon">Aa</span>
-        <span className="reading-settings__toggle-text">ธีม</span>
+        <span className="reading-settings__icon-aa" aria-hidden="true">Aa</span>
+        <span>ธีม</span>
       </button>
 
       {isOpen && (

@@ -66,13 +66,18 @@ function normalizeLatestUpdate(rawUpdate) {
   return null;
 }
 
+const formatMinioUrl = (url) => {
+  if (!url) return null;
+  return url.replace('http://minio:9000', 'http://localhost:9000');
+};
+
 function normalizeNovel(novel) {
   if (!novel || typeof novel !== "object") return null;
   return {
     id: novel.novel_id ?? novel.id ?? novel.novelId,
     title: novel.title || novel.name || "ไม่ทราบชื่อเรื่อง",
     status: novel.status || novel.state || "ongoing",
-    cover: novel.cover || novel.cover_image || novel.coverImage || novel.thumbnail || null,
+    cover: formatMinioUrl(novel.cover || novel.cover_image || novel.coverImage || novel.thumbnail) || null,
     chapterCount: novel.chapter_count ?? novel.chapterCount ?? 0,
   };
 }
@@ -85,14 +90,40 @@ function mapWriter(writer) {
     : [];
   const latestUpdate = normalizeLatestUpdate(writer.latest_update || writer.latestUpdate || null);
 
+  const rawAvatar =
+    writer.avatar_url ||
+    writer.avatar ||
+    writer.avatarUrl ||
+    writer.pic_profile ||
+    writer.author_avatar ||
+    writer.user_avatar ||
+    writer.profile_picture;
+
+  const resolvedAvatar = formatMinioUrl(rawAvatar) || null;
+
+  const followerCount =
+    writer.follower_count ??
+    writer.followers_count ??
+    writer.total_followers ??
+    writer.total_like_count ??
+    writer.followers ??
+    0;
+
+  const novelCount =
+    writer.novel_count ??
+    writer.total_novels ??
+    writer.novels_count ??
+    writer.novelCount ??
+    novels.length;
+
   return {
     id: writer.writer_id ?? writer.id,
     name: writer.pen_name || writer.name || writer.name_lastname || "นักเขียน",
     bio: plainBio || null,
-    avatar: writer.avatar_url || writer.avatar || writer.avatarUrl || null,
+    avatar: resolvedAvatar,
     color: writer.color || ["#6D28D9", "#E91E8C", "#0F766E", "#0EA5E9"][Math.abs((writer.writer_id ?? writer.id ?? 0) % 4)],
-    followers: writer.follower_count ?? writer.total_like_count ?? writer.followers ?? 0,
-    novelCount: writer.novel_count ?? novels.length,
+    followers: followerCount,
+    novelCount: novelCount,
     hasUnreadUpdate: Boolean(writer.has_unread_update || writer.hasUnreadUpdate),
     novels,
     latestUpdate,
@@ -161,7 +192,82 @@ export default function FollowingWriters() {
           }
         });
 
-        setWriters(mergedList);
+        // 🟢 ดึงข้อมูลสถิติที่แท้จริง (จำนวนผู้ติดตาม + นิยายที่เผยแพร่ทั้งหมด) จาก /writer/:id และ /novels
+        let enrichedList = [...mergedList];
+        try {
+          enrichedList = await Promise.all(
+            mergedList.map(async (writer) => {
+              const wId = writer.id;
+              if (!wId) return writer;
+
+              try {
+                const res = await fetch(`${API_BASE_URL}/writer/${wId}`, {
+                  headers: token ? { Authorization: `Bearer ${token}` } : {},
+                });
+                if (res.ok) {
+                  const resJson = await res.json().catch(() => null);
+                  const wData = resJson?.data || resJson?.writer || resJson || {};
+                  if (wData) {
+                    let rawNovels = Array.isArray(wData.novels) ? wData.novels : [];
+
+                    // ถ้า wData.novels ไม่มีหรือโล่ง ให้ดึงรายการนิยายทั้งหมดจาก /novels
+                    if (rawNovels.length === 0) {
+                      try {
+                        const nRes = await fetch(`${API_BASE_URL}/novels`, {
+                          headers: token ? { Authorization: `Bearer ${token}` } : {},
+                        });
+                        if (nRes.ok) {
+                          const nJson = await nRes.json().catch(() => null);
+                          const rawAll = nJson?.novels || nJson?.data?.novels || nJson?.data || (Array.isArray(nJson) ? nJson : []);
+                          rawNovels = (Array.isArray(rawAll) ? rawAll : []).filter(
+                            n => String(n.author_id || n.authorId || n.user_id || n.userId || n.writer_id) === String(wId)
+                          );
+                        }
+                      } catch (_) {}
+                    }
+
+                    const normalizedNovels = rawNovels.map(normalizeNovel).filter(Boolean);
+                    const finalNovels = normalizedNovels.length > 0 ? normalizedNovels : writer.novels;
+
+                    const followerCount =
+                      wData.follower_count ??
+                      wData.followers_count ??
+                      wData.followers ??
+                      wData.total_followers ??
+                      writer.followers ??
+                      0;
+
+                    const novelCount =
+                      wData.novel_count ??
+                      wData.total_novels ??
+                      wData.novels_count ??
+                      finalNovels.length ??
+                      writer.novelCount ??
+                      0;
+
+                    return {
+                      ...writer,
+                      name: wData.pen_name || wData.name || writer.name,
+                      bio: stripHTML(wData.bio || writer.bio),
+                      avatar: formatMinioUrl(wData.avatar_url || wData.avatar || wData.pic_profile || writer.avatar) || writer.avatar,
+                      followers: followerCount,
+                      novelCount: Math.max(novelCount, finalNovels.length),
+                      novels: finalNovels,
+                      latestUpdate: normalizeLatestUpdate(wData.latest_update || wData.latestUpdate || writer.latestUpdate),
+                    };
+                  }
+                }
+              } catch (e) {
+                console.warn("Failed to fetch full stats for writer", wId, e);
+              }
+              return writer;
+            })
+          );
+        } catch (e) {
+          enrichedList = mergedList;
+        }
+
+        setWriters(enrichedList);
         setError("");
       } catch (err) {
         console.error("โหลดรายการนักเขียนที่ติดตามล้มเหลว:", err);

@@ -544,21 +544,22 @@
    📱 Responsive Breakpoints
    ══════════════════════════════════════════ */
 
-@media (max-width: 1200px) {
+@media (max-width: 1280px) {
   .admin-nav-container {
-    padding: 0 18px;
-    gap: 14px;
+    padding: 0 16px;
+    gap: 10px;
   }
   .admin-nav-menu {
-    gap: 4px;
+    gap: 3px;
   }
   .admin-nav-item a {
-    padding: 7px 10px;
-    font-size: 13px;
+    padding: 6px 8px;
+    font-size: 12.5px;
+    white-space: nowrap;
   }
 }
 
-@media (max-width: 991px) {
+@media (max-width: 1150px) {
   .admin-nav-container {
     height: 72px;
     padding: 0 16px;
