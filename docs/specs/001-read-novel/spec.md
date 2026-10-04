@@ -21,8 +21,8 @@
 
 * การค้นหาและเรียกดูนิยาย
 * การบันทึกและอ่านต่อจากตำแหน่งเดิม
-* การดูโครงสร้างเนื้อเรื่องจาก Story Map
-* การเลือก Scene จาก Story Map
+* การดูโครงสร้างเนื้อเรื่องจากแผนผังการอ่าน
+* การเลือก Scene จากแผนผังการอ่าน
 * การสร้างหรือแก้ไข Novel, ตอน, Scene และ Choice
 * การเผยแพร่นิยาย
 * Preview
@@ -88,7 +88,7 @@
 * Choice ต้องเชื่อมโยงไปยัง Scene ปลายทาง
 * Reader ทั่วไปอ่านได้เฉพาะเนื้อหาที่เผยแพร่แล้ว
 * รายละเอียดเกี่ยวกับการบันทึกตำแหน่งการอ่านไม่อยู่ใน Feature นี้
-* รายละเอียดเกี่ยวกับ Story Map ไม่อยู่ใน Feature นี้
+* รายละเอียดเกี่ยวกับแผนผังการอ่านไม่อยู่ใน Feature นี้
 
 ## 6. Traceability
 
@@ -103,11 +103,11 @@
 
 ไม่มีสำหรับขอบเขตของ Feature นี้ในขณะนี้
 
-ประเด็นที่พบจากการตรวจ implementation เช่น Reading Progress และพฤติกรรมของ Reader Story Map จะถูกจัดการใน Spec ของ Feature ที่เกี่ยวข้อง ไม่รวมไว้ใน Feature นี้
+ประเด็นที่พบจากการตรวจ implementation เช่น Reading Progress และพฤติกรรมของแผนผังการอ่านของ Reader จะถูกจัดการใน Spec ของ Feature ที่เกี่ยวข้อง ไม่รวมไว้ใน Feature นี้
 
 ## 8. Review Status
 
-**Version:** 1.1
-**Status:** Draft — Scope refined
+**Version:** 1.2
+**Status:** Draft — Terminology aligned with SRS
 **Last reviewed:** 2026-10-05
     
