@@ -52,7 +52,7 @@ func GetSceneByID(db *sql.DB, id int) (*models.Scene, error) {
 func GetStartSceneByNovelID(db *sql.DB, novelID int) (*models.Scene, error) {
 	var endingTitle, endingType, endingDescription sql.NullString
 
-	// 🎯 พยายามดึงฉากที่ถูกมาร์กเป็น start ก่อน
+	// Start ของ Reader ต้องเป็น Scene ที่กำหนด type เป็น start เท่านั้น
 	row := db.QueryRow(`
 		SELECT 
 			s.scene_id, s.chapter_id, s.novel_id, s.title, s.content, s.image_url, s.type, s.status,
@@ -77,34 +77,7 @@ func GetStartSceneByNovelID(db *sql.DB, novelID int) (*models.Scene, error) {
 		&s.ChapterEpisode,
 	)
 	if err != nil {
-		if err == sql.ErrNoRows {
-			// ถ้าไม่มีฉากประเภท start ให้ fallback ไปฉากแรกสุดของนิยายแทน
-			row = db.QueryRow(`
-				SELECT 
-					s.scene_id, s.chapter_id, s.novel_id, s.title, s.content, s.image_url, s.type, s.status,
-					s.ending_title, s.ending_type, s.ending_description,
-					s.created_at, s.updated_at,
-					n.title AS novel_title,
-            c.title AS chapter_title,
-            c.episode AS chapter_episode
-				FROM scenes s
-				INNER JOIN novels n ON s.novel_id = n.novel_id
-				INNER JOIN chapters c ON s.chapter_id = c.chapter_id
-				WHERE s.novel_id = $1
-				ORDER BY c.chapter_id, s.scene_id
-				LIMIT 1
-			`, novelID)
-			err = row.Scan(
-				&s.SceneID, &s.ChapterID, &s.NovelID, &s.Title, &s.Content, &s.ImageURL, &s.Type, &s.Status,
-				&endingTitle, &endingType, &endingDescription,
-				&s.CreatedAt, &s.UpdatedAt,
-				&s.NovelTitle, &s.ChapterTitle,
-				&s.ChapterEpisode,
-			)
-		}
-		if err != nil {
-			return nil, err
-		}
+		return nil, err
 	}
 	if endingTitle.Valid {
 		s.EndingTitle = &endingTitle.String

@@ -204,6 +204,302 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
 
+  /api/me/username:
+    patch:
+      summary: Update current user's username
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username]
+              properties:
+                username:
+                  type: string
+      responses:
+        '200':
+          description: Username updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/me/email:
+    patch:
+      summary: Update current user's email
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  format: email
+      responses:
+        '200':
+          description: Email updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/me/password:
+    patch:
+      summary: Change current user's password
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [current_password, new_password, confirm_password]
+              properties:
+                current_password:
+                  type: string
+                new_password:
+                  type: string
+                confirm_password:
+                  type: string
+      responses:
+        '200':
+          description: Password updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/me/profile-picture:
+    patch:
+      summary: Update current user's profile picture
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [profileImage]
+              properties:
+                profileImage:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: Profile picture updated
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message, pic_profile]
+                properties:
+                  message:
+                    type: string
+                  pic_profile:
+                    type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    put:
+      summary: Update current user's profile picture
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [profileImage]
+              properties:
+                profileImage:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: Profile picture updated
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message, pic_profile]
+                properties:
+                  message:
+                    type: string
+                  pic_profile:
+                    type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/me:
+    delete:
+      summary: Delete current user's account
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [current_password]
+              properties:
+                current_password:
+                  type: string
+      responses:
+        '200':
+          description: Account deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/me/suspend:
+    patch:
+      summary: Suspend current user's account
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Account suspended
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/me/notification-settings:
+    get:
+      summary: Get current user's notification settings
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Notification settings
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/NotificationSettings'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    patch:
+      summary: Update current user's notification settings
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NotificationSettings'
+      responses:
+        '200':
+          description: Notification settings updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    put:
+      summary: Update current user's notification settings
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NotificationSettings'
+      responses:
+        '200':
+          description: Notification settings updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
   /categories:
     get:
       summary: Get all novel categories
@@ -213,31 +509,133 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Category'
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Category'
+
+  /api/admin/categories:
+    post:
+      summary: Admin create a category
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+      responses:
+        '201':
+          description: Category created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/admin/categories/{categoryId}:
+    patch:
+      summary: Admin update a category
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: categoryId
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+      responses:
+        '200':
+          description: Category updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    delete:
+      summary: Admin delete a category
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: categoryId
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Category deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
 
   /novels:
     get:
       summary: List all novels
-      parameters:
-        - in: query
-          name: category_id
-          schema:
-            type: integer
-        - in: query
-          name: status
-          schema:
-            type: string
       responses:
         '200':
           description: List of novels
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Novel'
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Novel'
     post:
       summary: Create new novel (Writer)
       security:
@@ -248,29 +646,55 @@ paths:
           application/json:
             schema:
               type: object
-              required: [title, description, category_id]
+              required: [title]
               properties:
                 title:
                   type: string
-                description:
+                captions:
                   type: string
-                category_id:
-                  type: integer
+                  nullable: true
+                introduction:
+                  type: string
+                  nullable: true
                 cover_image:
                   type: string
+                  nullable: true
+                category_ids:
+                  type: array
+                  items:
+                    type: integer
+                status:
+                  type: string
+                is_published:
+                  type: boolean
+                is_completed:
+                  type: boolean
       responses:
         '201':
           description: Novel created successfully
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Novel'
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required: [message, novel_id]
+                        properties:
+                          message:
+                            type: string
+                          novel_id:
+                            type: integer
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
 
   /novels/{id}:
     get:
@@ -287,7 +711,36 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Novel'
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required: [novel, visited_scenes, total_scenes, discovered_choices, total_choices, unlocked_endings, total_endings, endings]
+                        properties:
+                          novel:
+                            $ref: '#/components/schemas/Novel'
+                          visited_scenes:
+                            type: integer
+                          total_scenes:
+                            type: integer
+                          discovered_choices:
+                            type: integer
+                          total_choices:
+                            type: integer
+                          unlocked_endings:
+                            type: integer
+                          total_endings:
+                            type: integer
+                          endings:
+                            type: array
+                            items:
+                              type: object
+                          is_following:
+                            type: boolean
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '404':
           $ref: '#/components/responses/NotFound'
     put:
@@ -309,27 +762,53 @@ paths:
               properties:
                 title:
                   type: string
-                description:
+                captions:
                   type: string
-                category_id:
-                  type: integer
+                  nullable: true
+                introduction:
+                  type: string
+                  nullable: true
                 cover_image:
                   type: string
+                  nullable: true
+                category_ids:
+                  type: array
+                  items:
+                    type: integer
                 status:
                   type: string
+                is_published:
+                  type: boolean
+                is_completed:
+                  type: boolean
+              anyOf:
+                - required: [title]
+                - required: [captions]
+                - required: [introduction]
+                - required: [cover_image]
+                - required: [category_ids]
+                - required: [status]
+                - required: [is_published]
+                - required: [is_completed]
       responses:
         '200':
           description: Novel updated successfully
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Novel'
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
     delete:
       summary: Delete novel (Writer)
       security:
@@ -343,12 +822,20 @@ paths:
       responses:
         '200':
           description: Novel deleted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
 
   /novels/{id}/chapters:
     get:
@@ -365,9 +852,26 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Chapter'
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required: [novel_id, chapters]
+                        properties:
+                          novel_id:
+                            type: integer
+                          chapters:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/Chapter'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
 
   /novels/{id}/chapters/reorder:
     put:
@@ -386,19 +890,29 @@ paths:
           application/json:
             schema:
               type: object
-              required: [chapter_ids]
+              required: [order]
               properties:
-                chapter_ids:
+                order:
                   type: array
                   items:
                     type: integer
       responses:
         '200':
           description: Chapters reordered successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
 
   /novels/{id}/story-tree:
     get:
@@ -415,16 +929,32 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  nodes:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/SceneNode'
-                  edges:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/ChoiceEdge'
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required: [novel_title, current_scene_id, stats, nodes, edges]
+                        properties:
+                          novel_title:
+                            type: string
+                          current_scene_id:
+                            type: integer
+                          stats:
+                            type: object
+                          nodes:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/SceneNode'
+                          edges:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/ChoiceEdge'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
 
   /novels/{id}/start:
     get:
@@ -441,9 +971,18 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Scene'
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Scene'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '404':
           $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
 
   /novels/{id}/restart:
     post:
@@ -462,9 +1001,28 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ReadingProgress'
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required: [novel_id, start_scene_id]
+                        properties:
+                          novel_id:
+                            type: integer
+                          start_scene_id:
+                            type: integer
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
 
   /chapters:
     post:
@@ -477,25 +1035,45 @@ paths:
           application/json:
             schema:
               type: object
-              required: [novel_id, title]
+              required: [novel_id, episode, title]
               properties:
                 novel_id:
                   type: integer
+                episode:
+                  type: integer
                 title:
                   type: string
-                order_index:
-                  type: integer
+                status:
+                  type: string
+                  default: draft
       responses:
         '201':
           description: Chapter created successfully
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Chapter'
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required: [message, chapter_id]
+                        properties:
+                          message:
+                            type: string
+                          chapter_id:
+                            type: integer
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
 
   /chapters/{id}:
     put:
@@ -517,15 +1095,28 @@ paths:
               properties:
                 title:
                   type: string
-                order_index:
-                  type: integer
+                status:
+                  type: string
+              anyOf:
+                - required: [title]
+                - required: [status]
       responses:
         '200':
           description: Chapter updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
     delete:
       summary: Delete chapter (Writer)
       security:
@@ -539,8 +1130,22 @@ paths:
       responses:
         '200':
           description: Chapter deleted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
 
   /chapters/{id}/scenes:
     get:
@@ -557,9 +1162,26 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Scene'
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required: [chapter_id, scenes]
+                        properties:
+                          chapter_id:
+                            type: integer
+                          scenes:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/Scene'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
 
   /scenes:
     post:
@@ -572,8 +1194,10 @@ paths:
           application/json:
             schema:
               type: object
-              required: [chapter_id, title, content]
+              required: [novel_id, chapter_id, title]
               properties:
+                novel_id:
+                  type: integer
                 chapter_id:
                   type: integer
                 title:
@@ -582,8 +1206,12 @@ paths:
                   type: string
                 image_url:
                   type: string
-                is_ending:
-                  type: boolean
+                type:
+                  type: string
+                  default: normal
+                status:
+                  type: string
+                  default: draft
                 ending_type:
                   type: string
                   enum: [Good Ending, Bad Ending, True Ending, Secret Ending]
@@ -600,9 +1228,9 @@ paths:
                     properties:
                       label:
                         type: string
-                      text:
-                        type: string
                       to_scene_id:
+                        type: integer
+                      choice_id:
                         type: integer
                       targetSubScene:
                         type: string
@@ -612,11 +1240,26 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Scene'
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required: [message, scene_id]
+                        properties:
+                          message:
+                            type: string
+                          scene_id:
+                            type: integer
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
 
   /scenes/{id}:
     get:
@@ -633,9 +1276,18 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Scene'
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Scene'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '404':
           $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
     put:
       summary: Update scene (Writer)
       security:
@@ -657,10 +1309,12 @@ paths:
                   type: string
                 content:
                   type: string
-                image_url:
+                type:
                   type: string
                 is_ending:
                   type: boolean
+                status:
+                  type: string
                 ending_type:
                   type: string
                   enum: [Good Ending, Bad Ending, True Ending, Secret Ending]
@@ -668,13 +1322,36 @@ paths:
                   type: string
                 ending_description:
                   type: string
+                choices:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      choice_id:
+                        type: integer
+                      label:
+                        type: string
+                      to_scene_id:
+                        type: integer
+                      targetSubScene:
+                        type: string
       responses:
         '200':
           description: Scene updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
     delete:
       summary: Delete scene (Writer)
       security:
@@ -688,8 +1365,20 @@ paths:
       responses:
         '200':
           description: Scene deleted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
 
   /choices:
     post:
@@ -702,13 +1391,13 @@ paths:
           application/json:
             schema:
               type: object
-              required: [from_scene_id, to_scene_id, choice_text]
+              required: [from_scene_id, to_scene_id, label]
               properties:
                 from_scene_id:
                   type: integer
                 to_scene_id:
                   type: integer
-                choice_text:
+                label:
                   type: string
       responses:
         '201':
@@ -716,7 +1405,18 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Choice'
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required: [message, choice_id]
+                        properties:
+                          message:
+                            type: string
+                          choice_id:
+                            type: integer
         '400':
           description: Bad request or DAG loop conflict detected
           content:
@@ -725,6 +1425,14 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '405':
+          description: Method Not Allowed
+        '500':
+          $ref: '#/components/responses/InternalError'
 
   /choices/{id}:
     put:
@@ -743,18 +1451,29 @@ paths:
           application/json:
             schema:
               type: object
+              required: [label, to_scene_id]
               properties:
-                choice_text:
+                label:
                   type: string
                 to_scene_id:
                   type: integer
       responses:
         '200':
           description: Choice updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
     delete:
       summary: Delete choice
       security:
@@ -768,8 +1487,20 @@ paths:
       responses:
         '200':
           description: Choice deleted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
 
   /progress:
     post:
@@ -782,21 +1513,32 @@ paths:
           application/json:
             schema:
               type: object
-              required: [novel_id, current_scene_id]
+              required: [user_id, novel_id, current_scene_id]
               properties:
+                user_id:
+                  type: integer
+                  description: Required by the request validator; the authenticated JWT user ID is used when saving progress.
                 novel_id:
                   type: integer
                 current_scene_id:
                   type: integer
       responses:
-        '200':
+        '201':
           description: Reading progress recorded
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ReadingProgress'
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
 
   /history:
     get:
@@ -809,11 +1551,79 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/ReadingHistory'
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required: [history]
+                        properties:
+                          history:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/Novel'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    delete:
+      summary: Delete current user's reading history
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                novelIds:
+                  type: array
+                  items:
+                    type: integer
+      responses:
+        '200':
+          description: Reading history deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /history/{novelId}:
+    delete:
+      summary: Delete reading history for one novel
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: novelId
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Reading history deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
 
   /user-endings:
     post:
@@ -833,17 +1643,31 @@ paths:
                 scene_id:
                   type: integer
       responses:
-        '200':
+        '201':
           description: Ending unlocked successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
 
   /bookshelves:
     get:
       summary: Get user bookshelf or check novel bookmark count
-      security:
-        - BearerAuth: []
       parameters:
+        - in: query
+          name: user_id
+          schema:
+            type: integer
         - in: query
           name: novel_id
           schema:
@@ -851,14 +1675,44 @@ paths:
       responses:
         '200':
           description: Bookshelf details
-        '401':
-          $ref: '#/components/responses/Unauthorized'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        oneOf:
+                          - type: object
+                            required: [bookshelf]
+                            properties:
+                              bookshelf:
+                                type: array
+                                items:
+                                  $ref: '#/components/schemas/Novel'
+                          - type: object
+                            required: [novel_id, bookshelf_count]
+                            properties:
+                              novel_id:
+                                type: integer
+                              bookshelf_count:
+                                type: integer
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
     post:
       summary: Add novel to bookshelf (Bookmark)
       security:
         - BearerAuth: []
+      parameters:
+        - in: query
+          name: novel_id
+          schema:
+            type: integer
       requestBody:
-        required: true
+        required: false
         content:
           application/json:
             schema:
@@ -870,14 +1724,29 @@ paths:
       responses:
         '201':
           description: Bookmarked successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
     delete:
       summary: Remove novel from bookshelf
       security:
         - BearerAuth: []
+      parameters:
+        - in: query
+          name: novel_id
+          schema:
+            type: integer
       requestBody:
-        required: true
+        required: false
         content:
           application/json:
             schema:
@@ -889,8 +1758,18 @@ paths:
       responses:
         '200':
           description: Bookmark removed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
 
   /likes:
     post:
@@ -908,29 +1787,43 @@ paths:
                 novel_id:
                   type: integer
       responses:
-        '200':
+        '201':
           description: Novel liked
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
     delete:
       summary: Unlike a novel
       security:
         - BearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [novel_id]
-              properties:
-                novel_id:
-                  type: integer
+      parameters:
+        - in: query
+          name: novel_id
+          required: true
+          schema:
+            type: integer
       responses:
         '200':
           description: Novel unliked
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
 
   /comments:
     post:
@@ -954,8 +1847,18 @@ paths:
       responses:
         '201':
           description: Comment created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
     delete:
       summary: Remove a comment
       security:
@@ -969,8 +1872,20 @@ paths:
       responses:
         '200':
           description: Comment deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
 
   /api/writers/apply:
     post:
@@ -1252,10 +2167,22 @@ paths:
                 choice_id:
                   type: integer
       responses:
-        '200':
+        '201':
           description: Choice history recorded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
 
   /api/admin/audit-logs:
     get:
@@ -1354,12 +2281,7 @@ paths:
 
   /writer/{id}/bookshelf-counts:
     get:
-                allOf:
-                  - $ref: '#/components/schemas/SuccessResponse'
-                  - type: object
-                    properties:
-                      data:
-                        $ref: '#/components/schemas/AuditLog'
+      summary: Get bookshelf counts per novel for a writer
       parameters:
         - in: path
           name: id
@@ -1963,6 +2885,21 @@ components:
           type: integer
         created_at:
           type: string
+
+    NotificationSettings:
+      type: object
+      required: [in_app_notifications, novel_updates, comments, likes, follows]
+      properties:
+        in_app_notifications:
+          type: boolean
+        novel_updates:
+          type: boolean
+        comments:
+          type: boolean
+        likes:
+          type: boolean
+        follows:
+          type: boolean
 
     AuthResponse:
       type: object

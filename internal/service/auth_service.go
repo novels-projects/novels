@@ -17,18 +17,18 @@ import (
 )
 
 const (
-	jwtSecret            = "my-super-secret-novel-key"
-	refreshTokenSecret   = "my-super-secret-refresh-key"
 	accessTokenDuration  = time.Hour * 24
 	refreshTokenDuration = time.Hour * 24 * 7
 )
 
 type AuthService struct {
-	repo repository.AuthRepository
+	repo               repository.AuthRepository
+	jwtSecret          string
+	refreshTokenSecret string
 }
 
-func NewAuthService(repo repository.AuthRepository) *AuthService {
-	return &AuthService{repo: repo}
+func NewAuthService(repo repository.AuthRepository, jwtSecret, refreshTokenSecret string) *AuthService {
+	return &AuthService{repo: repo, jwtSecret: jwtSecret, refreshTokenSecret: refreshTokenSecret}
 }
 
 // Register จัดการการแฮชรหัสผ่านและสั่งบันทึกข้อมูลจริงลงฐานข้อมูล
@@ -69,12 +69,12 @@ func (s *AuthService) Register(ctx context.Context, req dto.RegisterRequest, ava
 		return nil, err
 	}
 
-	accessToken, err := s.createToken(user, accessTokenDuration, jwtSecret)
+	accessToken, err := s.createToken(user, accessTokenDuration, s.jwtSecret)
 	if err != nil {
 		return nil, err
 	}
 
-	refreshToken, err := s.createToken(user, refreshTokenDuration, refreshTokenSecret)
+	refreshToken, err := s.createToken(user, refreshTokenDuration, s.refreshTokenSecret)
 	if err != nil {
 		return nil, err
 	}
@@ -107,12 +107,12 @@ func (s *AuthService) Login(ctx context.Context, req dto.LoginRequest) (*dto.Aut
 		return nil, err
 	}
 
-	accessToken, err := s.createToken(user, accessTokenDuration, jwtSecret)
+	accessToken, err := s.createToken(user, accessTokenDuration, s.jwtSecret)
 	if err != nil {
 		return nil, err
 	}
 
-	refreshToken, err := s.createToken(user, refreshTokenDuration, refreshTokenSecret)
+	refreshToken, err := s.createToken(user, refreshTokenDuration, s.refreshTokenSecret)
 	if err != nil {
 		return nil, err
 	}
@@ -127,10 +127,10 @@ func (s *AuthService) RefreshToken(ctx context.Context, req dto.RefreshRequest) 
 	}
 
 	token, err := jwt.Parse(req.RefreshToken, func(token *jwt.Token) (interface{}, error) {
-		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+		if token.Method != jwt.SigningMethodHS256 {
 			return nil, errors.New("invalid refresh token signing method")
 		}
-		return []byte(refreshTokenSecret), nil
+		return []byte(s.refreshTokenSecret), nil
 	})
 	if err != nil || !token.Valid {
 		return nil, errors.New("refresh token is invalid or expired")
@@ -155,12 +155,12 @@ func (s *AuthService) RefreshToken(ctx context.Context, req dto.RefreshRequest) 
 		return nil, errors.New("user not found")
 	}
 
-	accessToken, err := s.createToken(user, accessTokenDuration, jwtSecret)
+	accessToken, err := s.createToken(user, accessTokenDuration, s.jwtSecret)
 	if err != nil {
 		return nil, err
 	}
 
-	refreshToken, err := s.createToken(user, refreshTokenDuration, refreshTokenSecret)
+	refreshToken, err := s.createToken(user, refreshTokenDuration, s.refreshTokenSecret)
 	if err != nil {
 		return nil, err
 	}

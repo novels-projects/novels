@@ -175,3 +175,26 @@
 - **สิ่งที่ทำ**: เปิด Agent Session ใหม่เพื่อตรวจสอบความเรียบร้อยของระบบในภาพรวม Security, DAG Constraints, SPEC Compliance และ Regression Testing
 - **Dependencies**: T-35
 - **Definition of Done (DoD)**: รายงานการตรวจสอบจาก Cross-Agent Review ใน Session ใหม่ผ่านครบถ้วนทุกข้อ โดยไม่มีข้อบกพร่องระดับ Critical หรือ High เหลืออยู่
+
+---
+
+## 6. Architecture Organization
+
+### T-37: [Architecture] จัดระเบียบไฟล์ Backend ภายใน layer packages เดิม
+- **สิ่งที่ทำ**: แยก handlers/helpers, route registrations และ scene service ตาม responsibility โดยคง package เดิมและย้าย declaration เท่านั้น
+- **ข้อจำกัด**: ห้ามเปลี่ยน business logic, API contract, middleware behavior, database/schema, frontend หรือ layer boundaries; ห้ามลบ DTO/model candidates
+- **Definition of Done (DoD)**: การจัดไฟล์ครบทั้ง 3 phases, `gofmt -d .`, `git diff --check` และ `go test ./...` ผ่าน โดยไม่มี behavior change
+
+### T-38: [Cleanup] ตรวจและนำ Unused DTO / Model ออกจาก Backend
+- **สิ่งที่ทำ**: ตรวจ references, tests, serialization, OpenAPI และ workspace dependencies ก่อนลบเฉพาะ DTO/model ที่พิสูจน์ได้ว่าไม่มีการใช้งาน
+- **ข้อจำกัด**: ทำทีละกลุ่ม; เก็บ type ไว้เมื่อมี dependency หรือ compatibility ที่ตรวจไม่ครบ; ห้ามเปลี่ยน behavior, API contract, schema หรือ frontend
+- **Definition of Done (DoD)**: ทุกกลุ่มผ่าน `gofmt`, `git diff --check` และ `go test ./...`; ไม่มีการลบ type ที่ยังมี usage หรือ test dependency
+
+---
+
+## 7. OpenAPI Contract Consistency
+
+### T-39: [Contract] ตรวจและปรับ OpenAPI ให้ตรงกับ Backend API ปัจจุบัน
+- **สิ่งที่ทำ**: เปรียบเทียบ OpenAPI method/path, auth, request/response fields และ status codes กับ routes, handlers, request types และ frontend calls
+- **ข้อจำกัด**: แก้เฉพาะ mismatch ที่ยืนยันได้; ห้ามเปลี่ยน runtime, database, frontend หรือเพิ่ม contract โดยเดา; ระบุ route ที่ยังไม่ยืนยันเป็น follow-up
+- **Definition of Done (DoD)**: มี contract matrix ครบทุก OpenAPI operation, mismatch ที่ยืนยันแล้วถูกแก้ใน OpenAPI เท่าที่พิสูจน์ได้ และไม่มี runtime/API behavior change

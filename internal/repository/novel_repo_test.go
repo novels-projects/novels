@@ -64,3 +64,15 @@ func TestBuildNovelWhereClauseHandlesEmptyFilters(t *testing.T) {
 		t.Fatalf("empty filters should produce empty WHERE clause, got: %s", clause)
 	}
 }
+
+func TestCountVisiblePublishedNovelsUsesPublishedScopeRules(t *testing.T) {
+	if !matchesPublishedScope("published", true, "approved") {
+		t.Fatal("published + approved writer should count as visible published")
+	}
+	if matchesPublishedScope("suspended", true, "approved") {
+		t.Fatal("suspended status must not count as visible published")
+	}
+	if matchesPublishedScope("published", true, "revoked") {
+		t.Fatal("non-approved writer must not count as visible published")
+	}
+}

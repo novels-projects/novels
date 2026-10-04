@@ -23,6 +23,7 @@ type NovelRepository interface {
 }
 
 type SceneRepository interface {
+	WithNovelGraphMutation(novelID int, mutate func(ChoiceMutationRepository) error) error
 	GetSceneByID(id int) (*models.Scene, error)
 	GetStartSceneByNovelID(novelID int) (*models.Scene, error)
 	GetChoicesBySceneID(id int) ([]models.Choice, error)
@@ -44,6 +45,17 @@ type SceneRepository interface {
 	GetEdgesByNovelID(novelID int) ([]models.SceneEdge, error)
 	GetEndingsByNovelIDForUser(novelID int, userID int) ([]models.EndingScene, error)
 	UpdateScenePosition(sceneID int, nodeX *float64, nodeY *float64) error
+}
+
+type ChoiceMutationRepository interface {
+	GetSceneByID(id int) (*models.Scene, error)
+	GetChoicesBySceneID(sceneID int) ([]models.Choice, error)
+	GetChoiceByID(choiceID int) (*models.Choice, error)
+	CreateChoice(choice models.Choice) (int, error)
+	UpdateChoice(choice models.Choice) error
+	DeleteChoice(choiceID int) error
+	CheckChoiceExists(fromID, toID int, label string) (bool, error)
+	GetEdgesByNovelID(novelID int) ([]models.SceneEdge, error)
 }
 
 type ChapterRepository interface {

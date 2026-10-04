@@ -46,13 +46,25 @@ func (m *mockNovelService) UnbanNovel(context.Context, int) error   { return nil
 
 type mockSceneService struct {
 	scene            models.SceneResponse
+	scenes           map[int]models.SceneResponse
+	startScene       models.SceneResponse
+	endings          []models.EndingScene
 	choice           *models.Choice
 	publicationCheck service.PublishValidationResult
 }
 
-func (m *mockSceneService) GetScene(int) (models.SceneResponse, error) { return m.scene, nil }
+func (m *mockSceneService) GetScene(id int) (models.SceneResponse, error) {
+	if m.scenes != nil {
+		scene, ok := m.scenes[id]
+		if !ok {
+			return models.SceneResponse{}, errors.New("scene not found")
+		}
+		return scene, nil
+	}
+	return m.scene, nil
+}
 func (m *mockSceneService) GetStartScene(int) (models.SceneResponse, error) {
-	return models.SceneResponse{}, nil
+	return m.startScene, nil
 }
 func (m *mockSceneService) GetScenesByChapterID(int) ([]models.Scene, error) { return nil, nil }
 func (m *mockSceneService) CreateScene(models.Scene) (int, error)            { return 0, nil }
@@ -69,7 +81,7 @@ func (m *mockSceneService) GetStoryTree(int, int) (models.StoryTreeResponse, err
 	return models.StoryTreeResponse{}, nil
 }
 func (m *mockSceneService) GetEndingsByNovelID(int, int) ([]models.EndingScene, error) {
-	return nil, nil
+	return m.endings, nil
 }
 func (m *mockSceneService) ValidateStoryForPublish(int) service.PublishValidationResult {
 	return service.PublishValidationResult{}
@@ -99,12 +111,13 @@ func (m *mockChapterService) DeleteChapter(int) error                   { return
 func (m *mockChapterService) ReorderChapters([]int) error               { return nil }
 
 type mockReadingService struct {
-	savedProgress *models.ReadingProgress
-	progress      *models.ReadingProgress
-	progressUser  int
-	resetUser     int
-	choiceHistory *models.ChoiceHistory
-	ending        *models.SaveEndingRequest
+	savedProgress      *models.ReadingProgress
+	saveProgressErr    error
+	progress           *models.ReadingProgress
+	progressUser       int
+	resetUser          int
+	choiceHistory      *models.ChoiceHistory
+	recordEndingCalled bool
 }
 
 func (m *mockReadingService) GetProgress(userID, _ int) (*models.ReadingProgress, error) {
@@ -113,7 +126,7 @@ func (m *mockReadingService) GetProgress(userID, _ int) (*models.ReadingProgress
 }
 func (m *mockReadingService) SaveProgress(progress models.ReadingProgress) error {
 	m.savedProgress = &progress
-	return nil
+	return m.saveProgressErr
 }
 func (m *mockReadingService) ResetProgress(userID, _ int) error {
 	m.resetUser = userID
@@ -125,7 +138,7 @@ func (m *mockReadingService) RecordChoiceHistory(history models.ChoiceHistory) e
 	return nil
 }
 func (m *mockReadingService) RecordEnding(userID, novelID, sceneID int) error {
-	m.ending = &models.SaveEndingRequest{UserID: userID, NovelID: novelID, SceneID: sceneID}
+	m.recordEndingCalled = true
 	return nil
 }
 func (m *mockReadingService) DeleteReadingHistoryByNovel(int, int) (bool, error) {

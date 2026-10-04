@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"time"
 
 	"novel-be/internal/models"
 
@@ -11,6 +12,7 @@ import (
 )
 
 var ErrReadingHistoryForbidden = errors.New("reading history is not owned by the authenticated user")
+var ErrReadingProgressTransitionInvalid = errors.New("reading progress must follow a valid story choice")
 
 // ======= Reading Repository Methods =======
 
@@ -60,6 +62,113 @@ func (r *postgresReadingRepository) SaveReadingProgress(userID, novelID, sceneID
 	// ถ้ามีอะไรผิดพลาดกลางทาง ให้ Rollback
 	defer tx.Rollback()
 
+	var targetType, targetStatus, targetChapterStatus string
+	var novelIsPublished bool
+	err = tx.QueryRow(`
+		SELECT s.type, s.status, ch.status, n.is_published
+		FROM scenes s
+		JOIN chapters ch ON ch.chapter_id = s.chapter_id
+		JOIN novels n ON n.novel_id = s.novel_id
+		WHERE s.scene_id = $1 AND s.novel_id = $2
+	`, sceneID, novelID).Scan(&targetType, &targetStatus, &targetChapterStatus, &novelIsPublished)
+	if err != nil {
+		return ErrReadingProgressTransitionInvalid
+	}
+
+	var currentSceneID int
+	var currentUpdatedAt time.Time
+	err = tx.QueryRow(`
+		SELECT current_scene_id, updated_at
+		FROM reading_progress
+		WHERE user_id = $1 AND novel_id = $2 AND updated_at IS NOT NULL
+		FOR UPDATE
+	`, userID, novelID).Scan(&currentSceneID, &currentUpdatedAt)
+	hasCurrentProgress := err == nil
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return err
+	}
+
+	progressChanged := !hasCurrentProgress || currentSceneID != sceneID
+	validTransition := false
+	if !hasCurrentProgress && targetType != "start" {
+		var selectedFromStart bool
+		err = tx.QueryRow(`
+			SELECT EXISTS (
+				SELECT 1
+				FROM user_choice_history uch
+				JOIN choices c ON c.choice_id = uch.choice_id
+				JOIN scenes source ON source.scene_id = c.from_scene_id
+				JOIN scenes target ON target.scene_id = c.to_scene_id
+				JOIN chapters source_chapter ON source_chapter.chapter_id = source.chapter_id
+				JOIN chapters target_chapter ON target_chapter.chapter_id = target.chapter_id
+				JOIN novels n ON n.novel_id = source.novel_id
+				WHERE uch.user_id = $1
+				  AND c.to_scene_id = $2
+				  AND source.novel_id = $3
+				  AND target.novel_id = $3
+				  AND source.type = 'start'
+				  AND source.status = 'published'
+				  AND target.status = 'published'
+				  AND source_chapter.status = 'published'
+				  AND target_chapter.status = 'published'
+				  AND n.is_published = TRUE
+			)
+		`, userID, sceneID, novelID).Scan(&selectedFromStart)
+		if err != nil {
+			return err
+		}
+		validTransition = selectedFromStart
+		if !validTransition {
+			canReplay, err := canReplayScene(tx, userID, novelID, sceneID, targetType)
+			if err != nil {
+				return err
+			}
+			if !canReplay {
+				return ErrReadingProgressTransitionInvalid
+			}
+		}
+	} else if hasCurrentProgress && currentSceneID != sceneID {
+		var selectedFromCurrentScene bool
+		err = tx.QueryRow(`
+			SELECT EXISTS (
+				SELECT 1
+				FROM user_choice_history uch
+				JOIN choices c ON c.choice_id = uch.choice_id
+				JOIN scenes source ON source.scene_id = c.from_scene_id
+				JOIN scenes target ON target.scene_id = c.to_scene_id
+				JOIN chapters source_chapter ON source_chapter.chapter_id = source.chapter_id
+				JOIN chapters target_chapter ON target_chapter.chapter_id = target.chapter_id
+				JOIN novels n ON n.novel_id = source.novel_id
+				WHERE uch.user_id = $1
+				  AND c.from_scene_id = $2
+				  AND c.to_scene_id = $3
+				  AND source.novel_id = $4
+				  AND target.novel_id = $4
+				  AND source.type <> 'ending'
+				  AND target.type <> 'start'
+				  AND source.status = 'published'
+				  AND target.status = 'published'
+				  AND source_chapter.status = 'published'
+				  AND target_chapter.status = 'published'
+				  AND n.is_published = TRUE
+				  AND uch.selected_at > $5
+			)
+		`, userID, currentSceneID, sceneID, novelID, currentUpdatedAt).Scan(&selectedFromCurrentScene)
+		if err != nil {
+			return err
+		}
+		validTransition = selectedFromCurrentScene
+		if !validTransition {
+			canReplay, err := canReplayScene(tx, userID, novelID, sceneID, targetType)
+			if err != nil {
+				return err
+			}
+			if !canReplay {
+				return ErrReadingProgressTransitionInvalid
+			}
+		}
+	}
+
 	// 2. เซฟจุดปัจจุบัน (Bookmark)
 	progressQuery := `
 		INSERT INTO reading_progress (
@@ -103,8 +212,64 @@ func (r *postgresReadingRepository) SaveReadingProgress(userID, novelID, sceneID
 		return err
 	}
 
+	if progressChanged && validTransition && targetType == "ending" && targetStatus == "published" && targetChapterStatus == "published" && novelIsPublished {
+		if _, err := tx.Exec(`
+			INSERT INTO user_endings (user_id, scene_id)
+			VALUES ($1, $2)
+			ON CONFLICT (user_id, scene_id) DO NOTHING
+		`, userID, sceneID); err != nil {
+			return err
+		}
+	}
+
 	// 4. ถ้าผ่านทั้ง 2 คำสั่ง ให้ Commit
 	return tx.Commit()
+}
+
+func canReplayScene(tx *sql.Tx, userID, novelID, sceneID int, sceneType string) (bool, error) {
+	if sceneType == "ending" {
+		var alreadyUnlocked bool
+		err := tx.QueryRow(`
+			SELECT EXISTS (
+				SELECT 1
+				FROM user_endings ue
+				JOIN scenes s ON s.scene_id = ue.scene_id
+				WHERE ue.user_id = $1
+				  AND ue.scene_id = $2
+				  AND s.novel_id = $3
+			)
+		`, userID, sceneID, novelID).Scan(&alreadyUnlocked)
+		return alreadyUnlocked, err
+	}
+
+	var previouslyVisited bool
+	err := tx.QueryRow(`
+		SELECT EXISTS (
+			SELECT 1
+			FROM user_scene_history ush
+			JOIN scenes s ON s.scene_id = ush.scene_id
+			WHERE ush.user_id = $1
+			  AND ush.scene_id = $2
+			  AND s.novel_id = $3
+			  AND (
+				  s.type = 'start'
+				  OR EXISTS (
+					  SELECT 1
+					  FROM user_choice_history uch
+					  JOIN choices c ON c.choice_id = uch.choice_id
+					  JOIN scenes source ON source.scene_id = c.from_scene_id
+					  JOIN user_scene_history source_history
+						ON source_history.user_id = uch.user_id
+						AND source_history.scene_id = source.scene_id
+					  WHERE uch.user_id = ush.user_id
+						AND c.to_scene_id = s.scene_id
+						AND source.novel_id = s.novel_id
+						AND source.type <> 'ending'
+				  )
+			  )
+		)
+	`, userID, sceneID, novelID).Scan(&previouslyVisited)
+	return previouslyVisited, err
 }
 
 func (r *postgresReadingRepository) InsertSceneHistory(userID int, sceneID int) error {

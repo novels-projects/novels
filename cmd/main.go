@@ -26,6 +26,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("❌ load config fail: %v", err)
 	}
+	middleware.SetJWTSecret(cfg.JWTSecret)
 
 	// -----------------------
 	// 2. Connect DB
@@ -107,7 +108,7 @@ func main() {
 	writerService := service.NewWriterServiceDirect(writerRepo)
 
 	// 🟢 สร้างบริการระบบ Authentication สมาชิกของแท้
-	authService := service.NewAuthService(authRepo)
+	authService := service.NewAuthService(authRepo, cfg.JWTSecret, cfg.JWTRefreshSecret)
 	notificationService := service.NewNotificationService(dbConn)
 	reportService := service.NewReportService(reportRepo)
 	auditService := service.NewAuditService(auditRepo)

@@ -19,6 +19,8 @@ type Config struct {
 	MinIOAccessKey   string
 	MinIOSecretKey   string
 	MinIOUseSSL      bool
+	JWTSecret        string
+	JWTRefreshSecret string
 }
 
 func LoadConfig() (Config, error) {
@@ -45,6 +47,12 @@ func LoadConfig() (Config, error) {
 	viper.SetDefault("MINIO.SECRET_KEY", "minioadmin")
 	viper.SetDefault("MINIO.USE_SSL", false)
 
+	jwtSecret := strings.TrimSpace(viper.GetString("JWT.SECRET"))
+	jwtRefreshSecret := strings.TrimSpace(viper.GetString("JWT.REFRESH_SECRET"))
+	if jwtSecret == "" || jwtRefreshSecret == "" {
+		return Config{}, fmt.Errorf("JWT_SECRET and JWT_REFRESH_SECRET must be set")
+	}
+
 	// Set config values
 	config := Config{
 		AppPort:          viper.GetString("APP.PORT"),
@@ -58,6 +66,8 @@ func LoadConfig() (Config, error) {
 		MinIOAccessKey:   viper.GetString("MINIO.ACCESS_KEY"),
 		MinIOSecretKey:   viper.GetString("MINIO.SECRET_KEY"),
 		MinIOUseSSL:      viper.GetBool("MINIO.USE_SSL"),
+		JWTSecret:        jwtSecret,
+		JWTRefreshSecret: jwtRefreshSecret,
 	}
 
 	return config, nil

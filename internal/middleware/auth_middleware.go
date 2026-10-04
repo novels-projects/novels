@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"os"
 	"strings"
 
 	"novel-be/internal/dto"
@@ -22,10 +21,11 @@ const (
 	RoleKey   contextKey = "role"
 )
 
-// jwtSecret ต้องมาจาก env var JWT_SECRET เสมอในโปรดักชัน
-// ของเดิม hardcode ค่าไว้ในซอร์สโค้ดตรงๆ — ใครก็เห็น repo (leak/public) ก็ปลอม token
-// เป็น role admin ได้ทันที นี่คือช่องโหว่ร้ายแรงที่สุดในไฟล์นี้
-var jwtSecret = loadJWTSecret()
+var jwtSecret []byte
+
+func SetJWTSecret(secret string) {
+	jwtSecret = []byte(secret)
+}
 
 // UnauthorizedRecorder คือ signature ของฟังก์ชันที่ใช้บันทึก audit log เวลามีการเข้าถึงโดยไม่มีสิทธิ์
 // ใช้ function type แทนการ import "novel-be/internal/service" ตรงๆ เพราะ service package (audit_service.go)
@@ -72,16 +72,6 @@ func writeAuthError(w http.ResponseWriter, statusCode int, code, message string)
 	_ = json.NewEncoder(w).Encode(dto.ErrorResponse{Error: dto.ErrorDetail{Code: code, Message: message}})
 }
 
-func loadJWTSecret() []byte {
-	if s := strings.TrimSpace(os.Getenv("JWT_SECRET")); s != "" {
-		return []byte(s)
-	}
-	// fallback นี้มีไว้กันแอปพังตอน deploy ครั้งแรกที่ยังไม่ได้ตั้ง env เท่านั้น
-	// ห้ามปล่อยให้รันแบบนี้ใน production เด็ดขาด — ตั้ง JWT_SECRET ให้เป็นค่าสุ่มยาวๆ แล้ว rotate token เดิมทั้งหมดทิ้ง (บังคับ re-login)
-	log.Println("⚠️  WARNING: JWT_SECRET env var ไม่ได้ตั้งค่า — กำลังใช้ fallback secret ที่ไม่ปลอดภัย ห้ามใช้ค่านี้ใน production!")
-	return []byte("my-super-secret-novel-key")
-}
-
 func RequireAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodOptions {
@@ -101,7 +91,7 @@ func RequireAuth(next http.Handler) http.Handler {
 		}
 
 		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			if token.Method != jwt.SigningMethodHS256 {
 				return nil, fmt.Errorf("unexpected signing method")
 			}
 			return jwtSecret, nil
@@ -138,7 +128,7 @@ func OptionalAuth(next http.Handler) http.Handler {
 
 		if tokenString != "" {
 			token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-				if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+				if token.Method != jwt.SigningMethodHS256 {
 					return nil, fmt.Errorf("unexpected signing method")
 				}
 				return jwtSecret, nil

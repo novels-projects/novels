@@ -28,12 +28,71 @@ func NewAnalyticsRepository(db *sql.DB) AnalyticsRepository {
 	return &postgresAnalyticsRepository{db: db}
 }
 
+// readerReachableScenesCTE สร้างชุด Scene ที่ Reader เดินทางถึงได้จาก Start Scene จริง
+// ใช้ publication chain และข้อจำกัด Source/Target เดียวกับ Reading Flow;
+// ไม่ใช้ Publish Validator และไม่ใช้ fallback ที่เลือก Scene แรกเมื่อไม่มี Start
+func readerReachableScenesCTE(novelIDParam string) string {
+	return `
+	WITH RECURSIVE reader_start AS (
+		SELECT s.scene_id
+		FROM scenes s
+		WHERE s.novel_id = ` + novelIDParam + `
+		  AND s.type = 'start'
+		LIMIT 1
+	),
+	reachable_scene_ids(scene_id) AS (
+		SELECT s.scene_id
+		FROM reader_start start_scene
+		JOIN scenes s ON s.scene_id = start_scene.scene_id
+		JOIN chapters ch ON ch.chapter_id = s.chapter_id
+		JOIN novels n ON n.novel_id = s.novel_id
+		WHERE s.status = 'published'
+		  AND ch.status = 'published'
+		  AND ch.novel_id = s.novel_id
+		  AND n.is_published = TRUE
+		  AND n.status NOT IN ('suspended', 'banned')
+
+		UNION
+
+		SELECT target.scene_id
+		FROM reachable_scene_ids reachable
+		JOIN scenes source ON source.scene_id = reachable.scene_id
+		JOIN chapters source_ch ON source_ch.chapter_id = source.chapter_id
+		JOIN novels n ON n.novel_id = source.novel_id
+		JOIN choices c ON c.from_scene_id = source.scene_id
+		JOIN scenes target ON target.scene_id = c.to_scene_id
+			AND target.novel_id = source.novel_id
+		JOIN chapters target_ch ON target_ch.chapter_id = target.chapter_id
+		WHERE source.novel_id = ` + novelIDParam + `
+		  AND source.status = 'published'
+		  AND source_ch.status = 'published'
+		  AND source_ch.novel_id = source.novel_id
+		  AND target.status = 'published'
+		  AND target_ch.status = 'published'
+		  AND target_ch.novel_id = source.novel_id
+		  AND n.is_published = TRUE
+		  AND n.status NOT IN ('suspended', 'banned')
+		  AND source.type <> 'ending'
+		  AND target.type <> 'start'
+		  AND source.scene_id <> target.scene_id
+	)
+	`
+}
+
 // GetSceneChoiceAnalytics ดึงสถิติ Choices ของ sceneID เฉพาะกรณีที่ฉากนั้นอยู่ใน novelID
 // คืน (nil, nil) หากฉากไม่อยู่ใน novel หรือไม่มีอยู่จริง
 func (r *postgresAnalyticsRepository) GetSceneChoiceAnalytics(novelID, sceneID int) (*models.SceneChoiceAnalyticsStats, error) {
 	// ─── 1. Verify scene exists & belongs to novel ───────────────────────────
 	var exists bool
-	checkQuery := `SELECT EXISTS(SELECT 1 FROM scenes WHERE scene_id = $1 AND novel_id = $2)`
+	checkQuery := readerReachableScenesCTE("$2") + `
+		SELECT EXISTS (
+			SELECT 1
+			FROM scenes s
+			JOIN reachable_scene_ids reachable ON reachable.scene_id = s.scene_id
+			WHERE s.scene_id = $1
+			  AND s.novel_id = $2
+		)
+	`
 	if err := r.db.QueryRow(checkQuery, sceneID, novelID).Scan(&exists); err != nil {
 		return nil, err
 	}
@@ -49,7 +108,7 @@ func (r *postgresAnalyticsRepository) GetSceneChoiceAnalytics(novelID, sceneID i
 	// ─── 2. Query all choices for this scene + selection_count ───────────────
 	// JOIN scenes s_to เพื่อดึง target_scene_title
 	// LEFT JOIN user_choice_history uch เพื่อดึง COUNT(uch.id)
-	choiceQuery := `
+	choiceQuery := readerReachableScenesCTE("$2") + `
 		SELECT
 			c.choice_id,
 			c.label,
@@ -57,14 +116,24 @@ func (r *postgresAnalyticsRepository) GetSceneChoiceAnalytics(novelID, sceneID i
 			COALESCE(s_to.title, '') AS target_scene_title,
 			COUNT(uch.id)           AS selection_count
 		FROM choices c
-		LEFT JOIN scenes s_to ON s_to.scene_id = c.to_scene_id
+		JOIN scenes s_from ON s_from.scene_id = c.from_scene_id
+		JOIN chapters ch_from ON ch_from.chapter_id = s_from.chapter_id
+		JOIN novels n ON n.novel_id = s_from.novel_id
+		JOIN scenes s_to ON s_to.scene_id = c.to_scene_id AND s_to.novel_id = s_from.novel_id
+		JOIN chapters ch_to ON ch_to.chapter_id = s_to.chapter_id
+		JOIN reachable_scene_ids source_reachable ON source_reachable.scene_id = s_from.scene_id
+		JOIN reachable_scene_ids target_reachable ON target_reachable.scene_id = s_to.scene_id
 		LEFT JOIN user_choice_history uch ON uch.choice_id = c.choice_id
 		WHERE c.from_scene_id = $1
+		  AND s_from.novel_id = $2
+		  AND s_from.type <> 'ending'
+		  AND s_to.type <> 'start'
+		  AND s_from.scene_id <> s_to.scene_id
 		GROUP BY c.choice_id, c.label, c.to_scene_id, s_to.title
 		ORDER BY c.choice_id ASC
 	`
 
-	rows, err := r.db.Query(choiceQuery, sceneID)
+	rows, err := r.db.Query(choiceQuery, sceneID, novelID)
 	if err != nil {
 		return nil, err
 	}
@@ -124,7 +193,7 @@ func (r *postgresAnalyticsRepository) GetSceneAnalytics(novelID, sceneID int) (*
 	var rawUniqueReaders sql.NullInt64
 	var sceneType string
 
-	sceneQuery := `
+	sceneQuery := readerReachableScenesCTE("$2") + `
 		SELECT
 			s.scene_id,
 			s.title,
@@ -133,7 +202,11 @@ func (r *postgresAnalyticsRepository) GetSceneAnalytics(novelID, sceneID int) (*
 			COUNT(DISTINCT ush.user_id) AS unique_readers
 		FROM scenes s
 		LEFT JOIN user_scene_history ush ON ush.scene_id = s.scene_id
-		WHERE s.scene_id = $1 AND s.novel_id = $2
+		JOIN chapters ch ON ch.chapter_id = s.chapter_id
+		JOIN novels n ON n.novel_id = s.novel_id
+		JOIN reachable_scene_ids reachable ON reachable.scene_id = s.scene_id
+		WHERE s.scene_id = $1
+		  AND s.novel_id = $2
 		GROUP BY s.scene_id, s.title, s.type
 	`
 
@@ -168,15 +241,25 @@ func (r *postgresAnalyticsRepository) GetSceneAnalytics(novelID, sceneID int) (*
 	// ─── 3. Query Previous Scenes ─────────────────────────────────────────────
 	// หา choices ที่ชี้เข้ามายังฉากนี้ (to_scene_id = sceneID)
 	// นับจำนวนครั้งที่ผู้ใช้เลือกทางเลือกนี้จริงจาก user_choice_history
-	prevQuery := `
+	prevQuery := readerReachableScenesCTE("$2") + `
 		SELECT
 			s_from.scene_id,
 			s_from.title,
 			COUNT(uch.user_id) AS transition_count
 		FROM choices c
 		JOIN scenes s_from ON s_from.scene_id = c.from_scene_id
+		JOIN chapters ch_from ON ch_from.chapter_id = s_from.chapter_id
+		JOIN novels n ON n.novel_id = s_from.novel_id
+		JOIN scenes s_to ON s_to.scene_id = c.to_scene_id AND s_to.novel_id = s_from.novel_id
+		JOIN chapters ch_to ON ch_to.chapter_id = s_to.chapter_id
+		JOIN reachable_scene_ids source_reachable ON source_reachable.scene_id = s_from.scene_id
+		JOIN reachable_scene_ids target_reachable ON target_reachable.scene_id = s_to.scene_id
 		LEFT JOIN user_choice_history uch ON uch.choice_id = c.choice_id
-		WHERE c.to_scene_id = $1 AND s_from.novel_id = $2
+		WHERE c.to_scene_id = $1
+		  AND s_from.novel_id = $2
+		  AND s_from.type <> 'ending'
+		  AND s_to.type <> 'start'
+		  AND s_from.scene_id <> s_to.scene_id
 		GROUP BY s_from.scene_id, s_from.title
 		ORDER BY transition_count DESC, s_from.scene_id ASC
 	`
@@ -211,16 +294,27 @@ func (r *postgresAnalyticsRepository) GetSceneAnalytics(novelID, sceneID int) (*
 	// ─── 4. Query Next Scenes ────────────────────────────────────────────────
 	// หา choices ที่ออกจากฉากนี้ (from_scene_id = sceneID)
 	// นับจำนวนครั้งที่ผู้ใช้เลือกทางเลือกนี้จริงจาก user_choice_history
-	nextQuery := `
+	nextQuery := readerReachableScenesCTE("$2") + `
 		SELECT
 			s_to.scene_id,
 			s_to.title,
 			c.label,
 			COUNT(uch.user_id) AS transition_count
 		FROM choices c
+		JOIN scenes s_from ON s_from.scene_id = c.from_scene_id
+		JOIN chapters ch_from ON ch_from.chapter_id = s_from.chapter_id
+		JOIN novels n ON n.novel_id = s_from.novel_id
 		JOIN scenes s_to ON s_to.scene_id = c.to_scene_id
+		JOIN chapters ch_to ON ch_to.chapter_id = s_to.chapter_id
+		JOIN reachable_scene_ids source_reachable ON source_reachable.scene_id = s_from.scene_id
+		JOIN reachable_scene_ids target_reachable ON target_reachable.scene_id = s_to.scene_id
 		LEFT JOIN user_choice_history uch ON uch.choice_id = c.choice_id
-		WHERE c.from_scene_id = $1 AND s_to.novel_id = $2
+		WHERE c.from_scene_id = $1
+		  AND s_from.novel_id = $2
+		  AND s_to.novel_id = s_from.novel_id
+		  AND s_from.type <> 'ending'
+		  AND s_to.type <> 'start'
+		  AND s_from.scene_id <> s_to.scene_id
 		GROUP BY s_to.scene_id, s_to.title, c.label, c.choice_id
 		ORDER BY transition_count DESC, c.choice_id ASC
 	`
@@ -261,12 +355,22 @@ func (r *postgresAnalyticsRepository) GetSceneAnalytics(novelID, sceneID int) (*
 		stats.DropOffRate = 0.0
 	} else {
 		var continuedUsers int64
-		contQuery := `
+		contQuery := readerReachableScenesCTE("$2") + `
 			SELECT COUNT(DISTINCT uch.user_id)
 			FROM user_choice_history uch
 			JOIN choices c ON c.choice_id = uch.choice_id
 			JOIN scenes s ON s.scene_id = c.from_scene_id
-			WHERE c.from_scene_id = $1 AND s.novel_id = $2
+			JOIN chapters ch ON ch.chapter_id = s.chapter_id
+			JOIN novels n ON n.novel_id = s.novel_id
+			JOIN scenes target ON target.scene_id = c.to_scene_id AND target.novel_id = s.novel_id
+			JOIN chapters target_ch ON target_ch.chapter_id = target.chapter_id
+			JOIN reachable_scene_ids source_reachable ON source_reachable.scene_id = s.scene_id
+			JOIN reachable_scene_ids target_reachable ON target_reachable.scene_id = target.scene_id
+			WHERE c.from_scene_id = $1
+			  AND s.novel_id = $2
+			  AND s.type <> 'ending'
+			  AND target.type <> 'start'
+			  AND s.scene_id <> target.scene_id
 		`
 		if err := r.db.QueryRow(contQuery, sceneID, novelID).Scan(&continuedUsers); err != nil {
 			return nil, err
@@ -300,7 +404,7 @@ func (r *postgresAnalyticsRepository) GetNovelOverview(novelID int) (*models.Nov
 	//
 	// - completed_readers: COUNT(DISTINCT) จาก user_endings JOIN scenes
 	//   user_endings ไม่ถูกลบตอน Restart → สะสมถูกต้อง
-	summaryQuery := `
+	summaryQuery := readerReachableScenesCTE("$1") + `
 		SELECT
 			n.views                                               AS total_views,
 			COUNT(DISTINCT ush_agg.user_id)                       AS unique_readers,
@@ -310,13 +414,20 @@ func (r *postgresAnalyticsRepository) GetNovelOverview(novelID int) (*models.Nov
 			SELECT DISTINCT ush.user_id
 			FROM user_scene_history ush
 			JOIN scenes s ON s.scene_id = ush.scene_id
+			JOIN chapters ch ON ch.chapter_id = s.chapter_id
+			JOIN novels n ON n.novel_id = s.novel_id
+			JOIN reachable_scene_ids reachable ON reachable.scene_id = s.scene_id
 			WHERE s.novel_id = $1
 		) ush_agg ON true
 		LEFT JOIN (
 			SELECT DISTINCT ue.user_id
 			FROM user_endings ue
 			JOIN scenes s ON s.scene_id = ue.scene_id
+			JOIN chapters ch ON ch.chapter_id = s.chapter_id
+			JOIN novels n ON n.novel_id = s.novel_id
+			JOIN reachable_scene_ids reachable ON reachable.scene_id = s.scene_id
 			WHERE s.novel_id = $1
+			  AND LOWER(s.type) IN ('ending', 'end')
 		) ue_agg ON true
 		WHERE n.novel_id = $1
 		GROUP BY n.novel_id, n.views
@@ -336,7 +447,7 @@ func (r *postgresAnalyticsRepository) GetNovelOverview(novelID int) (*models.Nov
 	// ─── 3. ending_stats ──────────────────────────────────────────────────────
 	// ดึงฉากจบทั้งหมดของนิยายเรื่องนี้ (รวมถึงฉากที่ยังไม่มีผู้อ่านปลดล็อก เพื่อให้นักเขียนเห็นสถิติครบทุกฉากจบ)
 	// ดึงทั้ง scene_id, ending_title, ending_type, และจำนวน distinct readers ที่ปลดล็อก
-	endingQuery := `
+	endingQuery := readerReachableScenesCTE("$1") + `
 		SELECT
 			s.scene_id,
 			COALESCE(NULLIF(s.ending_title, ''), s.title)     AS ending_title,
@@ -344,8 +455,11 @@ func (r *postgresAnalyticsRepository) GetNovelOverview(novelID int) (*models.Nov
 			COUNT(DISTINCT ue.user_id)                         AS cnt
 		FROM scenes s
 		LEFT JOIN user_endings ue ON ue.scene_id = s.scene_id
+		JOIN chapters ch ON ch.chapter_id = s.chapter_id
+		JOIN novels n ON n.novel_id = s.novel_id
+		JOIN reachable_scene_ids reachable ON reachable.scene_id = s.scene_id
 		WHERE s.novel_id = $1
-		  AND (LOWER(s.type) IN ('ending', 'end') OR s.ending_type IS NOT NULL OR s.ending_title IS NOT NULL)
+		  AND LOWER(s.type) IN ('ending', 'end')
 		GROUP BY s.scene_id, s.ending_title, s.title, s.ending_type
 		ORDER BY cnt DESC, s.scene_id ASC
 	`
@@ -382,8 +496,8 @@ func (r *postgresAnalyticsRepository) GetNovelOverview(novelID int) (*models.Nov
 	//   - Ending scenes ถูกกรองออก (type = 'ending' / 'end') เพราะไม่มี outgoing choice
 	//   - ผู้ที่ยังอ่านอยู่แต่ยังไม่เลือก จะถูกนับว่า drop-off ด้วย (limitation)
 	//   - ไม่ใช่ exact session drop-off
-	dropOffQuery := `
-		WITH scene_visit AS (
+	dropOffQuery := readerReachableScenesCTE("$1") + `
+		, scene_visit AS (
 			SELECT
 				s.scene_id,
 				s.title,
@@ -391,6 +505,9 @@ func (r *postgresAnalyticsRepository) GetNovelOverview(novelID int) (*models.Nov
 				COUNT(DISTINCT ush.user_id)     AS visited_users
 			FROM user_scene_history ush
 			JOIN scenes s ON s.scene_id = ush.scene_id
+			JOIN chapters ch ON ch.chapter_id = s.chapter_id
+			JOIN novels n ON n.novel_id = s.novel_id
+			JOIN reachable_scene_ids reachable ON reachable.scene_id = s.scene_id
 			WHERE s.novel_id = $1
 			  AND LOWER(s.type) NOT IN ('ending', 'end')
 			GROUP BY s.scene_id, s.title
@@ -402,7 +519,16 @@ func (r *postgresAnalyticsRepository) GetNovelOverview(novelID int) (*models.Nov
 			FROM user_choice_history uch
 			JOIN choices c ON c.choice_id = uch.choice_id
 			JOIN scenes s ON s.scene_id = c.from_scene_id
+			JOIN chapters ch ON ch.chapter_id = s.chapter_id
+			JOIN novels n ON n.novel_id = s.novel_id
+			JOIN scenes target ON target.scene_id = c.to_scene_id AND target.novel_id = s.novel_id
+			JOIN chapters target_ch ON target_ch.chapter_id = target.chapter_id
+			JOIN reachable_scene_ids source_reachable ON source_reachable.scene_id = s.scene_id
+			JOIN reachable_scene_ids target_reachable ON target_reachable.scene_id = target.scene_id
 			WHERE s.novel_id = $1
+			  AND s.type <> 'ending'
+			  AND target.type <> 'start'
+			  AND s.scene_id <> target.scene_id
 			GROUP BY c.from_scene_id
 		)
 		SELECT
@@ -449,13 +575,16 @@ func roundFloat2(v float64) float64 {
 }
 
 func (r *postgresAnalyticsRepository) GetAllScenesAnalytics(novelID int) ([]models.AllScenesAnalyticsStats, error) {
-	query := `
-		WITH scene_visit AS (
+	query := readerReachableScenesCTE("$1") + `
+		, scene_visit AS (
 			SELECT s.scene_id, s.title, s.type,
 				SUM(ush.visit_count) AS total_visit_count,
 				COUNT(DISTINCT ush.user_id) AS visited_users
 			FROM scenes s
 			LEFT JOIN user_scene_history ush ON ush.scene_id = s.scene_id
+			JOIN chapters ch ON ch.chapter_id = s.chapter_id
+			JOIN novels n ON n.novel_id = s.novel_id
+			JOIN reachable_scene_ids reachable ON reachable.scene_id = s.scene_id
 			WHERE s.novel_id = $1
 			GROUP BY s.scene_id, s.title, s.type
 		),
@@ -465,7 +594,16 @@ func (r *postgresAnalyticsRepository) GetAllScenesAnalytics(novelID int) ([]mode
 			FROM user_choice_history uch
 			JOIN choices c ON c.choice_id = uch.choice_id
 			JOIN scenes s ON s.scene_id = c.from_scene_id
+			JOIN chapters ch ON ch.chapter_id = s.chapter_id
+			JOIN novels n ON n.novel_id = s.novel_id
+			JOIN scenes target ON target.scene_id = c.to_scene_id AND target.novel_id = s.novel_id
+			JOIN chapters target_ch ON target_ch.chapter_id = target.chapter_id
+			JOIN reachable_scene_ids source_reachable ON source_reachable.scene_id = s.scene_id
+			JOIN reachable_scene_ids target_reachable ON target_reachable.scene_id = target.scene_id
 			WHERE s.novel_id = $1
+			  AND s.type <> 'ending'
+			  AND target.type <> 'start'
+			  AND s.scene_id <> target.scene_id
 			GROUP BY c.from_scene_id
 		)
 		SELECT sv.scene_id, sv.title,
@@ -503,15 +641,23 @@ func (r *postgresAnalyticsRepository) GetAllScenesAnalytics(novelID int) ([]mode
 }
 
 func (r *postgresAnalyticsRepository) GetEdgeAnalytics(novelID int) ([]models.EdgeAnalyticsStats, error) {
-	query := `
-		WITH edge_counts AS (
+	query := readerReachableScenesCTE("$1") + `
+		, edge_counts AS (
 			SELECT c.from_scene_id, c.to_scene_id, c.choice_id, c.label,
 				COALESCE(s_to.title, '') AS target_scene_title,
 				COUNT(uch.id) AS selection_count
 			FROM choices c
 			JOIN scenes s_from ON s_from.scene_id = c.from_scene_id AND s_from.novel_id = $1
-			LEFT JOIN scenes s_to ON s_to.scene_id = c.to_scene_id
+			JOIN chapters ch_from ON ch_from.chapter_id = s_from.chapter_id
+			JOIN novels n ON n.novel_id = s_from.novel_id
+			JOIN scenes s_to ON s_to.scene_id = c.to_scene_id AND s_to.novel_id = s_from.novel_id
+			JOIN chapters ch_to ON ch_to.chapter_id = s_to.chapter_id
+			JOIN reachable_scene_ids source_reachable ON source_reachable.scene_id = s_from.scene_id
+			JOIN reachable_scene_ids target_reachable ON target_reachable.scene_id = s_to.scene_id
 			LEFT JOIN user_choice_history uch ON uch.choice_id = c.choice_id
+			WHERE s_from.type <> 'ending'
+			  AND s_to.type <> 'start'
+			  AND s_from.scene_id <> s_to.scene_id
 			GROUP BY c.from_scene_id, c.to_scene_id, c.choice_id, c.label, s_to.title
 		)
 		SELECT from_scene_id, to_scene_id, choice_id, label, target_scene_title,

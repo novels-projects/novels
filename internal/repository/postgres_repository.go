@@ -26,6 +26,8 @@ type postgresReadingRepository struct {
 	db *sql.DB
 }
 
+const novelGraphLockNamespace uint32 = 0x4E4F564C
+
 func NewNovelRepository(db *sql.DB) NovelRepository {
 	return &postgresNovelRepository{db: db}
 }
@@ -163,6 +165,27 @@ func (r *postgresSceneRepository) GetIncomingChoiceCount(sceneID int) (int, erro
 
 func (r *postgresSceneRepository) UpdateSceneTypeByID(sceneID int, typ string) error {
 	return UpdateSceneTypeByID(r.db, sceneID, typ)
+}
+
+func (r *postgresSceneRepository) WithNovelGraphMutation(novelID int, mutate func(ChoiceMutationRepository) error) error {
+	tx, err := r.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	lockKey := int64(novelGraphLockNamespace)<<32 | int64(uint32(novelID))
+	var lockAcquired int
+	if err := tx.QueryRow(`
+		SELECT 1 FROM (SELECT pg_advisory_xact_lock($1)) AS graph_lock
+	`, lockKey).Scan(&lockAcquired); err != nil {
+		return err
+	}
+
+	if err := mutate(&postgresChoiceMutationRepository{tx: tx}); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 // ======= Chapter Repository Methods =======

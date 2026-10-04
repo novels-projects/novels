@@ -26,7 +26,14 @@ func (r *sqlDashboardRepository) GetSummary(ctx context.Context) (dto.DashboardS
 	err := r.db.QueryRowContext(ctx, `
 		SELECT
 			(SELECT COUNT(*) FROM users),
-			(SELECT COUNT(*) FROM novels WHERE is_published = TRUE),
+			(
+				SELECT COUNT(*)
+				FROM novels n
+				JOIN writers w ON w.writer_id = n.author_id
+				WHERE n.is_published = TRUE
+				  AND n.status NOT IN ('suspended', 'banned')
+				  AND w.status = 'approved'
+			),
 			(SELECT COUNT(DISTINCT user_id) FROM writers WHERE status = 'approved'),
 			(
 				SELECT COUNT(DISTINCT w.user_id)
@@ -138,10 +145,12 @@ func (r *sqlDashboardRepository) GetTrend(ctx context.Context, months int, timez
 			FROM users
 			GROUP BY 1
 		), novel_counts AS (
-			-- นับเฉพาะนิยายที่เผยแพร่แล้ว โดยใช้วันที่สร้างเนื่องจากยังไม่มี published_at
-			SELECT date_trunc('month', created_at AT TIME ZONE 'UTC' AT TIME ZONE $1) AS month_start, COUNT(*) AS total
-			FROM novels
-			WHERE is_published = TRUE
+			SELECT date_trunc('month', n.created_at AT TIME ZONE 'UTC' AT TIME ZONE $1) AS month_start, COUNT(*) AS total
+			FROM novels n
+			JOIN writers w ON w.writer_id = n.author_id
+			WHERE n.is_published = TRUE
+			  AND n.status NOT IN ('suspended', 'banned')
+			  AND w.status = 'approved'
 			GROUP BY 1
 		)
 		SELECT

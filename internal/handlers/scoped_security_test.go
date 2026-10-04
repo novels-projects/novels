@@ -45,9 +45,14 @@ func TestProgressHandlersUseJWTUserID(t *testing.T) {
 func TestChoiceHistoryUsesJWTUserID(t *testing.T) {
 	reading := &mockReadingService{}
 	scene := &mockSceneService{
-		choice: &models.Choice{ChoiceID: 5, ToSceneID: 9},
+		choice: &models.Choice{ChoiceID: 5, FromSceneID: 8, ToSceneID: 9},
 		scene:  models.SceneResponse{SceneID: 9, NovelID: 7, ChapterID: 11, Status: "published"},
+		scenes: map[int]models.SceneResponse{
+			8: {SceneID: 8, NovelID: 7, ChapterID: 11, Status: "published"},
+			9: {SceneID: 9, NovelID: 7, ChapterID: 11, Status: "published"},
+		},
 	}
+	reading.progress = &models.ReadingProgress{UserID: 42, NovelID: 7, CurrentSceneID: 8}
 	novel := &mockNovelService{novel: models.Novel{ID: 7, IsPublished: true}}
 	chapter := &mockChapterService{chapter: &models.Chapter{ChapterID: 11, NovelID: 7, Status: "published"}}
 	handler := RecordChoiceHistoryHandler(reading, scene, novel, &mockWriterService{}, chapter)
@@ -60,6 +65,80 @@ func TestChoiceHistoryUsesJWTUserID(t *testing.T) {
 	}
 }
 
+func TestChoiceHistoryCanStartFromStartSceneBeforeInitialProgressSave(t *testing.T) {
+	reading := &mockReadingService{}
+	scene := &mockSceneService{
+		choice:     &models.Choice{ChoiceID: 5, FromSceneID: 8, ToSceneID: 9},
+		scene:      models.SceneResponse{SceneID: 9, NovelID: 7, ChapterID: 11, Status: "published"},
+		startScene: models.SceneResponse{SceneID: 8, NovelID: 7, ChapterID: 11, Type: "start", Status: "published"},
+		scenes: map[int]models.SceneResponse{
+			8: {SceneID: 8, NovelID: 7, ChapterID: 11, Type: "start", Status: "published"},
+			9: {SceneID: 9, NovelID: 7, ChapterID: 11, Status: "published"},
+		},
+	}
+	novel := &mockNovelService{novel: models.Novel{ID: 7, IsPublished: true}}
+	chapter := &mockChapterService{chapter: &models.Chapter{ChapterID: 11, NovelID: 7, Status: "published"}}
+	handler := RecordChoiceHistoryHandler(reading, scene, novel, &mockWriterService{}, chapter)
+	response := httptest.NewRecorder()
+	request := requestWithUser(http.MethodPost, "/choice-history", map[string]int{"user_id": 42, "choice_id": 5}, 42)
+	handler(response, request)
+
+	if response.Code != http.StatusCreated || reading.choiceHistory == nil {
+		t.Fatalf("expected initial start-scene choice to be recorded, status=%d history=%+v", response.Code, reading.choiceHistory)
+	}
+}
+
+func TestChoiceHistoryRejectsChoiceFromNonCurrentScene(t *testing.T) {
+	reading := &mockReadingService{progress: &models.ReadingProgress{UserID: 42, NovelID: 7, CurrentSceneID: 6}}
+	scene := &mockSceneService{
+		choice: &models.Choice{ChoiceID: 5, FromSceneID: 8, ToSceneID: 9},
+		scene:  models.SceneResponse{SceneID: 9, NovelID: 7, ChapterID: 11, Status: "published"},
+		scenes: map[int]models.SceneResponse{
+			8: {SceneID: 8, NovelID: 7, ChapterID: 11, Status: "published"},
+			9: {SceneID: 9, NovelID: 7, ChapterID: 11, Status: "published"},
+		},
+	}
+	novel := &mockNovelService{novel: models.Novel{ID: 7, IsPublished: true}}
+	chapter := &mockChapterService{chapter: &models.Chapter{ChapterID: 11, NovelID: 7, Status: "published"}}
+	handler := RecordChoiceHistoryHandler(reading, scene, novel, &mockWriterService{}, chapter)
+	response := httptest.NewRecorder()
+	request := requestWithUser(http.MethodPost, "/choice-history", map[string]int{"user_id": 42, "choice_id": 5}, 42)
+	handler(response, request)
+
+	if response.Code != http.StatusForbidden || reading.choiceHistory != nil {
+		t.Fatalf("expected non-current choice to be rejected, status=%d history=%+v", response.Code, reading.choiceHistory)
+	}
+}
+
+func TestProgressRejectsInvalidTransitionAndKeepsWriterPreviewReadOnly(t *testing.T) {
+	novel := &mockNovelService{novel: models.Novel{ID: 7, IsPublished: true}}
+	scene := &mockSceneService{scene: models.SceneResponse{SceneID: 9, NovelID: 7, ChapterID: 11, Type: "ending", Status: "published"}}
+	chapter := &mockChapterService{chapter: &models.Chapter{ChapterID: 11, NovelID: 7, Status: "published"}}
+	reading := &mockReadingService{saveProgressErr: repository.ErrReadingProgressTransitionInvalid}
+	handler := SaveProgressHandler(reading, novel, &mockWriterService{}, scene, chapter)
+	response := httptest.NewRecorder()
+	request := requestWithUser(http.MethodPost, "/progress", map[string]int{
+		"user_id": 42, "novel_id": 7, "current_scene_id": 9,
+	}, 42)
+	handler(response, request)
+	if response.Code != http.StatusForbidden {
+		t.Fatalf("expected invalid progress transition to return 403, got %d", response.Code)
+	}
+
+	previewReading := &mockReadingService{}
+	previewNovel := &mockNovelService{novel: models.Novel{ID: 7, AuthorID: 12}}
+	previewWriter := &mockWriterService{writer: &models.Writer{WriterID: 12, UserID: 42}}
+	previewHandler := SaveProgressHandler(previewReading, previewNovel, previewWriter, nil, nil)
+	previewResponse := httptest.NewRecorder()
+	previewRequest := requestWithUser(http.MethodPost, "/progress?preview=true", map[string]int{
+		"user_id": 42, "novel_id": 7, "current_scene_id": 9,
+	}, 42)
+	previewHandler(previewResponse, previewRequest)
+	if previewResponse.Code != http.StatusCreated || previewReading.savedProgress != nil {
+		t.Fatalf("writer preview should remain read-only, status=%d saved=%+v", previewResponse.Code, previewReading.savedProgress)
+	}
+}
+
 func TestEndingRecordingRequiresCurrentPublishedEnding(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -69,13 +148,17 @@ func TestEndingRecordingRequiresCurrentPublishedEnding(t *testing.T) {
 	}{
 		{"not reached", &models.ReadingProgress{CurrentSceneID: 8}, "published", http.StatusForbidden},
 		{"unpublished", &models.ReadingProgress{CurrentSceneID: 9}, "draft", http.StatusNotFound},
-		{"reached", &models.ReadingProgress{CurrentSceneID: 9}, "published", http.StatusCreated},
+		{"reached and unlocked", &models.ReadingProgress{CurrentSceneID: 9}, "published", http.StatusCreated},
+		{"current but not unlocked", &models.ReadingProgress{CurrentSceneID: 9}, "published", http.StatusForbidden},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			reading := &mockReadingService{progress: tt.progress}
 			scene := &mockSceneService{scene: models.SceneResponse{SceneID: 9, NovelID: 7, Type: "ending", Status: tt.status}}
+			if tt.name == "reached and unlocked" {
+				scene.endings = []models.EndingScene{{SceneID: 9, IsUnlocked: true}}
+			}
 			novel := &mockNovelService{novel: models.Novel{ID: 7, IsPublished: true}}
 			handler := RecordUserEndingHandler(reading, scene, novel, &mockWriterService{})
 			response := httptest.NewRecorder()
@@ -85,8 +168,8 @@ func TestEndingRecordingRequiresCurrentPublishedEnding(t *testing.T) {
 			if response.Code != tt.wantCode {
 				t.Fatalf("expected status %d, got %d", tt.wantCode, response.Code)
 			}
-			if tt.wantCode == http.StatusCreated && (reading.ending == nil || reading.ending.UserID != 42) {
-				t.Fatalf("expected ending for JWT user 42, got %+v", reading.ending)
+			if reading.recordEndingCalled {
+				t.Fatal("ending confirmation must not create an unlock")
 			}
 		})
 	}

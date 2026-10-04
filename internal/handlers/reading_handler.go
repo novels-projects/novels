@@ -411,6 +411,10 @@ func SaveProgressHandler(readingService service.ReadingService, novelService ser
 			NovelID:        req.NovelID,
 			CurrentSceneID: req.CurrentSceneID,
 		}); err != nil {
+			if errors.Is(err, repository.ErrReadingProgressTransitionInvalid) {
+				WriteError(w, http.StatusForbidden, "scene must be reached through a valid choice")
+				return
+			}
 			WriteError(w, http.StatusInternalServerError, err.Error())
 			return
 		}
@@ -484,6 +488,39 @@ func RecordChoiceHistoryHandler(readingService service.ReadingService, sceneServ
 			return
 		}
 
+		fromScene, err := sceneService.GetScene(choice.FromSceneID)
+		if err != nil || fromScene.NovelID != toScene.NovelID || fromScene.SceneID == toScene.SceneID || fromScene.Type == "ending" || toScene.Type == "start" {
+			WriteError(w, http.StatusNotFound, "scene not found")
+			return
+		}
+		fromChapter, err := chapterService.GetChapterByID(fromScene.ChapterID)
+		if err != nil || fromChapter == nil || fromChapter.NovelID != toScene.NovelID {
+			WriteError(w, http.StatusNotFound, "scene not found")
+			return
+		}
+		if fromScene.Status != "published" || fromChapter.Status != "published" {
+			WriteError(w, http.StatusNotFound, "scene not found")
+			return
+		}
+
+		progress, err := readingService.GetProgress(int(ctxUserID), toScene.NovelID)
+		if err != nil {
+			WriteError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if progress != nil {
+			if progress.CurrentSceneID != choice.FromSceneID {
+				WriteError(w, http.StatusForbidden, "choice does not start at the current scene")
+				return
+			}
+		} else {
+			startScene, err := sceneService.GetStartScene(toScene.NovelID)
+			if err != nil || startScene.SceneID != choice.FromSceneID {
+				WriteError(w, http.StatusForbidden, "choice does not start at the current scene")
+				return
+			}
+		}
+
 		if err := readingService.RecordChoiceHistory(models.ChoiceHistory{UserID: int(ctxUserID), ChoiceID: req.ChoiceID}); err != nil {
 			WriteError(w, http.StatusInternalServerError, err.Error())
 			return
@@ -551,8 +588,20 @@ func RecordUserEndingHandler(readingService service.ReadingService, sceneService
 			return
 		}
 
-		if err := readingService.RecordEnding(int(ctxUserID), req.NovelID, req.SceneID); err != nil {
+		endings, err := sceneService.GetEndingsByNovelID(req.NovelID, int(ctxUserID))
+		if err != nil {
 			WriteError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		isUnlocked := false
+		for _, unlockedEnding := range endings {
+			if unlockedEnding.SceneID == req.SceneID && unlockedEnding.IsUnlocked {
+				isUnlocked = true
+				break
+			}
+		}
+		if !isUnlocked {
+			WriteError(w, http.StatusForbidden, "ending has not been reached")
 			return
 		}
 

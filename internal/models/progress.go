@@ -16,9 +16,3 @@ type ChoiceHistory struct {
 	ChoiceID   int       `json:"choice_id"`
 	SelectedAt time.Time `json:"selected_at"`
 }
-
-type SaveEndingRequest struct {
-	UserID  int `json:"user_id"`
-	NovelID int `json:"novel_id"`
-	SceneID int `json:"scene_id"`
-}
