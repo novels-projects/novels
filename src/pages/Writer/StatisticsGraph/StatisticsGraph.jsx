@@ -93,6 +93,15 @@ const getEndingTypeColor = (typeStr) => {
 };
 
 const getNodeId = (node) => normalizeId(node?.ID ?? node?.id ?? node?.SceneID ?? node?.scene_id);
+const isPublishedSceneAndChapter = (node) =>
+  String(node?.status ?? node?.Status ?? "").trim().toLowerCase() === "published";
+const isReaderAccessibleNovel = (novel) => {
+  const status = String(novel?.status ?? novel?.Status ?? "").trim().toLowerCase();
+  return (novel?.is_published ?? novel?.IsPublished) === true &&
+    (novel?.is_banned ?? novel?.IsBanned) !== true &&
+    status !== "suspended" &&
+    status !== "banned";
+};
 
 const getNodeType = (node) => {
   const type = stripHtml((node?.Type ?? node?.type ?? "")).toLowerCase();
@@ -262,6 +271,7 @@ function StatisticsGraph() {
   const [treeData, setTreeData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [isNovelReaderAccessible, setIsNovelReaderAccessible] = useState(false);
   
   // Analytics States
   const [overallAnalytics, setOverallAnalytics] = useState(null);
@@ -317,17 +327,19 @@ function StatisticsGraph() {
     setError(null);
     setIsEdgeLoading(true);
     setEdgeError(null);
+    setIsNovelReaderAccessible(false);
 
     try {
       const token = localStorage.getItem("token");
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
 
       // Requirement 1 & 2: Send token to all requests including story-tree and new edge analytics
-      const [treeSettled, analyticsSettled, scenesAnalyticsSettled, edgeAnalyticsSettled] = await Promise.allSettled([
+      const [treeSettled, analyticsSettled, scenesAnalyticsSettled, edgeAnalyticsSettled, novelsSettled] = await Promise.allSettled([
         axios.get(`${API_BASE_URL}/novels/${novelId}/story-tree`, { headers, signal: controller.signal }),
         axios.get(`${API_BASE_URL}/api/v1/writer/novels/${novelId}/analytics`, { headers, signal: controller.signal }),
         axios.get(`${API_BASE_URL}/api/v1/writer/novels/${novelId}/analytics/scenes`, { headers, signal: controller.signal }),
         axios.get(`${API_BASE_URL}/api/v1/writer/novels/${novelId}/analytics/edges`, { headers, signal: controller.signal }),
+        axios.get(`${API_BASE_URL}/api/me/novels`, { headers, signal: controller.signal }),
       ]);
       
       // Process story tree
@@ -370,6 +382,18 @@ function StatisticsGraph() {
           console.warn("Edge analytics fetch warning:", edgeAnalyticsSettled.reason);
           setEdgeError(getErrorMessage(edgeAnalyticsSettled.reason, "ไม่สามารถโหลดสถิติเส้นเชื่อมได้"));
         }
+      }
+
+      if (novelsSettled.status === "fulfilled") {
+        const responseData = novelsSettled.value.data?.data || novelsSettled.value.data || {};
+        const novels = responseData?.novels || [];
+        const currentNovel = Array.isArray(novels)
+          ? novels.find((novel) => normalizeId(novel?.novel_id ?? novel?.ID ?? novel?.id) === normalizeId(novelId))
+          : null;
+        setIsNovelReaderAccessible(isReaderAccessibleNovel(currentNovel));
+      } else if (!axios.isCancel(novelsSettled.reason)) {
+        console.error("Novel publication status fetch error:", novelsSettled.reason);
+        setError(getErrorMessage(novelsSettled.reason, "ไม่สามารถตรวจสอบสถานะการเผยแพร่นิยายได้"));
       }
     } catch (err) {
       if (!axios.isCancel(err)) {
@@ -419,13 +443,17 @@ function StatisticsGraph() {
       ]);
 
       if (sceneRequestIdRef.current === requestId) {
+        const sceneWasUnpublished = sceneSettled.status === "rejected" && sceneSettled.reason?.response?.status === 404;
+        const choicesWereUnpublished = choiceSettled.status === "rejected" && choiceSettled.reason?.response?.status === 404;
         if (sceneSettled.status === "fulfilled") {
           setSceneAnalytics(sceneSettled.value.data?.data || sceneSettled.value.data || null);
         } else {
           if (!axios.isCancel(sceneSettled.reason)) {
             console.error("Error fetching scene analytics:", sceneSettled.reason);
             setSceneAnalytics(null);
-            setSceneError(getErrorMessage(sceneSettled.reason, "ไม่สามารถโหลดสถิติฉากนี้ได้"));
+            setSceneError(sceneWasUnpublished
+              ? "ฉากนี้ไม่พร้อมใช้งานสำหรับ Analytics แล้ว"
+              : getErrorMessage(sceneSettled.reason, "ไม่สามารถโหลดสถิติฉากนี้ได้"));
           }
         }
 
@@ -435,8 +463,13 @@ function StatisticsGraph() {
           if (!axios.isCancel(choiceSettled.reason)) {
             console.error("Error fetching choice analytics:", choiceSettled.reason);
             setChoiceAnalytics(null);
-            setChoiceError(getErrorMessage(choiceSettled.reason, "ไม่สามารถโหลดสถิติทางเลือกของฉากนี้ได้"));
+            setChoiceError(choicesWereUnpublished
+              ? "ฉากนี้ไม่พร้อมใช้งานสำหรับ Analytics แล้ว"
+              : getErrorMessage(choiceSettled.reason, "ไม่สามารถโหลดสถิติทางเลือกของฉากนี้ได้"));
           }
+        }
+        if (sceneWasUnpublished || choicesWereUnpublished) {
+          fetchData();
         }
       }
     } catch (err) {
@@ -449,14 +482,52 @@ function StatisticsGraph() {
         setIsChoiceLoading(false);
       }
     }
-  }, [novelId]);
+  }, [novelId, fetchData]);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
 
+  const rawNodes = treeData?.Nodes ?? treeData?.nodes ?? [];
+  // ใช้รายการ Scene และ Edge จาก Analytics API ซึ่ง Backend กรอง Reachability ตาม Reader Flow แล้ว
+  // เพื่อไม่คำนวณหรือทำซ้ำกติกา Reachability ในหน้า Analytics
+  const reachableSceneIds = useMemo(
+    () => new Set((Array.isArray(allScenesAnalytics) ? allScenesAnalytics : [])
+      .map((scene) => normalizeId(scene?.scene_id ?? scene?.SceneID))
+      .filter(Boolean)),
+    [allScenesAnalytics]
+  );
+
+  const uniqueNodes = useMemo(() => {
+    const seen = new Set();
+    if (!isNovelReaderAccessible) return [];
+    return rawNodes.filter((scene) => {
+      const id = getNodeId(scene);
+      if (!id || seen.has(id) || !isPublishedSceneAndChapter(scene) || !reachableSceneIds.has(id)) return false;
+      seen.add(id);
+      return true;
+    });
+  }, [rawNodes, isNovelReaderAccessible, reachableSceneIds]);
+
+  const analyticsEdges = useMemo(() => {
+    const publishedNodeIds = new Set(uniqueNodes.map(getNodeId));
+    return (Array.isArray(edgeAnalytics) ? edgeAnalytics : [])
+      .map((edge, index) => {
+        const source = normalizeId(edge?.from_scene_id ?? edge?.FromSceneID);
+        const target = normalizeId(edge?.to_scene_id ?? edge?.ToSceneID);
+        return {
+          id: normalizeId(edge?.choice_id ?? edge?.ChoiceID ?? `edge-${source}-${target}-${index}`),
+          source,
+          target,
+          label: edge?.choice_label ?? edge?.ChoiceLabel ?? "",
+          data: edge,
+        };
+      })
+      .filter((edge) => publishedNodeIds.has(edge.source) && publishedNodeIds.has(edge.target));
+  }, [edgeAnalytics, uniqueNodes]);
+
   useEffect(() => {
-    if (selectedSceneId) {
+    if (selectedSceneId && uniqueNodes.some((node) => getNodeId(node) === selectedSceneId)) {
       fetchSceneDetails(selectedSceneId);
     } else {
       if (sceneAbortRef.current) {
@@ -478,20 +549,7 @@ function StatisticsGraph() {
       }
       sceneRequestIdRef.current += 1;
     };
-  }, [selectedSceneId, fetchSceneDetails]);
-
-  const rawNodes = treeData?.Nodes ?? treeData?.nodes ?? [];
-  const rawEdges = treeData?.Edges ?? treeData?.edges ?? [];
-
-  const uniqueNodes = useMemo(() => {
-    const seen = new Set();
-    return rawNodes.filter((scene) => {
-      const id = getNodeId(scene);
-      if (!id || seen.has(id)) return false;
-      seen.add(id);
-      return true;
-    });
-  }, [rawNodes]);
+  }, [selectedSceneId, fetchSceneDetails, uniqueNodes]);
 
   // Map display layout - chapter grouping
   const chapterAndSceneDisplayMap = useMemo(() => {
@@ -631,17 +689,7 @@ function StatisticsGraph() {
     const localMap = new Map();
     uniqueNodes.forEach((n) => localMap.set(getNodeId(n), n));
 
-    const edgeList = rawEdges.map((edge, index) => {
-      const source = normalizeId(edge.FromID || edge.from_id || edge.from || edge.source || "");
-      const target = normalizeId(edge.ToID || edge.to_id || edge.to || edge.target || "");
-      return {
-        id: normalizeId(edge.id ?? edge.ID ?? `edge-${source}-${target}-${index}`),
-        source,
-        target,
-        label: edge.Label || edge.label || edge.choice_text || edge.text || "",
-        data: edge,
-      };
-    });
+    const edgeList = analyticsEdges;
 
     const adjacency = {};
     const inDegree = {};
@@ -906,7 +954,7 @@ function StatisticsGraph() {
     });
 
     return { nodes: finalNodes, edges: finalEdges };
-  }, [uniqueNodes, rawEdges, selectedSceneId, chapterAndSceneDisplayMap, nodeAnalyticsMap, edgeAnalyticsMap, overallAnalytics, maxExitRate, isEdgeLoading, edgeError, choiceAnalytics]);
+  }, [uniqueNodes, analyticsEdges, selectedSceneId, chapterAndSceneDisplayMap, nodeAnalyticsMap, edgeAnalyticsMap, overallAnalytics, maxExitRate, isEdgeLoading, edgeError, choiceAnalytics]);
 
   const [rfNodes, setRfNodes] = useNodesState([]);
   const [rfEdges, setRfEdges] = useEdgesState([]);
@@ -989,6 +1037,7 @@ function StatisticsGraph() {
 
   const nextScenesList = useMemo(() => {
     if (!selectedSceneId) return [];
+    const publishedNodeIds = new Set(uniqueNodes.map(getNodeId));
 
     // 1. Direct from API payload sceneAnalytics if present
     const apiNext = sceneAnalytics?.next_scenes || sceneAnalytics?.destination_scenes || sceneAnalytics?.nextScenes;
@@ -999,7 +1048,7 @@ function StatisticsGraph() {
         choiceText: item.choice_label || item.choice_text || item.label || "",
         transitionCount: item.transition_count ?? item.selection_count ?? item.count,
         percentage: item.percentage,
-      }));
+      })).filter((scene) => publishedNodeIds.has(scene.sceneId));
     }
 
     // 2. Derive from choiceAnalytics.choices if available
@@ -1007,7 +1056,7 @@ function StatisticsGraph() {
       const list = [];
       choiceAnalytics.choices.forEach((choice) => {
         const targetId = normalizeId(choice.to_scene_id || choice.target_scene_id);
-        if (targetId) {
+        if (targetId && publishedNodeIds.has(targetId)) {
           let title = choice.target_scene_title;
           if (!title) {
             const targetNode = uniqueNodes.find((n) => getNodeId(n) === targetId);
@@ -1026,16 +1075,16 @@ function StatisticsGraph() {
     }
 
     // 3. Fallback to rawEdges where source === selectedSceneId
-    if (rawEdges && rawEdges.length > 0) {
+    if (analyticsEdges.length > 0) {
       const list = [];
-      rawEdges.forEach((edge) => {
-        const src = normalizeId(edge.FromID || edge.from_id || edge.from || edge.source || "");
+      analyticsEdges.forEach((edge) => {
+        const src = edge.source;
         if (src === selectedSceneId) {
-          const tgt = normalizeId(edge.ToID || edge.to_id || edge.to || edge.target || "");
+          const tgt = edge.target;
           if (tgt) {
             const targetNode = uniqueNodes.find((n) => getNodeId(n) === tgt);
             const title = targetNode ? getNodeTitle(targetNode) : "ไม่มีชื่อฉาก";
-            const choiceText = edge.Label || edge.label || edge.choice_text || edge.text || "";
+            const choiceText = edge.label || "";
             
             const edgeChoiceId = normalizeId(
               edge.data?.choice_id ?? edge.data?.ChoiceID ?? edge.data?.ID ?? edge.data?.id ?? edge.choice_id
@@ -1058,7 +1107,7 @@ function StatisticsGraph() {
     }
 
     return [];
-  }, [selectedSceneId, sceneAnalytics, choiceAnalytics, rawEdges, uniqueNodes, edgeAnalyticsMap]);
+  }, [selectedSceneId, sceneAnalytics, choiceAnalytics, analyticsEdges, uniqueNodes, edgeAnalyticsMap]);
 
 
   const selectedSceneDetails = useMemo(() => {
@@ -1164,6 +1213,28 @@ function StatisticsGraph() {
           </button>
         </div>
       </header>
+
+      <div
+        role="note"
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "8px",
+          padding: "9px 24px",
+          background: "#fff7ed",
+          borderBottom: "1px solid #fed7aa",
+          color: "#9a3412",
+          fontSize: "0.82rem",
+          lineHeight: 1.5,
+          flexShrink: 0,
+        }}
+      >
+        <Info size={16} aria-hidden="true" />
+        <span>
+          หมายเหตุ: สถิตินี้แสดงเฉพาะเนื้อหาที่เผยแพร่และผู้อ่านเข้าถึงได้จากจุดเริ่มต้นในปัจจุบัน
+          ไม่รวมฉาก Draft หรือฉากที่ไม่มีเส้นทางจากจุดเริ่มต้น
+        </span>
+      </div>
 
       {/* 🟢 KPI Dashboard แสดงตัวเลขภาพรวม 5 การ์ด */}
       <section className="wsg-kpis-new-container">
@@ -1574,7 +1645,7 @@ function StatisticsGraph() {
           {!hasInteractedWithNode && !selectedSceneId && (
             <div className="wsg-canvas-hint-pill">
               <span className="wsg-canvas-hint-icon">💡</span>
-              <span className="wsg-canvas-hint-text">คลิกเลือกโหนดฉากในแผนผังเพื่อดูสถิติและการตัดสินใจเชิงลึก</span>
+              <span className="wsg-canvas-hint-text">เลือกฉากที่เผยแพร่และผู้อ่านเข้าถึงได้ในแผนผัง เพื่อดูสถิติและการตัดสินใจเชิงลึก</span>
             </div>
           )}
 
