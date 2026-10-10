@@ -5,6 +5,8 @@
 // ══════════════════════════════════════════════════════════
 
 import React, { useState, useEffect } from "react";
+import Cropper from "react-easy-crop";
+import getCroppedImg from "../../utils/cropImage.js";
 import "./AuthPage.css";
 
 // ══════════════════════════════════════════════════════════
@@ -57,7 +59,7 @@ const IconCircle = () => (
 // ══════════════════════════════════════════════════════════
 //  Sub: Password input with toggle
 // ══════════════════════════════════════════════════════════
-const PasswordInput = ({ id, value, onChange, placeholder, error }) => {
+const PasswordInput = ({ id, value, onChange, placeholder, error, maxLength = 100 }) => {
   const [show, setShow] = useState(false);
   return (
     <div className={`auth-input-wrap ${error ? "auth-input-wrap--error" : ""}`}>
@@ -68,6 +70,7 @@ const PasswordInput = ({ id, value, onChange, placeholder, error }) => {
         value={value}
         onChange={onChange}
         placeholder={placeholder}
+        maxLength={maxLength}
         autoComplete={id === "confirm-password" ? "new-password" : "current-password"}
         aria-describedby={error ? `${id}-error` : undefined}
       />
@@ -160,10 +163,10 @@ const LoginForm = ({ onSwitchToRegister }) => {
 
   const handleSubmit = async (ev) => {
     if (ev) ev.preventDefault();
-    console.log("🔑 Login Event Triggered");
+    if (isLoading) return;
+
     const e = validate();
     if (Object.keys(e).length) { 
-      console.warn("⚠️ Login Validation Failed:", e);
       setErrors(e); 
       return; 
     }
@@ -171,17 +174,12 @@ const LoginForm = ({ onSwitchToRegister }) => {
     setIsLoading(true);
     setErrors({});
     try {
-      console.log("🛰️ Fetching Login API...", { email, passwordLength: password.length });
       const res = await fetch('/api/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email: email.trim(), password }),
       });
 
-      console.log("📥 Login Response Received. Status:", res.status);
-      // Some error responses are sent as plain text (http.Error) not JSON.
-      // Try to read as text first and parse JSON if possible, otherwise
-      // expose the plain text message so the UI can show a clearer reason.
       const raw = await res.text().catch(() => "");
       let data = {};
       try {
@@ -189,11 +187,10 @@ const LoginForm = ({ onSwitchToRegister }) => {
       } catch (err) {
         data = { message: raw };
       }
-      console.log("📦 Login Response Data:", data);
 
       if (!res.ok) {
         const message = data?.error?.message || data?.message || (typeof data?.error === "string" ? data.error : null);
-        setErrors({ general: message || 'ไม่สามารถเข้าสู่ระบบได้' });
+        setErrors({ general: message || 'ไม่สามารถเข้าสู่ระบบได้ กรุณาตรวจสอบอีเมลและรหัสผ่าน' });
         setIsLoading(false);
         return;
       }
@@ -203,24 +200,21 @@ const LoginForm = ({ onSwitchToRegister }) => {
         localStorage.removeItem("remembered_login_email");
       }
       if (data.token) {
-        console.log("💾 Saving token to LocalStorage");
         localStorage.setItem('token', data.token);
         localStorage.setItem('pw_len', password.length);
       }
 
       if (data.refresh_token) {
-        console.log("💾 Saving refresh token to LocalStorage");
         localStorage.setItem('refresh_token', data.refresh_token);
       }
       if (data.user) {
-        console.log("💾 Saving user data to LocalStorage");
         localStorage.setItem('user', JSON.stringify(data.user));
       }
       setIsLoading(false);
       window.location.href = '/';
     } catch (err) {
       console.error("❌ Catch Error in Login Process:", err);
-      setErrors({ general: 'ไม่สามารถติดต่อเซิร์ฟเวอร์ได้' });
+      setErrors({ general: 'ไม่สามารถติดต่อเซิร์ฟเวอร์ได้ กรุณาตรวจสอบการเชื่อมต่อของคุณ' });
       setIsLoading(false);
     }
   };
@@ -247,6 +241,7 @@ const LoginForm = ({ onSwitchToRegister }) => {
             type="email"
             className="auth-input"
             placeholder="you@example.com"
+            maxLength={100}
             value={email}
             onChange={(e) => { setEmail(e.target.value); if(errors.email) setErrors((p) => ({ ...p, email: "" })); }}
             autoComplete="email"
@@ -265,6 +260,7 @@ const LoginForm = ({ onSwitchToRegister }) => {
           value={password}
           onChange={(e) => { setPassword(e.target.value); if(errors.password) setErrors((p) => ({ ...p, password: "" })); }}
           placeholder="กรอกรหัสผ่านของคุณ"
+          maxLength={100}
           error={errors.password}
         />
         {errors.password && <p className="auth-field__error" role="alert">{errors.password}</p>}
@@ -317,12 +313,18 @@ const RegisterForm = ({ onSwitchToLogin }) => {
   const [errors,         setErrors]         = useState({});
   const [isLoading,      setIsLoading]      = useState(false);
 
-  // Field validation and messages (เหมือนกับ ReaderSetting.jsx)
-  const [usernameMsg, setUsernameMsg] = useState({ type: "hint", text: "ใช้ได้เฉพาะตัวอักษรภาษาอังกฤษ ตัวเลข และ _ ความยาว 3–20 ตัว" });
+  // States สำหรับ Cropper (ครอบตัดรูปโปรไฟล์)
+  const [imageToCrop,        setImageToCrop]        = useState(null);
+  const [crop,               setCrop]               = useState({ x: 0, y: 0 });
+  const [zoom,               setZoom]               = useState(1);
+  const [croppedAreaPixels,  setCroppedAreaPixels]  = useState(null);
+  const [isCropping,         setIsCropping]         = useState(false);
+
+  // Field validation and messages
+  const [usernameMsg, setUsernameMsg] = useState({ type: "hint", text: "ใช้ได้เฉพาะ A–Z, a–z, 0–9 และ _ ความยาว 3–50 ตัวอักษร" });
   const [emailMsg, setEmailMsg] = useState({ type: "hint", text: "" });
   const [pwMatchMsg, setPwMatchMsg] = useState({ type: "none", text: "" });
 
-  // รายชื่อ Username และ Email ที่มีผู้อื่นใช้งานแล้วในระบบ (เริ่มต้นจากค่า seed มาตรฐานของระบบ)
   const takenUsernames = [
     "admin_master",
     "dark_john",
@@ -342,16 +344,14 @@ const RegisterForm = ({ onSwitchToLogin }) => {
   ];
 
   const pwRules = [
-    { id: "r-len", label: "อย่างน้อย 8 ตัวอักษร", test: (v) => v.length >= 8 },
-    { id: "r-upper", label: "ตัวพิมพ์ใหญ่ (A–Z)", test: (v) => /[A-Z]/.test(v) },
-    { id: "r-num", label: "ตัวเลข (0–9)", test: (v) => /[0-9]/.test(v) },
-    { id: "r-sym", label: "อักขระพิเศษ (!@#$...) ", test: (v) => /[^A-Za-z0-9]/.test(v) },
+    { id: "r-len", label: "อย่างน้อย 8 ตัวอักษร", required: true, test: (v) => v.length >= 8 },
+    { id: "r-upper", label: "ตัวพิมพ์ใหญ่ (A–Z)", required: true, test: (v) => /[A-Z]/.test(v) },
+    { id: "r-num", label: "ตัวเลข (0–9)", required: true, test: (v) => /[0-9]/.test(v) },
   ];
 
   const pwLevels = [
-    { label: "อ่อนแอมาก", color: "#EF4444", cls: "active-weak" },
+    { label: "อ่อนแอ", color: "#EF4444", cls: "active-weak" },
     { label: "พอใช้", color: "#F59E0B", cls: "active-fair" },
-    { label: "ดี", color: "#22C55E", cls: "active-good" },
     { label: "แข็งแกร่ง", color: "#16A34A", cls: "active-strong" },
   ];
 
@@ -367,7 +367,17 @@ const RegisterForm = ({ onSwitchToLogin }) => {
     clearFieldError("username");
     
     if (!val) {
-      setUsernameMsg({ type: "hint", text: "ใช้ได้เฉพาะตัวอักษรภาษาอังกฤษ ตัวเลข และ _ ความยาว 3–20 ตัว" });
+      setUsernameMsg({ type: "hint", text: "ใช้ได้เฉพาะ A–Z, a–z, 0–9 และ _ ความยาว 3–50 ตัวอักษร" });
+      return;
+    }
+
+    if (val.length > 50) {
+      setUsernameMsg({ type: "err", text: "ความยาวชื่อผู้ใช้ต้องไม่เกิน 50 ตัวอักษร" });
+      return;
+    }
+
+    if (val.length < 3) {
+      setUsernameMsg({ type: "err", text: "ความยาวชื่อผู้ใช้ต้องอย่างน้อย 3 ตัวอักษร" });
       return;
     }
 
@@ -376,11 +386,11 @@ const RegisterForm = ({ onSwitchToLogin }) => {
       return;
     }
 
-    const ok = /^[a-zA-Z0-9_]{3,20}$/.test(val);
+    const ok = /^[a-zA-Z0-9_]{3,50}$/.test(val);
     if (ok) {
       setUsernameMsg({ type: "ok", text: "รูปแบบชื่อผู้ใช้ถูกต้อง" });
     } else {
-      setUsernameMsg({ type: "err", text: "ใช้ได้แค่ A–Z, a–z, 0–9, _ ความยาว 3–20 ตัว" });
+      setUsernameMsg({ type: "err", text: "ใช้ได้เฉพาะตัวอักษรภาษาอังกฤษ ตัวเลข และ _ ความยาว 3–50 ตัวอักษร" });
     }
   };
 
@@ -390,6 +400,11 @@ const RegisterForm = ({ onSwitchToLogin }) => {
 
     if (!val) {
       setEmailMsg({ type: "hint", text: "" });
+      return;
+    }
+
+    if (val.length > 100) {
+      setEmailMsg({ type: "err", text: "อีเมลต้องมีความยาวไม่เกิน 100 ตัวอักษร" });
       return;
     }
 
@@ -446,61 +461,75 @@ const RegisterForm = ({ onSwitchToLogin }) => {
       return "อีเมลนี้ถูกใช้งานแล้ว: กรุณาแก้ไขช่อง 'อีเมล' หรือใช้หน้า 'เข้าสู่ระบบ' ด้วยบัญชีนี้";
     }
     if (lower.includes("password") && (lower.includes("weak") || lower.includes("short"))) {
-      return "รหัสผ่านไม่ปลอดภัย: กรุณากรอกรหัสผ่านที่มีความยาว 8 ตัวขึ้นไป และมีตัวพิมพ์ใหญ่ ตัวเลข และอักขระพิเศษตามเงื่อนไข";
+      return "รหัสผ่านไม่ปลอดภัย: กรุณากรอกรหัสผ่านที่มีความยาว 8 ตัวขึ้นไป และมีตัวพิมพ์ใหญ่กับตัวเลข";
     }
     return `ข้อผิดพลาดจากเซิร์ฟเวอร์: ${msg} (กรุณาตรวจสอบและแก้ไขข้อมูลที่กรอกให้ถูกต้อง)`;
   };
 
   const handleProfileChange = (e) => {
-    console.log("📸 Image selection triggered");
     const file = e.target.files?.[0];
-    if (!file) {
-      console.log("🚫 No file selected or cancelled");
-      return;
-    }
-
-    console.log("ℹ️ Selected File Info:", { name: file.name, type: file.type, sizeBytes: file.size });
+    if (!file) return;
 
     if (!file.type.startsWith('image/')) {
-      console.error("❌ Error: File is not an image");
       alert("กรุณาเลือกไฟล์รูปภาพเท่านั้น");
       return;
     }
 
     if (file.size > 5 * 1024 * 1024) {
-      console.error("❌ Error: File size exceeds 5MB limit");
       alert("ขนาดไฟล์ต้องน้อยกว่า 5MB");
       return;
     }
 
     try {
-      if (profilePreview) {
-        console.log("🧹 Revoking old image preview URL");
-        URL.revokeObjectURL(profilePreview);
-      }
       const imageUrl = URL.createObjectURL(file);
-      setProfileFile(file);
-      setProfilePreview(imageUrl);
-      console.log("✨ Successfully created object preview URL:", imageUrl);
+      setImageToCrop(imageUrl);
+      setZoom(1);
+      setCrop({ x: 0, y: 0 });
     } catch (err) {
       console.error("❌ Error creating object URL:", err);
-      alert("เกิดข้อผิดพลาดในการอัพโหลดรูป");
+      alert("เกิดข้อผิดพลาดในการโหลดรูป");
+    }
+
+    // Reset input file value so re-selecting same file works
+    e.target.value = "";
+  };
+
+  const handleSaveCrop = async () => {
+    if (!imageToCrop || !croppedAreaPixels) return;
+    setIsCropping(true);
+    try {
+      const { file: croppedFile, url: croppedUrl } = await getCroppedImg(imageToCrop, croppedAreaPixels);
+      setProfileFile(croppedFile);
+      if (profilePreview) {
+        URL.revokeObjectURL(profilePreview);
+      }
+      setProfilePreview(croppedUrl);
+      setImageToCrop(null);
+    } catch (e) {
+      console.error("Error cropping image:", e);
+      alert("เกิดข้อผิดพลาดในการครอบตัดรูปภาพ");
+    } finally {
+      setIsCropping(false);
     }
   };
 
   useEffect(() => {
     return () => {
       if (profilePreview) {
-        console.log("🧹 Cleanup: Revoking profile preview URL on unmount");
         URL.revokeObjectURL(profilePreview);
       }
+      if (imageToCrop) {
+        URL.revokeObjectURL(imageToCrop);
+      }
     };
-  }, [profilePreview]);
+  }, [profilePreview, imageToCrop]);
 
   const validate = () => {
     const e = {};
     if (!username.trim()) {
       e.username = "กรุณากรอกชื่อผู้ใช้";
+    } else if (username.length < 3 || username.length > 50) {
+      e.username = "ชื่อผู้ใช้ต้องมีความยาวระหว่าง 3–50 ตัวอักษร";
     } else if (usernameMsg.type === "err") {
       e.username = usernameMsg.text;
     }
@@ -514,9 +543,12 @@ const RegisterForm = ({ onSwitchToLogin }) => {
     if (!password.trim()) {
       e.password = "กรุณากรอกรหัสผ่าน";
     } else {
-      const passed = pwRules.filter((r) => r.test(password)).length;
-      if (passed < 4) {
-        e.password = "รหัสผ่านไม่ปลอดภัย: กรุณากรอกรหัสผ่านให้ครบทุกเงื่อนไข";
+      const isLenOk = password.length >= 8;
+      const isUpperOk = /[A-Z]/.test(password);
+      const isNumOk = /[0-9]/.test(password);
+
+      if (!isLenOk || !isUpperOk || !isNumOk) {
+        e.password = "รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร ตัวพิมพ์ใหญ่ (A–Z) และตัวเลข (0–9)";
       }
     }
 
@@ -540,11 +572,10 @@ const RegisterForm = ({ onSwitchToLogin }) => {
 
   const handleSubmit = async (ev) => {
     if (ev) ev.preventDefault();
-    console.log("📝 Register Form Button Clicked!");
+    if (isLoading) return; // ป้องกันการส่งซ้ำระหว่าง request
     
     const e = validate();
     if (Object.keys(e).length) { 
-      console.warn("⚠️ Register Frontend Validation Failed. Errors:", e);
       setErrors(e); 
       return; 
     }
@@ -553,67 +584,41 @@ const RegisterForm = ({ onSwitchToLogin }) => {
     setErrors({});
 
     try {
-      console.log("📦 Preparing FormData payload...");
       const formData = new FormData();
-      formData.append('username', username);
-      formData.append('email', email);
+      formData.append('username', username.trim());
+      formData.append('email', email.trim());
       formData.append('password', password);
       
       if (profileFile) {
-        console.log("📎 Appending profile image to FormData");
         formData.append('profileImage', profileFile);
       }
 
-      console.log("🕵️ Inspecting FormData items to be sent:");
-      for (let [key, value] of formData.entries()) {
-        if (key === 'password') {
-          console.log(` -> ${key}: [REDACTED, length: ${value.length}]`);
-        } else if (value instanceof File) {
-          console.log(` -> ${key}: File -> Name: ${value.name}, Size: ${value.size} bytes`);
-        } else {
-          console.log(` -> ${key}: ${value}`);
-        }
-      }
-
-      const apiEndpoint = '/api/register'; 
-      console.log(`🛰️ Sending HTTP POST to endpoint: "${apiEndpoint}"`);
-
-      const res = await fetch(apiEndpoint, {
+      const res = await fetch('/api/register', {
         method: 'POST',
         body: formData, 
       });
 
-      console.log("📥 Register Response Received! Status Code:", res.status);
-      const data = await res.json().catch((jsonErr) => {
-        console.error("❌ Failed to parse response body to JSON:", jsonErr);
-        return {};
-      });
-      console.log("📦 Response Data payload:", data);
+      const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
         const errorMessage = data?.error?.message || data?.message || data?.error;
-        console.error(`❌ Register failed with status ${res.status}. Error Msg:`, errorMessage);
         setErrors({ general: formatRegisterError(errorMessage) });
         setIsLoading(false);
         return;
       }
       if (data.token) {
-        console.log("💾 Token received successfully! Storing to LocalStorage.");
         localStorage.setItem('token', data.token);
         localStorage.setItem('pw_len', password.length);
       }
 
       if (data.refresh_token) {
-        console.log("💾 Refresh token received successfully! Storing to LocalStorage.");
         localStorage.setItem('refresh_token', data.refresh_token);
       }
       if (data.user) {
-        console.log("💾 User data received successfully! Storing to LocalStorage.");
         localStorage.setItem('user', JSON.stringify(data.user));
       }
 
       setIsLoading(false);
-      console.log("🏁 Registration workflow completed. Redirecting to home...");
       window.location.href = '/';
     } catch (err) {
       console.error("💥 CRITICAL CATCH: Register process threw an exception:", err);
@@ -731,7 +736,7 @@ const RegisterForm = ({ onSwitchToLogin }) => {
         {password && (
           <div className="pw-strength">
             <div className="pw-bars">
-              {[1, 2, 3, 4].map((i) => {
+              {[1, 2, 3].map((i) => {
                 const strengthInfo = getPwStrength();
                 return (
                   <div 
@@ -809,6 +814,64 @@ const RegisterForm = ({ onSwitchToLogin }) => {
           เข้าสู่ระบบ
         </button>
       </p>
+
+      {/* Crop Modal */}
+      {imageToCrop && (
+        <div className="crop-modal-overlay" onClick={(e) => e.stopPropagation()}>
+          <div className="crop-modal-container">
+            <div className="crop-modal-header">
+              <h3>ครอบตัดรูปโปรไฟล์</h3>
+              <button type="button" className="crop-modal-close" onClick={() => setImageToCrop(null)}>✕</button>
+            </div>
+
+            <div className="crop-cropper-wrapper">
+              <Cropper
+                image={imageToCrop}
+                crop={crop}
+                zoom={zoom}
+                aspect={1}
+                cropShape="round"
+                showGrid={false}
+                onCropChange={setCrop}
+                onZoomChange={setZoom}
+                onCropComplete={(croppedArea, croppedAreaPixels) => setCroppedAreaPixels(croppedAreaPixels)}
+              />
+            </div>
+
+            <div className="crop-controls">
+              <span className="crop-control-label">🔍 ขยาย:</span>
+              <input
+                type="range"
+                min={1}
+                max={3}
+                step={0.1}
+                value={zoom}
+                onChange={(e) => setZoom(Number(e.target.value))}
+                className="crop-zoom-slider"
+              />
+            </div>
+
+            <div className="crop-modal-actions">
+              <button
+                type="button"
+                className="crop-btn-cancel"
+                onClick={() => setImageToCrop(null)}
+                disabled={isCropping}
+              >
+                ยกเลิก
+              </button>
+              <button
+                type="button"
+                className="crop-btn-save"
+                onClick={handleSaveCrop}
+                disabled={isCropping}
+              >
+                {isCropping ? "กำลังครอบตัด..." : "ใช้รูปภาพนี้"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </form>
   );
 };

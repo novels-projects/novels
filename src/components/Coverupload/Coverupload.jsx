@@ -18,11 +18,11 @@ const CoverUpload = ({ value, onChange }) => {
   const handleFile = (file) => {
     if (!file) return;
     if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
-      alert("รองรับเฉพาะไฟล์ PNG, JPG, WEBP เท่านั้น");
+      alert("รองรับเฉพาะไฟล์ JPEG, PNG, และ WebP เท่านั้น");
       return;
     }
-    if (file.size > 5 * 1024 * 1024) {
-      alert("ไฟล์ต้นฉบับต้องไม่เกิน 5MB");
+    if (file.size > 10 * 1024 * 1024) {
+      alert("ขนาดไฟล์ปกต้องไม่เกิน 10MB");
       return;
     }
     
@@ -120,7 +120,7 @@ const CoverUpload = ({ value, onChange }) => {
           <div className="cup__placeholder">
             <div className="cup__placeholder-icon" aria-hidden="true">🖼️</div>
             <p className="cup__placeholder-text">คลิกหรือลากไฟล์มาวางที่นี่</p>
-            <p className="cup__placeholder-hint">PNG, JPG · แนะนำสัดส่วนแนวตั้ง 2:3</p>
+            <p className="cup__placeholder-hint">PNG, JPG, WebP (สูงสุด 10MB) · แนะนำสัดส่วนแนวตั้ง 2:3</p>
           </div>
         )}
       </div>

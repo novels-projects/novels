@@ -14,7 +14,7 @@
   max-height: calc(100vh - 83px);
   width: 100%;
   background-color: #faf9f6;
-  font-family: 'Outfit', 'Inter', 'Prompt', sans-serif;
+  font-family: 'Sarabun', 'Prompt', 'Outfit', 'Inter', sans-serif;
   color: #334155;
   overflow: hidden; /* ล็อกความสูงหน้าหลักไม่ให้มี scrollbar แนวตั้งดันจอ */
   box-sizing: border-box;
@@ -167,25 +167,77 @@
   min-height: 0;
 }
 
-.wst-canvas-heading {
+/* Floating Canvas Header Overlay Container (Single Row: Left Heading, Right Toolbar) */
+.wst-canvas-header-overlay {
   position: absolute;
-  top: 20px;
-  left: 20px;
-  z-index: 10;
+  top: 16px;
+  left: 16px;
+  right: 16px;
+  z-index: 25;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   pointer-events: none;
+  box-sizing: border-box;
+}
+
+.wst-canvas-heading {
+  pointer-events: auto;
+  position: static;
+  top: auto;
+  left: auto;
+  background: rgba(250, 249, 246, 0.94); /* สีกลืนกับพื้นหลังกราฟ #faf9f6 */
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1.5px solid rgba(226, 232, 240, 0.85);
+  border-radius: 14px;
+  padding: 8px 16px;
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.04);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  flex-shrink: 1;
+  min-width: 0;
+  max-width: 340px;
+  transition: all 0.2s ease;
 }
 
 .wst-canvas-title {
-  font-size: 1.35rem;
+  font-family: 'Sarabun', sans-serif !important;
+  font-size: 1.15rem;
   font-weight: 800;
   color: #0f172a;
   margin: 0;
+  line-height: 1.25;
 }
 
 .wst-canvas-sub {
+  font-family: 'Sarabun', sans-serif !important;
+  font-size: 0.85rem;
+  color: #334155;
+  margin: 3px 0 0 0;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.wst-canvas-sub__label {
+  font-family: 'Sarabun', sans-serif !important;
+  color: #db2777;
+  font-weight: 700;
   font-size: 0.82rem;
-  color: #64748b;
-  margin: 2px 0 0 0;
+}
+
+.wst-canvas-sub__title {
+  font-family: 'Sarabun', sans-serif !important;
+  color: #0f172a;
+  font-weight: 800;
+  font-size: 0.88rem;
 }
 
 .wst-canvas-wrap {
@@ -201,22 +253,40 @@
 }
 
 /* ─────────────────────────────────────────────
-   React Flow Toolbar Overlay
+   React Flow Toolbar Overlay (Fit Content, No Blank Trailing Space)
    ───────────────────────────────────────────── */
 .wst-canvas-toolbar {
-  position: absolute;
-  top: 20px;
-  right: 20px;
-  z-index: 10;
+  pointer-events: auto;
+  position: static;
+  top: auto;
+  right: auto;
+  z-index: 25;
   background: #ffffff;
   border: 1px solid #e2e8f0;
   border-radius: 12px;
   display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 4px;
   padding: 4px;
   box-shadow: 0 4px 18px rgba(0, 0, 0, 0.05);
+  box-sizing: border-box;
+  width: max-content; /* ตัดส่วนสีขาวโล่งๆ ตรงท้ายออก ให้แนบพอดีกับปุ่ม */
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  flex-shrink: 0;
+}
+
+.wst-canvas-toolbar::-webkit-scrollbar {
+  display: none;
 }
 
 .wst-toolbar-btn {
+  flex: 1 1 auto;
+  min-width: max-content;
   background: transparent;
   border: none;
   display: flex;
@@ -232,6 +302,8 @@
   transition: all 0.15s;
   gap: 4px;
   border: 1px solid transparent;
+  box-sizing: border-box;
+  text-align: center;
 }
 
 .wst-toolbar-btn:hover {
@@ -386,19 +458,78 @@
   background: #ffffff;
   border: 1px solid #cbd5e1;
   border-radius: 8px;
-  padding: 6px 14px;
+  padding: 5px 12px;
   font-size: 0.78rem;
   font-weight: 600;
   color: #334155;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   transition: all 0.2s;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+}
+
+.wst-node-card__edit svg {
+  color: #64748b;
+  flex-shrink: 0;
 }
 
 .wst-node-card__edit:hover {
   background: #f1f5f9;
   border-color: #94a3b8;
+  color: #2563eb;
   transform: translateY(-1px);
+}
+
+.wst-node-card__edit:hover svg {
+  color: #2563eb;
+}
+
+/* Mode-Specific Cursors for Canvas, Pane, Nodes, and Edges */
+.wst-mode-select .react-flow__pane,
+.wst-mode-select .react-flow__viewport {
+  cursor: default !important;
+}
+
+.wst-mode-connect .react-flow__pane,
+.wst-mode-connect .react-flow__viewport,
+.wst-mode-connect .react-flow__node {
+  cursor: crosshair !important;
+}
+
+.wst-mode-add-node .react-flow__pane,
+.wst-mode-add-node .react-flow__viewport,
+.wst-mode-add-node .react-flow__node {
+  cursor: cell !important;
+}
+
+.wst-mode-delete .react-flow__pane,
+.wst-mode-delete .react-flow__viewport,
+.wst-mode-delete .react-flow__node,
+.wst-mode-delete .wst-node-card {
+  cursor: not-allowed !important;
+}
+
+.wst-mode-pan .react-flow__pane,
+.wst-mode-pan .react-flow__viewport {
+  cursor: grab !important;
+}
+
+.wst-mode-pan .react-flow__pane:active,
+.wst-mode-pan .react-flow__viewport:active {
+  cursor: grabbing !important;
+}
+
+/* ในโหมดเลื่อนบอร์ด (Pan Mode) ปิด hover effect และไฮไลท์สีแดงที่เส้นทางเลือก */
+.wst-mode-pan .react-flow__edge,
+.wst-mode-pan .react-flow__edge-path,
+.wst-mode-pan .react-flow__edge-foreignobject,
+.wst-mode-pan g.react-flow__edge,
+.wst-mode-pan .react-flow__edge:hover,
+.wst-mode-pan .react-flow__edge-path:hover {
+  pointer-events: none !important;
+  cursor: grab !important;
 }
 
 /* React Flow Handle custom style */
@@ -407,6 +538,46 @@
   height: 10px !important;
   background: #94a3b8 !important;
   border: 2px solid #ffffff !important;
+}
+
+/* React Flow Controls & MiniMap Styling */
+.react-flow__controls {
+  position: absolute !important;
+  bottom: 20px !important;
+  left: 20px !important;
+  z-index: 50 !important;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08) !important;
+  border-radius: 10px !important;
+  overflow: hidden;
+  border: 1px solid #e2e8f0 !important;
+  background: #ffffff !important;
+}
+
+.react-flow__controls-button {
+  border-bottom: 1px solid #f1f5f9 !important;
+  background: #ffffff !important;
+  fill: #475569 !important;
+  color: #475569 !important;
+  width: 30px !important;
+  height: 30px !important;
+}
+
+.react-flow__controls-button:hover {
+  background: #f8fafc !important;
+  fill: #0f172a !important;
+}
+
+.react-flow__minimap {
+  position: absolute !important;
+  bottom: 20px !important;
+  right: 20px !important;
+  z-index: 50 !important;
+  border-radius: 12px !important;
+  border: 1px solid #e2e8f0 !important;
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.08) !important;
+  background: rgba(255, 255, 255, 0.95) !important;
+  backdrop-filter: blur(8px);
+  overflow: hidden;
 }
 
 /* ─────────────────────────────────────────────
@@ -634,8 +805,12 @@
   color: #475569;
   font-size: 0.82rem;
   line-height: 1.5;
-  max-height: 80px;
-  overflow-y: auto;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
   word-break: break-word;
 }
 
@@ -1201,4 +1376,457 @@
   background: #ffffff;
   color: #db2777;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+}
+
+/* ─────────────────────────────────────────────────────────────
+   📱 RESPONSIVE LAYOUT SYSTEM (ทุกขนาดหน้าจอ)
+   ───────────────────────────────────────────────────────────── */
+
+/* 📱 Mobile Sidebar Selector Button (สไตล์การ์ดเปิดรายการตอนในหน้าจัดการตอน) */
+.wst-mobile-sidebar-selector {
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  width: calc(100% - 24px);
+  margin: 10px 12px 2px 12px;
+  background-color: #ffffff;
+  border: 1.5px solid #bae6fd;
+  border-radius: 16px;
+  padding: 10px 16px;
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.06);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+  font-family: 'Sarabun', 'Prompt', sans-serif;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.wst-mobile-sidebar-selector:hover {
+  border-color: #0284c7;
+  box-shadow: 0 6px 18px rgba(2, 132, 199, 0.12);
+  transform: translateY(-1px);
+}
+
+.wst-mobile-sidebar-selector__left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.wst-mobile-sidebar-selector__icon-box {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background-color: #f0f9ff;
+  border: 1px solid #e0f2fe;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #0284c7;
+  flex-shrink: 0;
+}
+
+.wst-mobile-sidebar-selector__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  text-align: left;
+}
+
+.wst-mobile-sidebar-selector__label {
+  font-size: 13px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.wst-mobile-sidebar-selector__info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #64748b;
+  flex-wrap: wrap;
+}
+
+.wst-mobile-sidebar-selector__stat {
+  color: #0284c7;
+  font-weight: 700;
+}
+
+.wst-mobile-sidebar-selector__orphan {
+  color: #db2777;
+  font-weight: 700;
+}
+
+.wst-mobile-sidebar-selector__dot {
+  color: #94a3b8;
+}
+
+.wst-mobile-sidebar-selector__right {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #0284c7;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* Mobile Sidebar Drawer Header & Close Button */
+.wst-sidebar__mobile-header {
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #f1f5f9;
+  margin-bottom: 4px;
+}
+
+.wst-sidebar__mobile-title {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.wst-sidebar__close-btn {
+  background: #f1f5f9;
+  border: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.wst-sidebar__close-btn:hover {
+  background: #ffe4e6;
+  color: #e11d48;
+}
+
+.wst-sidebar-backdrop {
+  display: none;
+}
+
+/* 💻 Medium Screens & Laptops (Max Width 1200px) */
+@media (max-width: 1200px) {
+  .wst-topbar {
+    padding: 0 16px;
+  }
+  
+  .wst-legend {
+    gap: 10px;
+  }
+  
+  .wst-legend__item {
+    font-size: 0.75rem;
+  }
+}
+
+/* 📱 Tablets & Small Laptops (Max Width 1023px) */
+@media (max-width: 1023px) {
+  .wst-page {
+    height: calc(100vh - 65px);
+    max-height: calc(100vh - 65px);
+  }
+
+  .wst-topbar {
+    height: auto;
+    min-height: 56px;
+    padding: 8px 16px;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .wst-topbar__left {
+    flex: 1;
+    min-width: 0;
+    gap: 10px;
+  }
+
+  .wst-topbar__actions {
+    gap: 8px;
+  }
+
+  .wst-mobile-sidebar-selector {
+    display: flex;
+  }
+
+  /* Transform Sidebar into an Off-Canvas Drawer on Tablet & Mobile */
+  .wst-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    z-index: 1000;
+    width: 330px;
+    max-width: 88vw;
+    background: #ffffff;
+    box-shadow: 6px 0 30px rgba(15, 23, 42, 0.18);
+    transform: translateX(-100%);
+    transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    padding: 16px;
+  }
+
+  .wst-sidebar.wst-sidebar--open {
+    transform: translateX(0);
+  }
+
+  .wst-sidebar__mobile-header {
+    display: flex;
+  }
+
+  .wst-sidebar-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.45);
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+    z-index: 999;
+    animation: wstFadeIn 0.2s ease-out;
+  }
+
+  .wst-body {
+    height: calc(100% - 56px);
+  }
+
+  .wst-legend {
+    overflow-x: auto;
+    max-width: 100%;
+    white-space: nowrap;
+    padding-bottom: 4px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .wst-legend::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* 📱 Mobile Screens (Max Width 767px) */
+@media (max-width: 767px) {
+  .wst-topbar {
+    padding: 8px 12px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .wst-topbar__left {
+    justify-content: space-between;
+    width: 100%;
+  }
+
+  .wst-topbar__actions {
+    justify-content: space-between;
+    width: 100%;
+  }
+
+  .wst-topbar__divider-v {
+    display: none;
+  }
+
+  .wsg-toggle-wrap {
+    flex: 1;
+    margin-right: 8px !important;
+  }
+
+  .wsg-toggle-btn {
+    flex: 1;
+    justify-content: center;
+    padding: 5px 8px;
+    font-size: 0.75rem;
+  }
+
+  .wst-topbar__add {
+    padding: 6px 14px;
+    font-size: 0.8rem;
+    white-space: nowrap;
+  }
+
+  .wst-topbar__back {
+    padding: 5px 10px;
+    font-size: 0.8rem;
+  }
+
+  /* Canvas Header Overlay (Left Heading, Right Toolbar) on Mobile */
+  .wst-canvas-header-overlay {
+    position: absolute !important;
+    top: 10px !important;
+    left: 10px !important;
+    right: 10px !important;
+    z-index: 25 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 8px !important;
+    flex-wrap: nowrap !important;
+  }
+
+  .wst-canvas-heading {
+    position: static !important;
+    top: auto !important;
+    left: auto !important;
+    padding: 6px 10px !important;
+    max-width: 140px !important;
+    border-radius: 10px !important;
+    background: rgba(255, 255, 255, 0.94) !important;
+    backdrop-filter: blur(8px) !important;
+    -webkit-backdrop-filter: blur(8px) !important;
+    box-shadow: 0 2px 10px rgba(15, 23, 42, 0.05) !important;
+    flex-shrink: 1 !important;
+  }
+
+  .wst-canvas-title {
+    font-size: 0.85rem !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+
+  .wst-canvas-sub {
+    font-size: 0.68rem !important;
+    max-width: 120px !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
+
+  /* Canvas Toolbar Single Row Fit Content on Mobile */
+  .wst-canvas-toolbar {
+    position: static !important;
+    top: auto !important;
+    left: auto !important;
+    right: auto !important;
+    z-index: 25 !important;
+    width: max-content !important;
+    max-width: calc(100vw - 165px) !important;
+    margin: 0 !important;
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    justify-content: flex-start !important;
+    align-items: center !important;
+    gap: 3px !important;
+    box-sizing: border-box !important;
+    padding: 4px 6px !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    scrollbar-width: none !important;
+    background: rgba(255, 255, 255, 0.96) !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 10px !important;
+    box-shadow: 0 4px 14px rgba(15, 23, 42, 0.06) !important;
+    flex-shrink: 0 !important;
+  }
+
+  .wst-canvas-toolbar::-webkit-scrollbar {
+    display: none !important;
+  }
+
+  .wst-toolbar-btn {
+    flex: 0 0 auto !important;
+    min-width: unset !important;
+    padding: 5px 8px !important;
+    font-size: 0.65rem !important;
+    white-space: nowrap !important;
+    gap: 3px !important;
+  }
+
+  /* Guidance Banner */
+  .wst-canvas-guidance-banner {
+    bottom: 68px;
+    max-width: calc(100vw - 24px);
+    white-space: normal;
+    text-align: center;
+    font-size: 0.75rem;
+    padding: 6px 14px;
+    border-radius: 16px;
+    line-height: 1.35;
+  }
+
+  /* Controls & MiniMap on mobile */
+  .react-flow__controls {
+    bottom: 12px !important;
+    left: 12px !important;
+  }
+
+  .react-flow__minimap {
+    bottom: 12px !important;
+    right: 12px !important;
+    width: 120px !important;
+    height: 80px !important;
+  }
+
+  /* Connect Modal Popup Responsive */
+  .wst-modal {
+    width: 92%;
+    max-width: 360px;
+    border-radius: 18px;
+  }
+
+  .wst-modal-header {
+    padding: 16px 16px 0;
+  }
+
+  .wst-modal-body {
+    padding: 0 16px;
+  }
+
+  .wst-modal-footer {
+    padding: 12px 16px;
+    gap: 8px;
+  }
+
+  .wst-modal-route {
+    margin: 0 16px 12px;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .wst-route-divider {
+    width: 100%;
+    height: 1px;
+  }
+
+  .wst-route-arrow {
+    justify-content: center;
+    padding: 4px 0;
+    transform: rotate(90deg);
+  }
+}
+
+/* 📱 Extra Small Mobile Screens (Max Width 400px) */
+@media (max-width: 400px) {
+  .wst-topbar__back span {
+    display: none;
+  }
+
+  .wst-canvas-title {
+    font-size: 0.95rem;
+  }
+
+  .wst-toolbar-btn {
+    padding: 5px 2px;
+    font-size: 0.6rem;
+  }
+
+  .react-flow__minimap {
+    width: 90px !important;
+    height: 60px !important;
+  }
+}
+
+@keyframes wstFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }

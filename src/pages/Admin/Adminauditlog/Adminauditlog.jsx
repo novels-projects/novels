@@ -1347,13 +1347,13 @@ export default function Adminauditlog() {
             <table className="admin-audit-table">
               <thead>
                 <tr>
-                  <th style={{ width: "15%", minWidth: "130px" }}>เวลา</th>
-                  <th style={{ width: "18%", minWidth: "140px" }}>ผู้กระทำ</th>
-                  <th style={{ width: "18%", minWidth: "140px" }}>การกระทำ</th>
-                  <th style={{ width: "20%", minWidth: "150px" }}>เป้าหมาย</th>
-                  <th style={{ width: "11%", minWidth: "100px" }}>สถานะ</th>
-                  <th style={{ width: "10%", minWidth: "100px" }}>ไอพี</th>
-                  <th style={{ width: "8%", minWidth: "100px", textAlign: "center" }} className="text-center">การจัดการ</th>
+                  <th style={{ width: "14%", minWidth: "130px" }}>เวลา</th>
+                  <th style={{ width: "17%", minWidth: "140px" }}>ผู้กระทำ</th>
+                  <th style={{ width: "17%", minWidth: "140px" }}>การกระทำ</th>
+                  <th style={{ width: "19%", minWidth: "150px" }}>เป้าหมาย</th>
+                  <th style={{ width: "10%", minWidth: "95px" }}>สถานะ</th>
+                  <th style={{ width: "10%", minWidth: "95px" }}>ไอพี</th>
+                  <th style={{ width: "13%", minWidth: "135px", textAlign: "center" }} className="text-center">การจัดการ</th>
                 </tr>
               </thead>
               <tbody>
@@ -1551,20 +1551,17 @@ export default function Adminauditlog() {
           {/* =======================================================
               4. Pagination
              ======================================================= */}
-          <div className="admin-audit-pagination">
-            <div className="admin-audit-pagination__left">
-              <span className="admin-audit-page-info">
-                หน้า <strong>{page}</strong> จาก <strong>{displayTotalPages}</strong>
-                {/* <span style={{ fontSize: "0.82rem", color: "#64748b", marginLeft: "10px", fontWeight: 500 }}>
-                  (แสดง {displayTotal > 0 ? (page - 1) * limit + 1 : 0} - {Math.min(page * limit, displayTotal)} จากทั้งหมด {displayTotal} รายการ)
-                </span> */}
+          {/* Footer Pagination Template (Image 2 style) */}
+          <div className="admin-table-footer">
+            <div className="admin-table-footer-left">
+              <span className="admin-table-info-text">
+                แสดง <strong>{displayTotal === 0 ? 0 : (page - 1) * limit + 1}–{Math.min(page * limit, displayTotal)}</strong> จาก <strong>{displayTotal}</strong> รายการ
               </span>
 
-              <div className="admin-audit-limit-selector">
-                <label htmlFor="select-limit" className="limit-label">แสดงต่อหน้า</label>
+              <div className="admin-table-per-page">
+                <span>แสดงต่อหน้า</span>
                 <select
-                  id="select-limit"
-                  className="admin-audit-select admin-audit-select--limit"
+                  className="admin-per-page-select"
                   value={limit}
                   onChange={handleLimitChange}
                 >
@@ -1575,10 +1572,10 @@ export default function Adminauditlog() {
               </div>
             </div>
 
-            <div className="admin-audit-pagination__right">
+            <div className="admin-pagination-img2">
               <button
                 type="button"
-                className="btn-page-nav"
+                className="page-btn-box"
                 disabled={page <= 1 || loading}
                 onClick={() => setPage((prev) => Math.max(prev - 1, 1))}
               >
@@ -1586,9 +1583,13 @@ export default function Adminauditlog() {
                 <span>ก่อนหน้า</span>
               </button>
 
+              <span className="page-indicator-text">
+                หน้า <strong>{page}</strong> จาก <strong>{displayTotalPages}</strong>
+              </span>
+
               <button
                 type="button"
-                className="btn-page-nav"
+                className="page-btn-box"
                 disabled={page >= displayTotalPages || loading}
                 onClick={() => setPage((prev) => Math.min(prev + 1, displayTotalPages))}
               >

@@ -530,52 +530,44 @@ const NovelCard = ({ novel, onEdit, onTree, onAnalytics, onDelete }) => {
 
       {/* Delete confirm overlay */}
       {showConfirm && (
-        <div className="nvc__confirm" onClick={(e) => e.stopPropagation()} style={{ display: "flex", flexDirection: "column", gap: "10px", padding: "15px" }}>
+        <div className="nvc__confirm" onClick={(e) => e.stopPropagation()}>
           {isPublishedNovel ? (
             <>
-              <p className="nvc__confirm-text" style={{ color: "#DC2626", fontWeight: "bold", margin: 0 }}>
+              <p className="nvc__confirm-text nvc__confirm-text--warning">
                 ⚠️ นิยายเรื่องนี้เผยแพร่แล้ว!
               </p>
-              <p style={{ fontSize: "12px", color: "#4B5563", margin: "0 0 5px 0" }}>
+              <p className="nvc__confirm-sub">
                 ข้อมูลและยอดคนอ่านทั้งหมดจะหายไปอย่างถาวร
               </p>
               <input
                 type="text"
+                className="nvc__confirm-input"
                 placeholder='พิมพ์คำว่า "ลบ" เพื่อยืนยัน'
                 value={deleteConfirmText}
                 onChange={(e) => setDeleteConfirmText(e.target.value)}
-                style={{
-                  width: "100%",
-                  padding: "6px 10px",
-                  borderRadius: "4px",
-                  border: "1px solid #D1D5DB",
-                  fontSize: "13px",
-                  textAlign: "center",
-                  boxSizing: "border-box"
-                }}
               />
             </>
           ) : (
-            <p className="nvc__confirm-text" style={{ margin: 0 }}>ต้องการลบนิยายเรื่องนี้หรือไม่?</p>
+            <p className="nvc__confirm-text">ต้องการลบนิยายเรื่องนี้หรือไม่?</p>
           )}
 
-          <div className="nvc__confirm-btns" style={{ display: "flex", gap: "8px", width: "100%", marginTop: "5px" }}>
+          <div className="nvc__confirm-btns">
             <button 
+              type="button"
               className="nvc__confirm-yes" 
               disabled={isPublishedNovel && deleteConfirmText !== "ลบ"}
               onClick={() => { 
                 handleCloseConfirm(); 
                 onDelete(); 
               }}
-              style={{
-                opacity: isPublishedNovel && deleteConfirmText !== "ลบ" ? 0.5 : 1,
-                cursor: isPublishedNovel && deleteConfirmText !== "ลบ" ? "not-allowed" : "pointer",
-                flex: 1
-              }}
             >
               ยืนยัน
             </button>
-            <button className="nvc__confirm-no" onClick={handleCloseConfirm} style={{ flex: 1 }}>
+            <button 
+              type="button"
+              className="nvc__confirm-no" 
+              onClick={handleCloseConfirm}
+            >
               ยกเลิก
             </button>
           </div>

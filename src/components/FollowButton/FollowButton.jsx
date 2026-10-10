@@ -30,7 +30,9 @@ export default function FollowButton({
   novels = [],
   isFollowing = false,
   onFollowChange,
-  size = "medium"
+  size = "medium",
+  followedText = "ติดตามแล้ว",
+  unfollowedText = "ติดตาม",
 }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -183,6 +185,9 @@ export default function FollowButton({
           list = list.filter((w) => Number(w.id || w.writer_id) !== numericWriterId);
           localStorage.setItem("local_following_writers", JSON.stringify(list));
         }
+        window.dispatchEvent(new CustomEvent("local_following_writers_changed", {
+          detail: { writerId: numericWriterId, isFollowing: newFollowStatus }
+        }));
       } catch (localErr) {
         console.warn("FollowButton: failed to sync local_following_writers", localErr);
       }
@@ -211,7 +216,7 @@ export default function FollowButton({
 
   const getText = () => {
     if (loading) return "กำลังดำเนิน...";
-    return isFollowed ? "กำลังติดตาม" : "ติดตาม";
+    return isFollowed ? (followedText || "ติดตามแล้ว") : (unfollowedText || "ติดตาม");
   };
 
   return (

@@ -937,11 +937,11 @@ export default function AdminReportsDashboard() {
                                         <table className="admin-table">
                                              <thead>
                                                  <tr>
-                                                     <th style={{ width: "18%" }}>เรื่อง</th>
-                                                     <th style={{ width: "12%" }}>ผู้เขียน</th>
-                                                     <th style={{ width: "22%" }}>หมวดหมู่</th>
-                                                     <th style={{ width: "9%" }}>สถานะ</th>
-                                                     <th style={{ width: "13%" }}>
+                                                     <th style={{ width: "20%", minWidth: "180px" }}>เรื่อง</th>
+                                                     <th style={{ width: "13%", minWidth: "120px" }}>ผู้เขียน</th>
+                                                     <th style={{ width: "19%", minWidth: "150px" }}>หมวดหมู่</th>
+                                                     <th style={{ width: "10%", minWidth: "90px" }}>สถานะ</th>
+                                                     <th style={{ width: "13%", minWidth: "125px" }}>
                                                          <div className="th-date-wrapper">
                                                              <span>วันที่เผยแพร่</span>
                                                              <button
@@ -955,7 +955,7 @@ export default function AdminReportsDashboard() {
                                                              </button>
                                                          </div>
                                                      </th>
-                                                     <th style={{ width: "26%" }} className="text-center">การจัดการ</th>
+                                                     <th style={{ width: "25%", minWidth: "270px", textAlign: "center" }} className="text-center">การจัดการ</th>
                                                  </tr>
                                              </thead>
                                              <tbody>
@@ -1433,12 +1433,12 @@ export default function AdminReportsDashboard() {
                                         <table className="admin-table">
                                             <thead>
                                                 <tr>
-                                                     <th style={{ width: "22%" }}>เรื่องที่รายงาน</th>
-                                                     <th style={{ width: "14%" }}>ผู้รายงาน</th>
-                                                     <th style={{ width: "19%" }}>เหตุผล</th>
-                                                     <th style={{ width: "13%" }}>วันที่รายงาน</th>
-                                                     <th style={{ width: "8%" }}>สถานะ</th>
-                                                     <th style={{ width: "24%" }} className="text-center">การจัดการ</th>
+                                                     <th style={{ width: "22%", minWidth: "180px" }}>เรื่องที่รายงาน</th>
+                                                     <th style={{ width: "14%", minWidth: "120px" }}>ผู้รายงาน</th>
+                                                     <th style={{ width: "21%", minWidth: "170px" }}>เหตุผล</th>
+                                                     <th style={{ width: "13%", minWidth: "125px" }}>วันที่รายงาน</th>
+                                                     <th style={{ width: "11%", minWidth: "95px" }}>สถานะ</th>
+                                                     <th style={{ width: "19%", minWidth: "160px", textAlign: "center" }} className="text-center">การจัดการ</th>
                                                  </tr>
                                             </thead>
                                             <tbody>

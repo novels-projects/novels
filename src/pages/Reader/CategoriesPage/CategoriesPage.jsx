@@ -485,11 +485,10 @@ const CategoriesPage = () => {
                       )}
                     </div>
 
-                    <div className="novel-horiz-header">
-                      <h3 className="novel-horiz-title" title={novel.title}>{novel.title}</h3>
-                      <span className="novel-horiz-author">
-                        <Pencil size={12} className="novel-author-icon" /> <span>{novel.author}</span>
-                      </span>
+                    <h3 className="novel-horiz-title" title={novel.title}>{novel.title}</h3>
+
+                    <div className="novel-horiz-author">
+                      <Pencil size={12} className="novel-author-icon" /> <span>{novel.author}</span>
                     </div>
 
                     <p className="novel-horiz-synopsis" title={novel.synopsis || ""}>

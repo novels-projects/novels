@@ -31,14 +31,14 @@ export default async function getCroppedImg(imageSrc, pixelCrop) {
     pixelCrop.height
   );
 
-  // แปลง Canvas ให้กลายเป็นไฟล์ Blob เพื่อส่งไปใช้งานต่อ
+  // แปลง Canvas ให้กลายเป็นไฟล์ File เพื่อส่งไปใช้งานต่อใน FormData
   return new Promise((resolve, reject) => {
-    canvas.toBlob((file) => {
-      if (!file) {
+    canvas.toBlob((blob) => {
+      if (!blob) {
         reject(new Error("Canvas is empty"));
         return;
       }
-      file.name = "cropped-cover.jpeg";
+      const file = new File([blob], "avatar.jpg", { type: "image/jpeg" });
       resolve({
         file: file,
         url: URL.createObjectURL(file)

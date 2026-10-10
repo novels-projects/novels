@@ -479,18 +479,23 @@
 .wsg-flow-node {
   width: 260px;
   background: #ffffff;
-  border: 2px solid #e2e8f0;
-  border-radius: 16px;
-  padding: 12px 16px;
+  border-radius: 18px;
+  padding: 12px 14px 10px 14px;
   box-sizing: border-box;
   font-family: inherit;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 14px rgba(84, 33, 58, 0.08), 0 1px 3px rgba(0, 0, 0, 0.03);
+}
+
+.wsg-flow-node:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 22px rgba(84, 33, 58, 0.16);
+  filter: brightness(0.97);
 }
 
 .wsg-flow-node.active-selection {
-  border-color: #2563eb;
-  box-shadow: 0 10px 15px -3px rgba(37, 99, 235, 0.15), 0 4px 6px -2px rgba(37, 99, 235, 0.05);
+  border-color: #d95791 !important;
+  box-shadow: 0 10px 20px -3px rgba(217, 87, 145, 0.25), 0 4px 6px -2px rgba(217, 87, 145, 0.1);
 }
 
 .wsg-flow-node.dimmed {
@@ -499,41 +504,42 @@
 }
 
 .wsg-flow-node.high-exit {
-  border-color: #f97316;
+  border-color: #f59e0b;
 }
 
 .wsg-flow-node.max-drop {
-  border-color: #ef4444 !important;
-  box-shadow: 0 4px 14px rgba(239, 68, 68, 0.15);
+  border-color: #e11d48 !important;
+  box-shadow: 0 4px 16px rgba(225, 29, 72, 0.25);
 }
 
-/* Badge สัญลักษณ์ทรงวงกลมมุมขวาบนโหนด (Circle Badge) */
-.wsg-node-badge-circle {
-  position: absolute;
-  top: -15px;
-  right: -10px;
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
+/* Badge สัญลักษณ์แจ้งเตือนแบบ Pill มุมขวาบนในโหนด (จัดเรียงแนวนอนใน Flexbox ไม่ทับซ้อนข้อมูล) */
+.wsg-node-badge-pill {
+  position: relative;
+  top: auto;
+  right: auto;
+  padding: 2px 7px;
+  border-radius: 12px;
   color: #ffffff;
   display: flex;
-  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  border: 1.5px solid #ffffff;
-  z-index: 15;
-  pointer-events: auto;
+  gap: 3px;
+  font-size: 0.68rem;
+  font-weight: 800;
   user-select: none;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.12);
+  flex-shrink: 0;
 }
 
-.wsg-node-badge-circle.max-drop {
-  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
-  box-shadow: 0 3px 8px rgba(239, 68, 68, 0.35);
+.wsg-node-badge-pill.max-drop {
+  background: linear-gradient(135deg, #e11d48 0%, #be123c 100%);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  box-shadow: 0 2px 8px rgba(225, 29, 72, 0.35);
 }
 
-.wsg-node-badge-circle.high-exit {
-  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
-  box-shadow: 0 3px 8px rgba(249, 115, 22, 0.35);
+.wsg-node-badge-pill.high-exit {
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.35);
 }
 
 .wsg-node-header {
@@ -541,13 +547,14 @@
   justify-content: space-between;
   align-items: center;
   margin-bottom: 8px;
+  width: 100%;
 }
 
 .wsg-node-label {
-  font-size: 0.78rem;
-  font-weight: 700;
-  padding: 2px 8px;
-  border-radius: 20px;
+  font-size: 0.74rem;
+  font-weight: 800;
+  padding: 2px 7px;
+  border-radius: 12px;
 }
 
 .wsg-node-status-badge {
@@ -557,23 +564,24 @@
 }
 
 .wsg-node-title {
-  font-size: 0.88rem;
+  font-size: 0.92rem;
   font-weight: 800; /* ตัวหนาพิเศษ */
   color: inherit;   /* สืบทอดสีเข้ม/สว่างจากโหนดโดยตรง เพื่อให้อ่านง่าย */
-  margin: 0 0 10px 0;
+  margin: 6px 0 8px 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  line-height: 1.25;
 }
 
 .wsg-node-stats {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: 8px;
-  border-top: 1px dashed rgba(0, 0, 0, 0.12); /* เส้นประโปร่งใสบางเบา */
-  padding-top: 8px;
+  border-top: none !important;
   font-size: 0.72rem;
-  color: inherit;   /* สืบทอดสีตัวอักษรที่ตัดกันชัดเจน */
+  color: inherit;
 }
 
 .wsg-node-stat-item {
@@ -584,26 +592,57 @@
 }
 
 .wsg-node-stat-item strong {
-  color: inherit;   /* สืบทอดสีหนาตัวเลขไม่เบลอจาง */
+  color: inherit;
   font-weight: 800;
 }
 
-/* React Flow Connection line and edge label styling */
+/* React Flow Connection line and edge label text centering */
+.react-flow__edge-textwrapper {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  pointer-events: none !important;
+}
+
+.react-flow__edge-text {
+  text-anchor: middle !important;
+  dominant-baseline: central !important;
+  alignment-baseline: central !important;
+  fill: #54213a !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  font-family: inherit !important;
+}
+
+.react-flow__edge-textbg {
+  fill: #ffffff !important;
+  rx: 8px !important;
+  ry: 8px !important;
+  stroke: #ebcbd9 !important;
+  stroke-width: 1px !important;
+  filter: drop-shadow(0 2px 4px rgba(217, 87, 145, 0.08));
+}
+
 .wsg-edge-label-wrap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  line-height: 1;
   background: #ffffff;
-  padding: 4px 8px;
-  border-radius: 12px;
-  border: 1px solid #cbd5e1;
+  padding: 5px 10px;
+  border-radius: 8px;
+  border: 1px solid #ebcbd9;
   font-size: 0.72rem;
   font-weight: 700;
-  color: #334155;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+  color: #54213a;
+  box-shadow: 0 2px 6px rgba(217, 87, 145, 0.08);
   pointer-events: none;
 }
 
 .wsg-edge-label-wrap.highlighted {
-  border-color: #2563eb;
-  color: #2563eb;
+  border-color: #d95791;
+  color: #d95791;
   font-weight: 800;
 }
 

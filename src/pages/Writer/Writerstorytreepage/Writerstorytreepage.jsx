@@ -13,10 +13,11 @@ import ReactFlow, {
   useReactFlow,      // ใช้ hook เพื่อแปลงพิกัดหน้าจอกับพิกัด Canvas
   MarkerType,
   getSmoothStepPath,
+  EdgeLabelRenderer,
 } from "reactflow";
 import axios from "axios";
-import "reactflow/dist/style.css";  
 import "./Writerstorytreepage.css";
+import { ChevronRight } from "lucide-react";
 import LoadingScreen from "../../../components/LoadingScreen/LoadingScreen";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
@@ -24,7 +25,7 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080
 const NODE_WIDTH = 260;
 const NODE_HEIGHT = 118;
 const NODE_HORIZONTAL_GAP = 360;
-const NODE_VERTICAL_GAP = 250;
+const NODE_VERTICAL_GAP = 300;
 const CANVAS_MARGIN = 36;
 
 const WRITER_NODE_STATUS = {
@@ -79,11 +80,47 @@ const normalizeId = (value) => {
 };
 
 const stripHtml = (value) => {
-  if (typeof value !== "string") return value;
-  return value
-    .replace(/<\/?[^>]+(>|$)/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
+  if (typeof value !== "string" || !value) return "";
+  
+  let text = value;
+
+  // 1. Convert block-level tags & line breaks to spaces
+  text = text
+    .replace(/<\/(p|div|h[1-6]|li|blockquote|tr|table)>/gi, " ")
+    .replace(/<br\s*[\/]?>/gi, " ");
+
+  // 2. Strip remaining HTML tags
+  text = text.replace(/<[^>]+>/g, " ");
+
+  // 3. Decode common HTML entities (double-pass to catch double-encoded entities like &amp;nbsp;)
+  for (let i = 0; i < 2; i++) {
+    text = text
+      .replace(/&nbsp;/gi, " ")
+      .replace(/&amp;/gi, "&")
+      .replace(/&lt;/gi, "<")
+      .replace(/&gt;/gi, ">")
+      .replace(/&quot;/gi, '"')
+      .replace(/&#39;/gi, "'")
+      .replace(/&#160;/gi, " ")
+      .replace(/&[a-z0-9#]+;/gi, " ");
+  }
+
+  // 4. Decode via browser DOM if available
+  if (typeof document !== "undefined") {
+    try {
+      const textarea = document.createElement("textarea");
+      textarea.innerHTML = text;
+      text = textarea.value;
+    } catch (e) {
+      // fallback
+    }
+  }
+
+  // 5. Replace non-breaking space characters (\u00A0, \xa0) and collapse whitespace
+  text = text.replace(/[\u00A0\xa0]/g, " ");
+  text = text.replace(/\s+/g, " ").trim();
+
+  return text;
 };
 
 const getNodeId = (node) => normalizeId(node?.ID ?? node?.id ?? node?.SceneID ?? node?.scene_id);
@@ -242,7 +279,10 @@ const StoryNode = ({ data }) => {
 
   return (
     <div className={cardClassName} style={nodeCustomStyle}>
-      <Handle type="target" position={Position.Top} />
+      {/* จุดเชื่อมเข้าโหนดด้านบน (Top), ด้านซ้าย (Left), ด้านขวา (Right) */}
+      <Handle type="target" position={Position.Top} id="target-top" style={{ background: "#2563eb", width: 8, height: 8 }} />
+      <Handle type="target" position={Position.Left} id="target-left" style={{ background: "#2563eb", width: 8, height: 8, top: "50%" }} />
+      <Handle type="target" position={Position.Right} id="target-right" style={{ background: "#2563eb", width: 8, height: 8, top: "50%" }} />
       
       {/* ป้ายแสดงสถานะ เผยแพร่ / ฉบับร่าง ที่มุมบนขวา */}
       <div className={`wst-node-card__publish-badge ${isPublished ? "wst-node-card__publish-badge--published" : "wst-node-card__publish-badge--draft"}`}>
@@ -281,12 +321,33 @@ const StoryNode = ({ data }) => {
           );
         }}
       >
-        ✏️ แก้ไข
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+        </svg>
+        <span>แก้ไข</span>
       </button>
       
-      <Handle type="source" position={Position.Bottom} />
+      {/* จุดปล่อยเส้นขาออกจากโหนด (Bottom เท่านั้น) */}
+      <Handle type="source" position={Position.Bottom} id="source-bottom" style={{ background: "#2563eb", width: 8, height: 8 }} />
     </div>
   );
+};
+
+let cachedPathElement = null;
+const getPointOnSvgPath = (pathD, ratio = 0.5) => {
+  if (typeof document === "undefined" || !pathD) return null;
+  try {
+    if (!cachedPathElement) {
+      cachedPathElement = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    }
+    cachedPathElement.setAttribute("d", pathD);
+    const totalLen = cachedPathElement.getTotalLength();
+    if (!totalLen || isNaN(totalLen)) return null;
+    const pt = cachedPathElement.getPointAtLength(totalLen * ratio);
+    return { x: pt.x, y: pt.y, totalLen };
+  } catch (e) {
+    return null;
+  }
 };
 
 const CustomMultigraphEdge = ({
@@ -307,24 +368,34 @@ const CustomMultigraphEdge = ({
   const inIndex = data?.inIndex ?? 0;
   const inCount = data?.inCount ?? 1;
   const allEdges = data?.allEdges || [];
+  const allNodes = data?.allNodes || [];
   const source = data?.source;
   const target = data?.target;
 
   let adjustedSourceX = sourceX;
+  let adjustedSourceY = sourceY;
   let adjustedTargetX = targetX;
+  let adjustedTargetY = targetY;
 
-  // กระจายจุดปล่อยเส้นขาออก (Source Handle) ตามสัดส่วนขอบด้านล่างของการ์ดโหนดต้นทาง (ความกว้างใช้ 200px)
+  // กระจายจุดปล่อยเส้นขาออก (Source Handle) ตามขอบด้านล่างของการ์ดโหนดต้นทาง
   if (outCount > 1) {
-    const maxWidth = 200;
+    const maxWidth = Math.min(180, (outCount - 1) * 36);
     const step = maxWidth / (outCount - 1);
     adjustedSourceX = (sourceX - maxWidth / 2) + outIndex * step;
   }
 
-  // กระจายจุดปักเส้นขาเข้า (Target Handle) ตามสัดส่วนขอบด้านบนของการ์ดโหนดปลายทาง (ความกว้างใช้ 200px)
+  // กระจายจุดปักเส้นขาเข้า (Target Handle) ตามขอบของการ์ดโหนดปลายทาง (Top / Left / Right)
   if (inCount > 1) {
-    const maxWidth = 200;
-    const step = maxWidth / (inCount - 1);
-    adjustedTargetX = (targetX - maxWidth / 2) + inIndex * step;
+    const isSideTarget = targetPosition === Position.Left || targetPosition === Position.Right || targetPosition === "left" || targetPosition === "right";
+    if (isSideTarget) {
+      const maxHeight = Math.min(60, (inCount - 1) * 20);
+      const step = maxHeight / (inCount - 1);
+      adjustedTargetY = (targetY - maxHeight / 2) + inIndex * step;
+    } else {
+      const maxWidth = Math.min(180, (inCount - 1) * 36);
+      const step = maxWidth / (inCount - 1);
+      adjustedTargetX = (targetX - maxWidth / 2) + inIndex * step;
+    }
   }
 
   // ค้นหาเส้นขนานคู่เดียวกันทั้งหมดเพื่อหาลำดับจุดเลี้ยว (พิกัด Y ของเส้นแนวนอน)
@@ -334,27 +405,83 @@ const CustomMultigraphEdge = ({
   const pairIndex = samePairEdges.findIndex((e) => String(e.id) === String(id));
   const pairCount = samePairEdges.length;
 
-  // ขยับจุดเลี้ยวพับมุมฉากแนวตั้งของเส้นนอนให้ต่างระดับกัน (ห่างกันเส้นละ 24px) ป้องกันทับกัน
-  let edgeOffset = 20;
-  if (pairCount > 1) {
-    edgeOffset = 20 + (pairIndex * 24);
-  }
+  // คำนวณระยะหักเลี้ยวแนวระนาบ (Y offset) แยกระดับแต่ละทางเลือกอย่างชัดเจน (32px ต่อลำดับ)
+  const baseOffset = 28;
+  const outStep = 32;
+  const pairStep = 32;
+  const edgeOffset = baseOffset + (outIndex * outStep) + ((pairIndex > 0 ? pairIndex : 0) * pairStep);
 
-  // สร้างเส้นหักฉากมุมโค้งมน 90 องศา (SmoothStep Path) พร้อมขยับ offset จุดพับเลี้ยว
-  const [edgePath, labelX, labelY] = getSmoothStepPath({
+  // สร้างเส้นหักฉากมุมโค้งมน 90 องศา (SmoothStep Path)
+  const [edgePath, defaultLabelX, defaultLabelY] = getSmoothStepPath({
     sourceX: adjustedSourceX,
-    sourceY,
+    sourceY: adjustedSourceY,
     sourcePosition,
     targetX: adjustedTargetX,
-    targetY,
+    targetY: adjustedTargetY,
     targetPosition,
-    borderRadius: 12,
+    borderRadius: 14,
     offset: edgeOffset,
   });
 
-  // ให้กล่องข้อความเกาะแนบสนิทอยู่กึ่งกลางเส้นของตัวเองพอดี 100%
-  const adjustedLabelY = labelY - 15; // กึ่งกลางแนวตั้ง (กล่องสูง 30px)
-  const adjustedLabelX = labelX - 75; // กึ่งกลางแนวนอน (กล่องกว้าง 150px)
+  // คำนวณพิกัดตำแหน่ง Label Badge บนเส้นทาง Edge จริง 100% ด้วยการสุ่มตัวอย่างพิกัดบน SVG Path
+  const badgeWidth = 140;
+  const badgeHeight = 24;
+
+  // คำนวณสัดส่วนตำแหน่ง (ratio) บนเส้นทาง โดยกระจายทางเลือกหลายรายการตามความยาวเส้นทาง
+  let baseRatio = 0.5;
+  if (outCount > 1) {
+    const step = 0.48 / Math.max(1, outCount - 1);
+    baseRatio = 0.26 + outIndex * step;
+  } else if (pairCount > 1) {
+    const step = 0.48 / Math.max(1, pairCount - 1);
+    baseRatio = 0.26 + pairIndex * step;
+  }
+
+  const candidateRatios = [
+    baseRatio,
+    baseRatio - 0.06, baseRatio + 0.06,
+    baseRatio - 0.12, baseRatio + 0.12,
+    baseRatio - 0.18, baseRatio + 0.18,
+    0.5, 0.4, 0.6, 0.3, 0.7, 0.25, 0.75
+  ].filter((r) => r >= 0.12 && r <= 0.88);
+
+  let labelCenterX = defaultLabelX;
+  let labelCenterY = defaultLabelY;
+  let selectedPt = null;
+
+  // ตรวจสอบว่าพิกัด (px, py) ตกอยู่ภายในหรือใกล้เคียงกับโหนดใดๆ ในกราฟทั้งหมดหรือไม่
+  const isPointInsideAnyNode = (px, py) => {
+    for (const node of allNodes) {
+      const nx = node.x ?? node.position?.x ?? 0;
+      const ny = node.y ?? node.position?.y ?? 0;
+
+      const left = nx - 10 - badgeWidth / 2;
+      const right = nx + 260 + 10 + badgeWidth / 2;
+      const top = ny - 10 - badgeHeight / 2;
+      const bottom = ny + 118 + 10 + badgeHeight / 2;
+
+      if (px >= left && px <= right && py >= top && py <= bottom) {
+        return true;
+      }
+    }
+    return false;
+  };
+
+  for (const ratio of candidateRatios) {
+    const pt = getPointOnSvgPath(edgePath, ratio);
+    if (pt) {
+      if (!isPointInsideAnyNode(pt.x, pt.y)) {
+        selectedPt = pt;
+        break;
+      }
+      if (!selectedPt) selectedPt = pt;
+    }
+  }
+
+  if (selectedPt) {
+    labelCenterX = selectedPt.x;
+    labelCenterY = selectedPt.y;
+  }
 
   const isHighlighted = !!data?.isHighlighted;
   const hasSelection = !!data?.hasActiveSelection;
@@ -367,7 +494,7 @@ const CustomMultigraphEdge = ({
   if (hasSelection) {
     if (isHighlighted) {
       labelOpacity = 1;
-      labelZIndex = 2000; // วิ่งลอยขึ้นมาระนาบด้านบนสุดเหนือโหนด
+      labelZIndex = 2000;
       borderStyleColor = "#2563eb";
       labelTextColor = "#2563eb";
     } else {
@@ -386,44 +513,46 @@ const CustomMultigraphEdge = ({
         markerEnd={markerEnd}
       />
       {label && (
-        <foreignObject
-          width={150}
-          height={30}
-          x={adjustedLabelX}
-          y={adjustedLabelY}
-          className="react-flow__edge-foreignobject"
-          requiredExtensions="http://www.w3.org/1999/xhtml"
-          style={{
-            zIndex: labelZIndex,
-            opacity: labelOpacity,
-            transition: "opacity 0.3s ease, z-index 0.3s ease",
-          }}
-        >
+        <EdgeLabelRenderer>
           <div
+            className="nodrag nopan"
             style={{
-              background: "#ffffff",
-              padding: "4px 8px",
-              border: `1.5px solid ${borderStyleColor}`,
-              borderRadius: "8px",
-              fontSize: "11px",
-              fontWeight: "700",
-              color: labelTextColor,
-              textAlign: "center",
-              whiteSpace: "nowrap",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              boxShadow: isHighlighted 
-                ? "0 4px 12px rgba(37, 99, 235, 0.16), 0 0 0 1.5px rgba(37, 99, 235, 0.25)" 
-                : "0 2px 6px rgba(37, 99, 235, 0.08)",
+              position: "absolute",
+              transform: `translate(-50%, -50%) translate(${labelCenterX}px, ${labelCenterY}px)`,
               pointerEvents: labelOpacity < 0.5 ? "none" : "all",
-              fontFamily: '"Outfit", "Sarabun", sans-serif',
-              lineHeight: "1.2",
-              transition: "all 0.3s ease",
+              zIndex: labelZIndex,
+              opacity: labelOpacity,
+              transition: "opacity 0.3s ease, z-index 0.3s ease",
             }}
           >
-            {label}
+            <div
+              title={label}
+              style={{
+                background: "#ffffff",
+                padding: "3px 8px",
+                border: `1.5px solid ${borderStyleColor}`,
+                borderRadius: "6px",
+                fontSize: "11px",
+                fontWeight: "700",
+                color: labelTextColor,
+                textAlign: "center",
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                maxWidth: `${badgeWidth}px`,
+                boxShadow: isHighlighted 
+                  ? "0 4px 12px rgba(37, 99, 235, 0.16), 0 0 0 1.5px rgba(37, 99, 235, 0.25)" 
+                  : "0 2px 6px rgba(37, 99, 235, 0.08)",
+                fontFamily: '"Outfit", "Sarabun", sans-serif',
+                lineHeight: "1.3",
+                boxSizing: "border-box",
+                transition: "all 0.3s ease",
+              }}
+            >
+              {label}
+            </div>
           </div>
-        </foreignObject>
+        </EdgeLabelRenderer>
       )}
     </>
   );
@@ -498,6 +627,7 @@ const StoryTreeInner = ({ novelId, onNavigate }) => {
   const [error, setError] = useState(null);
   const [selectedSceneId, setSelectedSceneId] = useState(null);
   const [interactionMode, setInteractionMode] = useState("select"); // select | connect | pan | add-node
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false); // ควบคุมเปิด/ปิด Sidebar บนมือถือ/แท็บเล็ต
   const reactflowWrapperRef = useRef(null);
 
   // State สำหรับระบบวนค้นหาโหนดฉากที่ยังไม่ได้เชื่อมต่อ (Focus to Orphan Node)
@@ -888,6 +1018,29 @@ let orphanCounter = 0;
       const inIdx = incomingIndex[tgt] || 0;
       incomingIndex[tgt] = inIdx + 1;
 
+      // คำนวณพิกัดสัมพัทธ์ระหว่างโหนดต้นทางและโหนดปลายทางเพื่อเลือกจุดเชื่อมเข้า (Top / Left / Right)
+      const srcNode = positionedNodes.find((n) => normalizeId(n.id) === src);
+      const tgtNode = positionedNodes.find((n) => normalizeId(n.id) === tgt);
+
+      let targetHandle = "target-top"; // Standard default (Top)
+      if (srcNode && tgtNode) {
+        const dx = tgtNode.x - srcNode.x;
+        const dy = tgtNode.y - srcNode.y;
+
+        // หากโหนดปลายทางอยู่เฉียงไปทางขวามากกว่า 180px
+        if (dx > 180) {
+          targetHandle = "target-left"; // เข้าขอบซ้าย
+        }
+        // หากโหนดปลายทางอยู่เฉียงไปทางซ้ายมากกว่า 180px
+        else if (dx < -180) {
+          targetHandle = "target-right"; // เข้าขอบขวา
+        }
+        // หากโหนดปลายทางอยู่แนวระนาบเดียวกันหรืออยู่สูงกว่าโหนดต้นทาง (dy <= 40)
+        else if (dy <= 40) {
+          targetHandle = dx >= 0 ? "target-left" : "target-right";
+        }
+      }
+
       const inLoop = localDetectedLoops.some((loop) => {
         const path = loop.nodes;
         for (let i = 0; i < path.length - 1; i++) {
@@ -898,9 +1051,12 @@ let orphanCounter = 0;
 
       return {
         ...edge,
+        sourceHandle: "source-bottom",
+        targetHandle: targetHandle,
         type: "multigraphEdge", // บังคับเปิดใช้งาน Custom Multigraph Edge
         data: {
           allEdges: edgeList,
+          allNodes: positionedNodes,
           source: edge.source,
           target: edge.target,
           outIndex: outIdx,
@@ -974,7 +1130,7 @@ let orphanCounter = 0;
         id: String(n.id),
         type: "writerNode",
         position: { x: n.x, y: n.y },
-        zIndex: isSelectedNode ? 10 : 1, // โหนดที่ถูกเลือกจะมีความสำคัญระนาบลอยตัวเหนือโหนดอื่น
+        zIndex: isSelectedNode ? 100 : 20, // การ์ดโหนดอยู่ชั้นบนสุดเสมอ (zIndex 20) ป้องกันเส้นเชื่อมทับบังเนื้อหาโหนด
         data: {
           ...n.scene,
           sceneStatus: n.scene?.status ?? n.scene?.Status ?? n.scene?.publish_status ?? n.scene?.publishStatus ?? n.scene?.is_published,
@@ -1001,8 +1157,8 @@ let orphanCounter = 0;
       const isSelected = selectedEdge && String(selectedEdge.id) === String(e.id);
       const isConnectedToSelected = selectedSceneId && (String(e.source) === String(selectedSceneId) || String(e.target) === String(selectedSceneId));
 
-      // กำหนด zIndex สูงขึ้นมากสำหรับเส้นเชื่อมที่เกี่ยวข้องเพื่อให้ทับอยู่บนสุด (เหนือโหนด)
-      const edgeZIndex = isConnectedToSelected ? 20 : isSelected ? 15 : 5;
+      // เส้นปกติทั่วไปอยู่ชั้นล่าง (zIndex 2) อยู่ใต้การ์ดโหนดเสมอ ไม่บังข้อความในโหนด
+      const edgeZIndex = isConnectedToSelected ? 15 : isSelected ? 10 : 2;
 
       let strokeColor = "#94a3b8";
       let strokeWidth = 2;
@@ -2265,6 +2421,39 @@ let orphanCounter = 0;
   const onNodeDragStop = useCallback(async (event, node) => {
     if (!node?.id || node.id === "cursor-node" || node.id.startsWith("temp-new-")) return;
 
+    const newX = Math.round(node.position.x);
+    const newY = Math.round(node.position.y);
+
+    // 1. อัปเดตตำแหน่งฉากใน treeData state ฝั่ง Frontend ทันที ป้องกันไม่ให้เปลี่ยนเครื่องมือแล้วตำแหน่งเด้งกลับที่เดิม
+    setTreeData((prevTree) => {
+      if (!prevTree) return prevTree;
+      const scenesKey = prevTree.Scenes ? "Scenes" : prevTree.scenes ? "scenes" : "nodes";
+      const scenes = prevTree[scenesKey] || [];
+      if (!Array.isArray(scenes)) return prevTree;
+
+      const updatedScenes = scenes.map((sc) => {
+        const scId = normalizeId(sc.id ?? sc.ID ?? sc.scene_id ?? sc.SceneID);
+        if (scId === normalizeId(node.id)) {
+          return {
+            ...sc,
+            node_x: newX,
+            node_y: newY,
+            NodeX: newX,
+            NodeY: newY,
+            x: newX,
+            y: newY,
+          };
+        }
+        return sc;
+      });
+
+      return {
+        ...prevTree,
+        [scenesKey]: updatedScenes,
+      };
+    });
+
+    // 2. ส่งข้อมูลบันทึกตำแหน่งใหม่ลง Database ฝั่ง Backend ทันที
     const token = localStorage.getItem("token");
     const headers = {
       "Content-Type": "application/json"
@@ -2275,8 +2464,8 @@ let orphanCounter = 0;
       await axios.put(
         `${API_BASE_URL}/scenes/${node.id}/position`,
         {
-          node_x: node.position.x,
-          node_y: node.position.y,
+          node_x: newX,
+          node_y: newY,
         },
         { headers }
       );
@@ -2284,7 +2473,7 @@ let orphanCounter = 0;
       console.error("Save node position error:", err);
       showToast("บันทึกตำแหน่ง node ไม่สำเร็จ", "warn");
     }
-  }, [showToast]);
+  }, [showToast, setTreeData]);
 
   const onEdgesChangeWrapper = useCallback((changes) => {
     onEdgesChangeRF(changes);
@@ -2441,6 +2630,9 @@ let orphanCounter = 0;
 
     // โหมดเลือกปกติ (Select Mode)
     setSelectedSceneId(String(node.id));
+    if (typeof window !== "undefined" && window.innerWidth < 1024) {
+      setIsMobileSidebarOpen(true);
+    }
   }, [connectSource, getConnectionBlockReason, getBlockReasonMessage, screenToFlowPosition, setRfNodes, setRfEdges, showToast, setSceneToDelete, setShowDeleteModal, clearConnectionState]);
 
   const handleConfirmConnect = async () => {
@@ -2731,8 +2923,9 @@ let orphanCounter = 0;
             }}
           >
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M9 3L5 7L9 11" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" /></svg>
-            ย้อนกลับ
+            <span>ย้อนกลับ</span>
           </button>
+
           <div className="wst-topbar__divider-v" />
           <LegendBar />
         </div>
@@ -2753,14 +2946,85 @@ let orphanCounter = 0;
         </div>
       </header>
 
+      {/* 📱 ปุ่มสไตล์การ์ด สำหรับเปิด/ปิด แถบสถิติบนหน้าจอเล็ก (สไตล์เดียวกับหน้าจัดการตอน) */}
+      <button
+        type="button"
+        className="wst-mobile-sidebar-selector"
+        onClick={() => setIsMobileSidebarOpen((prev) => !prev)}
+        title={isMobileSidebarOpen ? "ซ่อนแถบสถิติและข้อมูล" : "ดูแถบสถิติและข้อมูล"}
+        aria-label="เปิด/ปิด แถบข้อมูลและสถิติ"
+      >
+        <div className="wst-mobile-sidebar-selector__left">
+          <div className="wst-mobile-sidebar-selector__icon-box">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="3" width="7" height="7" />
+              <rect x="14" y="3" width="7" height="7" />
+              <rect x="3" y="14" width="7" height="7" />
+              <rect x="14" y="14" width="7" height="7" />
+            </svg>
+          </div>
+          <div className="wst-mobile-sidebar-selector__text">
+            <span className="wst-mobile-sidebar-selector__label">ข้อมูล & สถิติโครงสร้าง</span>
+            <div className="wst-mobile-sidebar-selector__info">
+              <span className="wst-mobile-sidebar-selector__stat">
+                {stats?.TotalScenes ?? stats?.total_scenes ?? 0} ฉาก
+              </span>
+              <span className="wst-mobile-sidebar-selector__dot">•</span>
+              <span className="wst-mobile-sidebar-selector__stat">
+                {stats?.TotalChoicePoints ?? stats?.total_choice_points ?? 0} ทางเลือก
+              </span>
+              {orphanNodes.length > 0 && (
+                <>
+                  <span className="wst-mobile-sidebar-selector__dot">•</span>
+                  <span className="wst-mobile-sidebar-selector__orphan">
+                    ยังไม่เชื่อม {orphanNodes.length}
+                  </span>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="wst-mobile-sidebar-selector__right">
+          <span>{isMobileSidebarOpen ? "ซ่อนสถิติ" : "ดูสถิติ"}</span>
+          <ChevronRight
+            size={18}
+            style={{
+              transform: isMobileSidebarOpen ? "rotate(90deg)" : "rotate(0deg)",
+              transition: "transform 0.2s ease",
+              color: "#64748b",
+            }}
+          />
+        </div>
+      </button>
+
       <div className="wst-body">
-        {/* Sidebar ยึดฝั่งซ้ายของ Canvas */}
-        <aside className="wst-sidebar">
+        {/* Backdrop for Mobile Sidebar Drawer */}
+        {isMobileSidebarOpen && (
+          <div 
+            className="wst-sidebar-backdrop" 
+            onClick={() => setIsMobileSidebarOpen(false)} 
+          />
+        )}
+
+        {/* Sidebar ยึดฝั่งซ้ายของ Canvas (เปิดแบบ Drawer บนมือถือ/แท็บเล็ต) */}
+        <aside className={`wst-sidebar ${isMobileSidebarOpen ? "wst-sidebar--open" : ""}`}>
+          <div className="wst-sidebar__mobile-header">
+            <span className="wst-sidebar__mobile-title">📊 สถิติ & รายละเอียดฉาก</span>
+            <button 
+              type="button"
+              className="wst-sidebar__close-btn" 
+              onClick={() => setIsMobileSidebarOpen(false)}
+              aria-label="ปิดแถบข้อมูล"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </div>
           {/* Stats Grid */}
           <div className="wst-sidebar__stats-grid">
             <div className="wst-sidebar__stat-card">
               <div className="wst-sidebar__stat-header">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="3" y="14" width="7" height="7" /><rect x="14" y="14" width="7" height="7" /></svg>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="4"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg>
                 <span>ฉากทั้งหมด</span>
               </div>
               <div className="wst-sidebar__stat-value">
@@ -2879,16 +3143,105 @@ let orphanCounter = 0;
 
         {/* Canvas Area */}
         <div 
-          className="wst-canvas-area" 
+          className={`wst-canvas-area wst-mode-${interactionMode}`} 
           style={{ 
             cursor: interactionMode === "connect" ? "crosshair" 
                   : interactionMode === "add-node" ? "cell" 
+                  : interactionMode === "pan" ? "grab"
+                  : interactionMode === "delete" ? "not-allowed"
                   : "default" 
           }}
         >
-          <div className="wst-canvas-heading">
-            <h1 className="wst-canvas-title">โครงสร้างเนื้อเรื่อง</h1>
-            <p className="wst-canvas-sub">{title} · ดูภาพรวมโครงสร้างเนื้อเรื่อง</p>
+          {/* แถบส่วนหัวด้านบนแบบจัดวางในแถวเดียวกัน: ซ้ายเป็นหัวข้อเรื่อง ขวาเป็นแถบเครื่องมือ */}
+          <div className="wst-canvas-header-overlay" onClick={(e) => e.stopPropagation()}>
+            <div className="wst-canvas-heading">
+              <h1 className="wst-canvas-title">โครงสร้างเนื้อเรื่อง</h1>
+              {title && (
+                <p className="wst-canvas-sub" title={`เรื่อง: ${title}`}>
+                  <span className="wst-canvas-sub__label">เรื่อง:</span>{" "}
+                  <span className="wst-canvas-sub__title">{title}</span>
+                </p>
+              )}
+            </div>
+
+            <div className="wst-canvas-toolbar">
+              <button 
+                title="เลือก" 
+                className={`wst-toolbar-btn ${interactionMode==='select' ? 'wst-toolbar-btn--select-active':''}`} 
+                onClick={() => changeMode('select')}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 3h6v6H3V3M15 3h6v6h-6V3M3 15h6v6H3v-6M15 15h6v6h-6v-6"/></svg>
+                <span>เลือก</span>
+              </button>
+              <button 
+                title="เชื่อมทางเลือก (กด C)" 
+                className={`wst-toolbar-btn ${interactionMode==='connect' ? 'wst-toolbar-btn--connect-active':''}`} 
+                onClick={() => changeMode(interactionMode === 'connect' ? 'select' : 'connect')}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9l12 6-12 6V9z"/></svg>
+                <span>เชื่อม</span>
+              </button>
+              <button 
+                title="เลื่อน" 
+                className={`wst-toolbar-btn ${interactionMode==='pan' ? 'wst-toolbar-btn--pan-active':''}`} 
+                onClick={() => changeMode('pan')}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v5" />
+                  <path d="M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v6" />
+                  <path d="M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v9" />
+                  <path d="M6 14.5v-1.5a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v6a8 8 0 0 0 8 8h2a8 8 0 0 0 8-8V11" />
+                </svg>
+                <span>เลื่อน</span>
+              </button>
+              <button 
+                title="คลิกที่ว่างในบอร์ดเพื่อเพิ่มฉาก" 
+                className={`wst-toolbar-btn ${interactionMode==='add-node' ? 'wst-toolbar-btn--add-active':''}`}
+                onClick={() => changeMode(interactionMode === 'add-node' ? 'select' : 'add-node')}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12h14"/></svg>
+                <span>เพิ่ม</span>
+              </button>
+              <button 
+                title="คลิกเลือกโหนดฉากเพื่อลบ" 
+                className={`wst-toolbar-btn ${interactionMode==='delete' ? 'wst-toolbar-btn--delete-active':''}`}
+                onClick={() => changeMode(interactionMode === 'delete' ? 'select' : 'delete')}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18M8 6V4h8v2M10 11v6M14 11v6M5 6l1 13a1 1 0 001 1h10a1 1 0 001-1l1-13"/></svg>
+                <span>ลบ</span>
+              </button>
+              <button 
+                title="จัดเรียงตำแหน่งฉากอัตโนมัติและบันทึกลงฐานข้อมูลทันที" 
+                className="wst-toolbar-btn"
+                onClick={handleAutoLayout}
+                style={{
+                  background: '#eff6ff',
+                  color: '#1d4ed8',
+                  borderColor: '#bfdbfe',
+                  fontWeight: '700'
+                }}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+                <span>จัดเรียงอัตโนมัติ</span>
+              </button>
+
+              {orphanNodes.length > 0 && (
+                <button 
+                  title="ค้นหาและซูมพาไปยังฉากที่ยังไม่ได้เชื่อมต่อทีละโหนด" 
+                  className="wst-toolbar-btn"
+                  onClick={handleFocusNextOrphan}
+                  style={{
+                    background: '#fce7f3',
+                    color: '#be185d',
+                    borderColor: '#fbcfe8',
+                    fontWeight: '700'
+                  }}
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                  <span>หาโหนดว่าง ({orphanNodes.length})</span>
+                </button>
+              )}
+            </div>
           </div>
 
           <div className="wst-canvas-wrap">
@@ -2908,85 +3261,6 @@ let orphanCounter = 0;
                   }
                 }}
               >
-                {/* Floating toolbar */}
-                <div className="wst-canvas-toolbar" onClick={(e) => e.stopPropagation()}>
-                  <button 
-                    title="เลือก" 
-                    className={`wst-toolbar-btn ${interactionMode==='select' ? 'wst-toolbar-btn--select-active':''}`} 
-                    onClick={() => changeMode('select')}
-                  >
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 3h6v6H3V3M15 3h6v6h-6V3M3 15h6v6H3v-6M15 15h6v6h-6v-6"/></svg>
-                    <span>เลือก</span>
-                  </button>
-                  <button 
-                    title="เชื่อมทางเลือก (กด C)" 
-                    className={`wst-toolbar-btn ${interactionMode==='connect' ? 'wst-toolbar-btn--connect-active':''}`} 
-                    onClick={() => changeMode(interactionMode === 'connect' ? 'select' : 'connect')}
-                  >
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9l12 6-12 6V9z"/></svg>
-                    <span>เชื่อม</span>
-                  </button>
-                  <button 
-                    title="เลื่อน" 
-                    className={`wst-toolbar-btn ${interactionMode==='pan' ? 'wst-toolbar-btn--pan-active':''}`} 
-                    onClick={() => changeMode('pan')}
-                  >
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v5" />
-                      <path d="M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v6" />
-                      <path d="M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v9" />
-                      <path d="M6 14.5v-1.5a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v6a8 8 0 0 0 8 8h2a8 8 0 0 0 8-8V11" />
-                    </svg>
-                    <span>เลื่อน</span>
-                  </button>
-                  <button 
-                    title="คลิกที่ว่างในบอร์ดเพื่อเพิ่มฉาก" 
-                    className={`wst-toolbar-btn ${interactionMode==='add-node' ? 'wst-toolbar-btn--add-active':''}`}
-                    onClick={() => changeMode(interactionMode === 'add-node' ? 'select' : 'add-node')}
-                  >
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12h14"/></svg>
-                    <span>เพิ่ม</span>
-                  </button>
-                  <button 
-                    title="คลิกเลือกโหนดฉากเพื่อลบ" 
-                    className={`wst-toolbar-btn ${interactionMode==='delete' ? 'wst-toolbar-btn--delete-active':''}`}
-                    onClick={() => changeMode(interactionMode === 'delete' ? 'select' : 'delete')}
-                  >
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18M8 6V4h8v2M10 11v6M14 11v6M5 6l1 13a1 1 0 001 1h10a1 1 0 001-1l1-13"/></svg>
-                    <span>ลบ</span>
-                  </button>
-                  <button 
-                    title="จัดเรียงตำแหน่งฉากอัตโนมัติและบันทึกลงฐานข้อมูลทันที" 
-                    className="wst-toolbar-btn"
-                    onClick={handleAutoLayout}
-                    style={{
-                      background: '#eff6ff',
-                      color: '#1d4ed8',
-                      borderColor: '#bfdbfe',
-                      fontWeight: '700'
-                    }}
-                  >
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
-                    <span>จัดเรียงอัตโนมัติ</span>
-                  </button>
-
-                  {orphanNodes.length > 0 && (
-                    <button 
-                      title="ค้นหาและซูมพาไปยังฉากที่ยังไม่ได้เชื่อมต่อทีละโหนด" 
-                      className="wst-toolbar-btn"
-                      onClick={handleFocusNextOrphan}
-                      style={{
-                        background: '#fce7f3',
-                        color: '#be185d',
-                        borderColor: '#fbcfe8',
-                        fontWeight: '700'
-                      }}
-                    >
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                      <span>หาโหนดว่าง ({orphanNodes.length})</span>
-                    </button>
-                  )}
-                </div>
 
                 <ReactFlow
                   nodes={displayNodes}

@@ -447,32 +447,117 @@
 .nvc__confirm {
   position: absolute;
   inset: 0;
-  background: rgba(0, 0, 0, 0.85);
+  background: rgba(15, 23, 42, 0.92);
+  backdrop-filter: blur(4px);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 10px;
+  padding: 16px;
   z-index: 10;
+  border-radius: 12px;
+  animation: fadeIn 0.15s ease-out;
 }
 
 .nvc__confirm-text {
-  color: white;
+  color: #ffffff;
+  font-family: 'Sarabun', sans-serif;
+  font-size: 13.5px;
+  font-weight: 600;
+  text-align: center;
+  margin: 0;
+}
+
+.nvc__confirm-text--warning {
+  color: #f87171;
+  font-weight: 700;
+}
+
+.nvc__confirm-sub {
+  color: #cbd5e1;
+  font-family: 'Sarabun', sans-serif;
+  font-size: 12px;
+  text-align: center;
+  margin: 0 0 4px 0;
+}
+
+.nvc__confirm-input {
+  width: 100%;
+  padding: 7px 10px;
+  border-radius: 6px;
+  border: 1px solid #475569;
+  background: #1e293b;
+  color: #ffffff;
+  font-family: 'Sarabun', sans-serif;
   font-size: 13px;
+  text-align: center;
+  box-sizing: border-box;
+  outline: none;
+}
+
+.nvc__confirm-input:focus {
+  border-color: #ef4444;
+  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.2);
 }
 
 .nvc__confirm-btns {
   display: flex;
   gap: 8px;
+  width: 100%;
+  margin-top: 6px;
 }
 
-.nvc__confirm-yes,
-.nvc__confirm-no {
-  padding: 6px 14px;
+/* ปุ่มยืนยัน (ด้านซ้าย - สีแดง / Danger) */
+.nvc__confirm-yes {
+  flex: 1;
+  padding: 8px 14px;
   border: none;
-  border-radius: 6px;
-  font-size: 12px;
+  border-radius: 8px;
+  font-family: 'Sarabun', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  background: #ef4444;
+  color: #ffffff;
   cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 6px rgba(239, 68, 68, 0.3);
+}
+
+.nvc__confirm-yes:hover:not(:disabled) {
+  background: #dc2626;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(239, 68, 68, 0.4);
+}
+
+.nvc__confirm-yes:disabled {
+  background: #64748b;
+  color: #94a3b8;
+  opacity: 0.6;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+
+/* ปุ่มยกเลิก (ด้านขวา - สีเทา / Cancel Neutral) */
+.nvc__confirm-no {
+  flex: 1;
+  padding: 8px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  font-family: 'Sarabun', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.nvc__confirm-no:hover {
+  background: rgba(255, 255, 255, 0.22);
+  border-color: rgba(255, 255, 255, 0.4);
+  transform: translateY(-1px);
 }
 
 /* ── การ์ดสร้างนิยายใหม่ ── */

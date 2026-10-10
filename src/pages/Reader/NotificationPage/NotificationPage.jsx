@@ -7,7 +7,23 @@ import LoadingScreen from "../../../components/LoadingScreen/LoadingScreen";
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
 
 const normalizeNotification = (item = {}) => {
-  const type = item.type === "follow" ? "follower" : item.type || "system";
+  const rawType = String(item.type || item.notification_type || item.reference_type || "system").toLowerCase();
+
+  let type = "system";
+  if (["follow", "follower", "follows", "user_follow"].includes(rawType)) {
+    type = "follower";
+  } else if (["comment", "comments", "novel_comment", "chapter_comment"].includes(rawType)) {
+    type = "comment";
+  } else if (["like", "likes", "novel_like", "chapter_like"].includes(rawType)) {
+    type = "like";
+  } else if (["novel_update", "novel", "chapter", "new_chapter", "chapter_update"].includes(rawType)) {
+    type = "novel_update";
+  } else if (["system", "report", "ban", "notice"].includes(rawType)) {
+    type = "system";
+  } else {
+    type = rawType;
+  }
+
   const actorName = item.actor_name || item.actor?.name || "StoryVerse System";
   const actorColor = item.actor_color || item.actor?.avatarColor || "#E91E8C";
   const actorAvatar = item.actor_avatar || item.actor?.avatar || "";
@@ -60,16 +76,6 @@ const requestJson = async (path, options = {}) => {
   return null;
 };
 
-const TABS = [
-  { key: "all", label: "ทั้งหมด" },
-  { key: "unread", label: "ยังไม่อ่าน" },
-  { key: "system", label: "ระบบ" },
-  { key: "novel_update", label: "นิยาย" },
-  { key: "comment", label: "คอมเมนต์" },
-  { key: "like", label: "ถูกใจ ❤️" },
-  { key: "follower", label: "ผู้ติดตาม" },
-];
-
 function relativeTime(date) {
   const diff = (Date.now() - new Date(date)) / 1000;
 
@@ -104,22 +110,17 @@ export default function NotificationPage() {
   const settingsRef = useRef(null);
   const clearModalCancelRef = useRef(null);
 
-  const userObj = JSON.parse(localStorage.getItem("user") || "{}");
-  const isWriter = userObj.role === "writer" || userObj.role === "admin";
-
   const activeTabs = useMemo(() => {
     return [
       { key: "all", label: "ทั้งหมด" },
       { key: "unread", label: "ยังไม่อ่าน" },
       { key: "system", label: "ระบบ" },
       { key: "novel_update", label: "นิยาย" },
-      ...(isWriter ? [
-        { key: "comment", label: "คอมเมนต์" },
-        { key: "like", label: "ถูกใจ ❤️" },
-        { key: "follower", label: "ผู้ติดตาม" }
-      ] : [])
+      { key: "comment", label: "คอมเมนต์" },
+      { key: "like", label: "ถูกใจ" },
+      { key: "follower", label: "ผู้ติดตาม" }
     ];
-  }, [isWriter]);
+  }, []);
 
   const isCurrentTabDisabled = useMemo(() => {
     if (!notifSettings) return false;
@@ -137,10 +138,10 @@ export default function NotificationPage() {
     if (notifSettings.novel_updates === false) list.push("นิยายหรือตอนใหม่");
     if (notifSettings.follows === false) list.push("นักเขียนที่ผู้ใช้ติดตาม");
     if (notifSettings.comments === false) list.push("ความคิดเห็น");
-    if (notifSettings.likes === false && isWriter) list.push("การถูกใจ");
+    if (notifSettings.likes === false) list.push("การถูกใจ");
     if (notifSettings.in_app_notifications === false) list.push("การแจ้งเตือนจากระบบ");
     return list;
-  }, [notifSettings, isWriter]);
+  }, [notifSettings]);
 
   const unreadCount = items.filter((i) => !i.read).length;
 
@@ -189,17 +190,7 @@ export default function NotificationPage() {
       const list = Array.isArray(data) ? data : Array.isArray(data?.notifications) ? data.notifications : [];
       const normalized = list.map(normalizeNotification);
 
-      // Filter based on settings
-      const filteredList = normalized.filter(item => {
-        if (item.type === "novel_update" && settings.novel_updates === false) return false;
-        if (item.type === "follower" && settings.follows === false) return false;
-        if (item.type === "comment" && settings.comments === false) return false;
-        if (item.type === "like" && settings.likes === false) return false;
-        if (item.type === "system" && settings.in_app_notifications === false) return false;
-        return true;
-      });
-
-      setItems(filteredList);
+      setItems(normalized);
       setError("");
     } catch (err) {
       console.error("โหลดแจ้งเตือนไม่สำเร็จ", err);
@@ -385,7 +376,7 @@ export default function NotificationPage() {
             </button>
             <div className="notification-page__labels">
               <div className="notification-page__eyebrow">การแจ้งเตือน</div>
-              <div className="notification-page__title">🔔 ศูนย์การแจ้งเตือน</div>
+              <div className="notification-page__title">ศูนย์การแจ้งเตือน</div>
               <p aria-live="polite" aria-atomic="true">
                 {unreadCount > 0
                   ? `${unreadCount} รายการที่ยังไม่ได้อ่าน`
@@ -408,11 +399,10 @@ export default function NotificationPage() {
 
             <button
               type="button"
-              className="clear-button"
-              onClick={() => setShowClearConfirm(true)}
-              disabled={!hasItems}
+              className="settings-nav-button"
+              onClick={() => navigate("/settings")}
             >
-              ล้างทั้งหมด
+              ตั้งค่าการแจ้งเตือน
             </button>
           </div>
         </div>
@@ -431,7 +421,9 @@ export default function NotificationPage() {
             aria-labelledby="clear-confirm-title"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="confirm-modal-icon">🗑️</div>
+            <div className="confirm-modal-header-icon">
+              <span>🗑️</span>
+            </div>
             <h2 id="clear-confirm-title">ล้างการแจ้งเตือนทั้งหมด?</h2>
             <p>
               การแจ้งเตือนทั้งหมด {items.length} รายการจะถูกลบถาวร และไม่สามารถกู้คืนได้
@@ -459,38 +451,54 @@ export default function NotificationPage() {
       )}
 
       {/* ================= TAB ================= */}
-      <div className="notification-tabs" role="tablist" aria-label="กรองการแจ้งเตือน">
-        {activeTabs.map((tabItem) => {
-          const count =
-            tabItem.key === "all"
-              ? items.length
-              : tabItem.key === "unread"
-              ? unreadCount
-              : items.filter((item) => item.type === tabItem.key).length;
+      <div className="notification-tabs-container">
+        <div className="notification-tabs" role="tablist" aria-label="กรองการแจ้งเตือน">
+          {activeTabs.map((tabItem) => {
+            const count =
+              tabItem.key === "all"
+                ? items.length
+                : tabItem.key === "unread"
+                ? unreadCount
+                : items.filter((item) => item.type === tabItem.key).length;
 
-          return (
-            <button
-              type="button"
-              key={tabItem.key}
-              role="tab"
-              id={`notification-tab-${tabItem.key}`}
-              aria-selected={tab === tabItem.key}
-              aria-controls={`notification-panel-${tabItem.key}`}
-              className={tab === tabItem.key ? "tab active" : "tab"}
-              onClick={() => setTab(tabItem.key)}
-            >
-              {tabItem.label}
-              {count > 0 && <span>{count}</span>}
-            </button>
-          );
-        })}
+            return (
+              <button
+                type="button"
+                key={tabItem.key}
+                role="tab"
+                id={`notification-tab-${tabItem.key}`}
+                aria-selected={tab === tabItem.key}
+                aria-controls={`notification-panel-${tabItem.key}`}
+                className={tab === tabItem.key ? "tab active" : "tab"}
+                onClick={() => setTab(tabItem.key)}
+              >
+                {tabItem.label}
+                {count > 0 && <span>{count}</span>}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ================= SUB BAR ================= */}
+      <div className="notification-sub-bar">
+        <button
+          type="button"
+          className="clear-button"
+          onClick={() => setShowClearConfirm(true)}
+          disabled={!hasItems}
+        >
+          ล้างทั้งหมด
+        </button>
       </div>
 
       {/* ================= CONTENT ================= */}
       <div id={`notification-panel-${tab}`} className="notification-content" role="tabpanel" aria-labelledby={`notification-tab-${tab}`}>
         {isCurrentTabDisabled ? (
           <div className="notification-empty" style={{ padding: "40px 20px" }}>
-            <div className="empty-icon">⚠️</div>
+            <div className="empty-icon empty-icon--warning">
+              <span>⚠️</span>
+            </div>
             <h2 style={{ fontSize: "1.1rem", fontWeight: 800 }}>การแจ้งเตือนหมวดนี้ถูกปิดอยู่</h2>
             <p style={{ maxWidth: "380px", margin: "8px auto 16px auto", color: "#64748b", fontSize: "0.85rem" }}>
               คุณได้ปิดการแจ้งเตือนนี้ไว้ในหน้าตั้งค่าระบบ ทำให้ไม่มีข้อความแจ้งเตือนใหม่เข้ามาและไม่แสดงผลในหมวดนี้ค่ะ
@@ -500,8 +508,8 @@ export default function NotificationPage() {
               onClick={() => navigate("/settings")} 
               style={{
                 padding: "10px 20px",
-                backgroundColor: "var(--pink-500)",
-                color: "var(--white)",
+                backgroundColor: "#ec4899",
+                color: "#ffffff",
                 border: "none",
                 borderRadius: "12px",
                 fontWeight: 700,
@@ -516,7 +524,9 @@ export default function NotificationPage() {
           <LoadingScreen compact message="กำลังโหลดการแจ้งเตือน..." />
         ) : error ? (
           <div className="notification-empty notification-empty-error">
-            <div className="empty-icon">⚠️</div>
+            <div className="empty-icon empty-icon--warning">
+              <span>⚠️</span>
+            </div>
             <h2>{error}</h2>
             <p>ลองใหม่อีกครั้ง หรือตรวจสอบการเชื่อมต่อของคุณ</p>
             <button type="button" onClick={loadNotifications}>
@@ -525,55 +535,10 @@ export default function NotificationPage() {
           </div>
         ) : (
           <>
-            {(tab === "all" || tab === "unread") && disabledNotifTypes.length > 0 && (
-              <div style={{
-                margin: "0 0 16px 0",
-                padding: "12px 16px",
-                backgroundColor: "#fef2f2",
-                border: "1px solid #fee2e2",
-                borderRadius: "12px",
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                gap: "12px",
-                boxShadow: "0 1px 3px rgba(0,0,0,0.02)"
-              }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                  <span style={{ fontSize: "1.1rem" }}>⚠️</span>
-                  <span style={{ fontSize: "0.82rem", color: "#991b1b", fontWeight: 600, textAlign: "left", lineHeight: 1.4 }}>
-                    คุณปิดการแจ้งเตือน ({disabledNotifTypes.join(", ")}) อยู่ หากต้องการรับข้อมูลกรุณาไปเปิดใช้งานที่หน้าตั้งค่าค่ะ
-                  </span>
-                </div>
-                <button 
-                  type="button" 
-                  onClick={() => navigate("/settings")}
-                  style={{
-                    padding: "6px 12px",
-                    backgroundColor: "#ef4444",
-                    color: "#ffffff",
-                    border: "none",
-                    borderRadius: "8px",
-                    fontSize: "0.78rem",
-                    fontWeight: 700,
-                    cursor: "pointer",
-                    whiteSpace: "nowrap",
-                    transition: "background-color 0.2s"
-                  }}
-                  onMouseOver={(e) => e.target.style.backgroundColor = "#dc2626"}
-                  onMouseOut={(e) => e.target.style.backgroundColor = "#ef4444"}
-                >
-                  ไปหน้าตั้งค่า
-                </button>
-              </div>
-            )}
-
             {filtered.length === 0 ? (
               <div className="notification-empty">
-                <div className="empty-icon">
-                  {hasItems ? "🔍" : "🔔"}
-                </div>
                 <h2>
-                  {hasItems ? "ไม่มีรายการในหมวดนี้" : "ยังไม่มีการแจ้งเตือน"}
+                  {hasItems ? "ไม่มีรายการแจ้งเตือน" : "ยังไม่มีการแจ้งเตือน"}
                 </h2>
                 <p>
                   {hasItems

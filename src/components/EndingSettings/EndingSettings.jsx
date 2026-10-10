@@ -5,35 +5,60 @@ const TYPES = [
   {
     value: "good",
     icon: "🌸",
+    labelEN: "GOOD ENDING",
+    labelTH: "ฉากจบสมบูรณ์",
     label: "Good Ending",
     hint: "ฉากจบที่ตัวละครมีความสุขหรือประสบความสำเร็จ",
+    badgeBg: "#fce7f3",
+    badgeColor: "#be185d",
+    cardBorder: "#fbcfe8",
+    cardBg: "#fdf2f8",
     className: "good",
   },
   {
     value: "bad",
-    icon: "💀",
+    icon: "🥀",
+    labelEN: "BAD ENDING",
+    labelTH: "ฉากจบที่หม่นหมอง",
     label: "Bad Ending",
     hint: "ฉากจบที่หม่นหมอง ตัวละครพบกับความสูญเสียหรือความล้มเหลว",
+    badgeBg: "#fee2e2",
+    badgeColor: "#b91c1c",
+    cardBorder: "#fca5a5",
+    cardBg: "#fef2f2",
     className: "bad",
   },
   {
     value: "true",
     icon: "👑",
+    labelEN: "TRUE ENDING",
+    labelTH: "ฉากจบแท้จริง",
     label: "True Ending",
     hint: "ฉากจบที่แท้จริง เปิดเผยปมและบทสรุปทั้งหมดของเรื่องราว",
+    badgeBg: "#fef3c7",
+    badgeColor: "#b45309",
+    cardBorder: "#fde68a",
+    cardBg: "#fffbeb",
     className: "true",
   },
   {
     value: "secret",
-    icon: "🌙",
+    icon: "🔮",
+    labelEN: "SECRET ENDING",
+    labelTH: "ฉากจบลับ",
     label: "Secret Ending",
     hint: "ฉากจบลับที่ซ่อนอยู่หลังตัวเลือกพิเศษ",
+    badgeBg: "#f3e8ff",
+    badgeColor: "#6b21a8",
+    cardBorder: "#e9d5ff",
+    cardBg: "#faf5ff",
     className: "secret",
   },
 ];
 
 export default function EndingSettings({
   sceneTitle = "แสงสุดท้ายแห่งอาณาจักร",
+  novelTitle = "",
   isEnding = true,
   endingTitle = "",
   endingType = "true",
@@ -90,26 +115,145 @@ export default function EndingSettings({
         {isEnding && (
           <div className="ending-settings-two-columns" style={{
             display: "grid",
-            gridTemplateColumns: "1fr 1.35fr",
+            gridTemplateColumns: "1fr 1.15fr",
             gap: "24px",
             padding: "20px 24px",
             borderTop: "1px solid #f3f4f6"
           }}>
             
-            {/* ฝั่งซ้าย (Left Column) - ตัวอย่างคลังฉากจบ */}
-            <div className="ending-settings-left-col" style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-              <label style={{ fontWeight: "700", color: "#374151", fontSize: "0.95rem", textAlign: "left" }}>ตัวอย่างคลังฉากจบ</label>
+            {/* ฝั่งซ้าย (Left Column) - ตัวอย่างคลังฉากจบ (ถอดแบบจากการ์ดฝั่งนักอ่าน media_1791570384180.png) */}
+            <div className="ending-settings-left-col" style={{ display: "flex", flexDirection: "column", gap: "12px", textAlign: "left" }}>
+              <label style={{ fontWeight: "700", color: "#374151", fontSize: "0.95rem", textAlign: "left" }}>ตัวอย่างคลังฉากจบฝั่งนักอ่าน</label>
               
-              <div className={`preview-card ${current.className}`} style={{ height: "100%", justifyContent: "center" }}>
-                <div className="preview-icon">{current.icon}</div>
-                <div className="badge">{current.label}</div>
-                <h4>{previewTitle}</h4>
-                <p className="preview-description">
-                  {descriptionEnabled
-                    ? endingDescription.trim() || "ยังไม่มีคำอธิบายตอนจบ"
-                    : ""}
-                </p>
-                <small style={{ marginTop: "auto" }}>จะแสดงใน คลังฉากจบ หลังจากนักอ่านค้นพบฉากจบนี้</small>
+              <div 
+                className={`preview-card-reader-style ${current.className}`}
+                style={{
+                  backgroundColor: current.cardBg,
+                  borderColor: current.cardBorder,
+                  borderWidth: "1.5px",
+                  borderStyle: "solid",
+                  borderRadius: "20px",
+                  padding: "20px",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "14px",
+                  width: "100%",
+                  boxSizing: "border-box",
+                  boxShadow: "0 6px 24px rgba(15, 23, 42, 0.04)",
+                  textAlign: "left"
+                }}
+              >
+                {/* 1. Header Row: Badge (Icon + EN/TH) + Read Pill */}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%" }}>
+                  <div style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    backgroundColor: current.badgeBg,
+                    border: `1px solid ${current.cardBorder}`,
+                    padding: "4px 14px 4px 6px",
+                    borderRadius: "999px"
+                  }}>
+                    <div style={{
+                      width: "24px",
+                      height: "24px",
+                      borderRadius: "50%",
+                      backgroundColor: "#ffffff",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: "13px"
+                    }}>
+                      {current.icon}
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", lineHeight: 1.1 }}>
+                      <span style={{ fontSize: "10px", fontWeight: 800, color: current.badgeColor, letterSpacing: "0.4px" }}>
+                        {current.labelEN}
+                      </span>
+                      <span style={{ fontSize: "10px", fontWeight: 600, color: current.badgeColor, opacity: 0.85 }}>
+                        {current.labelTH}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div style={{
+                    backgroundColor: "#ffffff",
+                    border: "1.5px solid #e2e8f0",
+                    borderRadius: "999px",
+                    padding: "4px 12px",
+                    fontSize: "11px",
+                    fontWeight: 700,
+                    color: "#64748b"
+                  }}>
+                    คุณอ่านจบแล้ว
+                  </div>
+                </div>
+
+                {/* 2. Content Row: Artwork Box + Title & Description */}
+                <div style={{ display: "flex", alignItems: "center", gap: "16px", width: "100%" }}>
+                  <div style={{
+                    width: "72px",
+                    height: "72px",
+                    borderRadius: "16px",
+                    backgroundColor: "#ffffff",
+                    border: `1.5px solid ${current.cardBorder}`,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: "32px",
+                    flexShrink: 0,
+                    boxShadow: "0 2px 8px rgba(0,0,0,0.03)"
+                  }}>
+                    {current.icon}
+                  </div>
+
+                  <div style={{ flex: 1, minWidth: 0, textAlign: "left" }}>
+                    <div style={{ fontSize: "11.5px", color: "#64748b", fontWeight: 600, marginBottom: "2px" }}>
+                      เรื่อง : {novelTitle || "ชื่อเรื่องนิยาย"}
+                    </div>
+                    <h4 style={{
+                      margin: "0 0 4px 0",
+                      fontSize: "1.05rem",
+                      fontWeight: 800,
+                      color: "#0f172a",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap"
+                    }}>
+                      {previewTitle}
+                    </h4>
+                    {descriptionEnabled && (
+                      <p style={{
+                        margin: "4px 0 0 0",
+                        fontSize: "0.8rem",
+                        color: "#475569",
+                        lineHeight: 1.4,
+                        display: "-webkit-box",
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: "vertical",
+                        overflow: "hidden"
+                      }}>
+                        {endingDescription.trim() || "คุณตัดสินใจสละชีวิตทางโลกเพื่อกลายเป็นผู้พิทักษ์ความลับตลอดกาล..."}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* 3. Callout Notice Box */}
+                <div style={{
+                  backgroundColor: "#ffffff",
+                  borderRadius: "12px",
+                  border: "1px solid rgba(0,0,0,0.06)",
+                  padding: "10px 14px",
+                  textAlign: "left"
+                }}>
+                  <div style={{ fontSize: "12.5px", fontWeight: 800, color: "#1e293b", marginBottom: "2px" }}>
+                    คุณได้พบกับหนึ่งในบทจบของเรื่องนี้
+                  </div>
+                  <div style={{ fontSize: "11px", color: "#94a3b8" }}>
+                    ลองย้อนกลับไปเลือกทางอื่น เพื่อค้นพบเส้นทางที่ต่างออกไป
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -132,18 +276,21 @@ export default function EndingSettings({
                           display: "flex",
                           alignItems: "center",
                           gap: "10px",
-                          padding: "14px 16px",
+                          padding: "12px 14px",
                           borderRadius: "12px",
-                          border: isActive ? "2px solid #db2777" : "1.5px solid #e5e7eb",
-                          backgroundColor: isActive ? "rgba(219, 39, 119, 0.02)" : "#ffffff",
+                          border: isActive ? `2px solid ${item.badgeColor}` : "1.5px solid #e5e7eb",
+                          backgroundColor: isActive ? item.badgeBg : "#ffffff",
                           cursor: "pointer",
                           textAlign: "left",
                           position: "relative",
                           transition: "all 0.18s ease"
                         }}
                       >
-                        <div className="icon" style={{ fontSize: "1.6rem", marginBottom: 0 }}>{item.icon}</div>
-                        <div style={{ fontWeight: "700", color: isActive ? "#db2777" : "#374151", fontSize: "0.88rem" }}>{item.label}</div>
+                        <div className="icon" style={{ fontSize: "1.5rem", marginBottom: 0 }}>{item.icon}</div>
+                        <div>
+                          <div style={{ fontWeight: "800", color: isActive ? item.badgeColor : "#1e293b", fontSize: "0.82rem" }}>{item.labelEN}</div>
+                          <div style={{ fontWeight: "600", color: isActive ? item.badgeColor : "#64748b", fontSize: "0.74rem", opacity: 0.9 }}>{item.labelTH}</div>
+                        </div>
                         
                         {/* ✨ เครื่องหมาย Checkmark เมื่อเลือก */}
                         {isActive && (
@@ -154,7 +301,7 @@ export default function EndingSettings({
                             width: "16px",
                             height: "16px",
                             borderRadius: "50%",
-                            backgroundColor: "#db2777",
+                            backgroundColor: item.badgeColor,
                             color: "#ffffff",
                             display: "flex",
                             alignItems: "center",

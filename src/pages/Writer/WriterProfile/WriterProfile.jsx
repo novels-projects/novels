@@ -192,33 +192,92 @@ export default function WriterProfile() {
         }
         setIsOwner(computedIsOwner);
 
+        const effectiveWriterId = writerData.writer_id || writerData.id || targetWriterId;
+        const possibleWriterIds = [
+          targetWriterId,
+          writerData?.id,
+          writerData?.writer_id,
+          writerData?.user_id,
+          writerData?.userId,
+        ].filter(v => v !== undefined && v !== null && v !== "").map(String);
+
+        const isMatchingWriter = (w) => {
+          if (!w) return false;
+          const itemIds = [
+            w.writer_id,
+            w.id,
+            w.user_id,
+            w.userId,
+            w.author_id,
+            w.authorId,
+          ].filter(v => v !== undefined && v !== null && v !== "").map(String);
+
+          return possibleWriterIds.some(targetId => {
+            const targetNum = Number(targetId);
+            return itemIds.some(itemId => {
+              if (itemId === targetId) return true;
+              if (!Number.isNaN(targetNum) && Number(itemId) === targetNum) return true;
+              return false;
+            });
+          });
+        };
+
         let novelsArr = [];
         try {
           const novelsRes = await fetch(`${API_BASE_URL}/novels`, { headers });
           if (novelsRes.ok) {
             const nJson = await novelsRes.json();
             const rawList = nJson.novels || nJson.data?.novels || nJson.data || (Array.isArray(nJson) ? nJson : []);
-            novelsArr = (Array.isArray(rawList) ? rawList : []).filter(
-              n => String(n.author_id || n.authorId || n.user_id || n.userId) === String(targetWriterId)
-            );
+            novelsArr = (Array.isArray(rawList) ? rawList : []).filter(n => {
+              const authorId = String(n.author_id || n.authorId || n.user_id || n.userId || n.writer_id || "");
+              return authorId && possibleWriterIds.includes(authorId);
+            });
           }
         } catch (e) {
           console.warn("ดึงรายการนิยายล้มเหลว:", e);
         }
 
-        let followingState = false;
-        if (token && !computedIsOwner) {
+        // 1. ตรวจสอบสถานะการติดตามจากข้อมูล writerData
+        let followingState = Boolean(writerData.is_following || writerData.isFollowing);
+
+        // 2. ตรวจสอบสถานะการติดตามจาก /api/users/following-writers (ตรงกับหน้านักเขียนที่ติดตามและหน้ารายละเอียดนิยาย)
+        if (!followingState && token && !computedIsOwner) {
           try {
-            const followRes = await fetch(`${API_BASE_URL}/api/me/following-writers`, { headers });
+            const followRes = await fetch(`${API_BASE_URL}/api/users/following-writers`, { headers });
             if (followRes.ok) {
-              const fJson = await followRes.json();
-              const followList = fJson.writers || fJson.data || (Array.isArray(fJson) ? fJson : []);
-              followingState = (Array.isArray(followList) ? followList : []).some(
-                w => String(w.id || w.writer_id) === String(targetWriterId)
-              );
+              const fJson = await followRes.json().catch(() => null);
+              const fBody = fJson?.data ?? fJson ?? {};
+              const followList = Array.isArray(fBody) ? fBody : (fBody.following || fBody.writers || []);
+              if (Array.isArray(followList) && followList.some(isMatchingWriter)) {
+                followingState = true;
+              }
+            } else if (followRes.status === 404 || followRes.status === 500) {
+              // Fallback ไปยัง /api/me/following-writers เผื่อกรณี backend มี endpoint นี้
+              const fallbackRes = await fetch(`${API_BASE_URL}/api/me/following-writers`, { headers });
+              if (fallbackRes.ok) {
+                const fbJson = await fallbackRes.json().catch(() => null);
+                const fbBody = fbJson?.data ?? fbJson ?? {};
+                const fbList = Array.isArray(fbBody) ? fbBody : (fbBody.following || fbBody.writers || []);
+                if (Array.isArray(fbList) && fbList.some(isMatchingWriter)) {
+                  followingState = true;
+                }
+              }
             }
           } catch (e) {
-            console.warn("ดึงสถานะการติดตามล้มเหลว:", e);
+            console.warn("ดึงสถานะการติดตามจาก API ล้มเหลว:", e);
+          }
+        }
+
+        // 3. ตรวจสอบสถานะการติดตามจาก local_following_writers ใน localStorage (ตรงกับหน้ารายละเอียดนิยายและหน้านักเขียนที่ติดตาม)
+        if (!followingState && !computedIsOwner) {
+          try {
+            const localSaved = localStorage.getItem("local_following_writers");
+            const list = localSaved ? JSON.parse(localSaved) : [];
+            if (Array.isArray(list) && list.some(isMatchingWriter)) {
+              followingState = true;
+            }
+          } catch (e) {
+            console.warn("ดึงสถานะการติดตามจาก localStorage ล้มเหลว:", e);
           }
         }
 
@@ -233,7 +292,8 @@ export default function WriterProfile() {
         const joinDateRaw = writerData.approved_at || writerData.applied_at || null;
 
         setWriterInfo({
-          id: targetWriterId,
+          id: effectiveWriterId,
+          writerId: effectiveWriterId,
           userId: writerData.user_id || writerData.userId,
           name: displayName,
           username: writerData.username || null,
@@ -268,6 +328,43 @@ export default function WriterProfile() {
       active = false;
     };
   }, [id]);
+
+  // ซิงค์สถานะการติดตามแบบเรียลไทม์กับหน้ารายละเอียดนิยายและหน้านักเขียนที่ติดตาม
+  useEffect(() => {
+    const handleStorageChange = () => {
+      if (!writerInfo || isOwner) return;
+      try {
+        const localSaved = localStorage.getItem("local_following_writers");
+        const list = localSaved ? JSON.parse(localSaved) : [];
+        const possibleIds = [
+          id,
+          writerInfo.id,
+          writerInfo.writerId,
+          writerInfo.userId,
+        ].filter(v => v !== undefined && v !== null && v !== "").map(String);
+
+        if (Array.isArray(list)) {
+          const matched = list.some((w) => {
+            const wIds = [w.writer_id, w.id, w.user_id, w.userId, w.author_id, w.authorId]
+              .filter(v => v !== undefined && v !== null && v !== "")
+              .map(String);
+            return possibleIds.some((pId) => {
+              const pNum = Number(pId);
+              return wIds.some(wId => wId === pId || (!Number.isNaN(pNum) && Number(wId) === pNum));
+            });
+          });
+          setIsFollowing(matched);
+        }
+      } catch (_) {}
+    };
+
+    window.addEventListener("storage", handleStorageChange);
+    window.addEventListener("local_following_writers_changed", handleStorageChange);
+    return () => {
+      window.removeEventListener("storage", handleStorageChange);
+      window.removeEventListener("local_following_writers_changed", handleStorageChange);
+    };
+  }, [id, writerInfo, isOwner]);
 
   const formatNumber = (num = 0) => {
     if (num >= 1_000_000) return (num / 1_000_000).toFixed(1) + "M";
@@ -383,10 +480,14 @@ export default function WriterProfile() {
                     <>
                       {!isAdmin && (
                         <FollowButton
-                          writerId={writerInfo.id}
+                          writerId={writerInfo.writerId || writerInfo.id}
                           writerName={writerInfo.name}
+                          avatarUrl={writerInfo.avatarUrl}
+                          novels={novelsList}
                           isFollowing={isFollowing}
                           onFollowChange={handleFollowChange}
+                          followedText="ติดตามแล้ว"
+                          unfollowedText="ติดตาม"
                           size="small"
                         />
                       )}

@@ -2,11 +2,26 @@ import React, { useEffect, useMemo, useState, useCallback } from "react";
 import axios from "axios";
 import { useNavigate, useLocation } from "react-router-dom";
 import { getNovelStatusInfo } from "../../../utils/novelStatus";
-import { Eye, Heart, GitBranch, BookmarkPlus, SlidersHorizontal, Check } from "lucide-react";
+import { Eye, Heart, Bookmark, Pencil, SlidersHorizontal, Check } from "lucide-react";
 import LoadingScreen from "../../../components/LoadingScreen/LoadingScreen";
 import "./SearchPage.css";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
+
+const MEDIA_INTERNAL_HOST = import.meta.env.VITE_MEDIA_INTERNAL_HOST || "http://minio:9000";
+const MEDIA_PUBLIC_HOST = import.meta.env.VITE_MEDIA_PUBLIC_HOST || "http://localhost:9000";
+
+function resolveCoverUrl(url) {
+  if (!url) return null;
+  return url.replace(MEDIA_INTERNAL_HOST, MEDIA_PUBLIC_HOST);
+}
+
+const formatNumber = (num) => {
+  if (!num) return 0;
+  if (num >= 1000000) return (num / 1000000).toFixed(1) + "M+";
+  if (num >= 1000) return (num / 1000).toFixed(1) + "k+";
+  return num;
+};
 
 const normalizeNovel = (data) => {
   const rawCats = data.categories ?? data.Categories ?? data.category_ids ?? data.CategoryIDs ?? [];
@@ -53,7 +68,7 @@ const SearchPage = () => {
 
   const [categories, setCategories] = useState([]);
   const [novels, setNovels] = useState([]);
-  const [activeCategory, setActiveCategory] = useState(null);
+  const [selectedCategories, setSelectedCategories] = useState([]);
   const [searchQuery, setSearchQuery] = useState(getSearchFromUrl());
   const [searchType, setSearchType] = useState("all"); // all | title | author | synopsis
   const [showFilterPanel, setShowFilterPanel] = useState(false);
@@ -114,13 +129,28 @@ const SearchPage = () => {
     loadData();
   }, []);
 
-  // 🎯 กรองและเรียงลำดับนิยาย (Search + Category Filter + Sort Dropdown)
+  // 🎯 เลือกหมวดหมู่พร้อมกันได้สูงสุด 3 หมวดหมู่
+  const handleCategorySelect = (name) => {
+    setSelectedCategories((prev) => {
+      if (prev.includes(name)) {
+        return prev.filter((c) => c !== name);
+      }
+      if (prev.length >= 3) {
+        return prev;
+      }
+      return [...prev, name];
+    });
+  };
+
+  // 🎯 กรองและเรียงลำดับนิยาย (Search + Multi-Category Filter + Sort Dropdown)
   const filteredAndSortedNovels = useMemo(() => {
     let result = [...novels];
 
-    // 1. กรองด้วยหมวดหมู่
-    if (activeCategory) {
-      result = result.filter(n => n.categories.includes(activeCategory));
+    // 1. กรองด้วยหมวดหมู่ (เลือกได้สูงสุด 3 หมวดหมู่ แบบ OR)
+    if (selectedCategories.length > 0) {
+      result = result.filter(n =>
+        n.categories.some(cat => selectedCategories.includes(cat))
+      );
     }
 
     // 2. กรองด้วยคำค้นหาแยกตามประเภทการค้นหา
@@ -133,7 +163,6 @@ const SearchPage = () => {
       } else if (searchType === "synopsis") {
         result = result.filter(n => n.synopsis.toLowerCase().includes(q));
       } else {
-        // all: ค้นหารวมทั้งหมด
         result = result.filter(n => 
           n.title.toLowerCase().includes(q) ||
           n.author.toLowerCase().includes(q) ||
@@ -152,7 +181,7 @@ const SearchPage = () => {
     }
 
     return result;
-  }, [novels, activeCategory, searchQuery, sortBy, searchType]);
+  }, [novels, selectedCategories, searchQuery, sortBy, searchType]);
 
   // ตัวเลือกสำหรับประเภทการค้นหาแถบด้านบน
   const searchTypeTabs = [
@@ -170,17 +199,17 @@ const SearchPage = () => {
         <header className="search-header">
           <h1 className="search-title">
             {searchQuery.trim() ? (
-              activeCategory ? (
+              selectedCategories.length > 0 ? (
                 <>
                   ผลการค้นหา: <span className="highlight-text">"{searchQuery}"</span>{" "}
                   <span className="search-category-in">ในหมวดหมู่</span>{" "}
-                  <span className="highlight-text">{activeCategory}</span>
+                  <span className="highlight-text">{selectedCategories.join(", ")}</span>
                 </>
               ) : (
                 <>ผลการค้นหา: <span className="highlight-text">"{searchQuery}"</span></>
               )
-            ) : activeCategory ? (
-              <>หมวดหมู่: <span className="highlight-text">"{activeCategory}"</span></>
+            ) : selectedCategories.length > 0 ? (
+              <>หมวดหมู่: <span className="highlight-text">"{selectedCategories.join(", ")}"</span></>
             ) : (
               "นิยายทั้งหมด"
             )}
@@ -191,7 +220,7 @@ const SearchPage = () => {
         {/* แถบตัวกรอง Filters Bar */}
         <div className="filter-bar">
           
-          {/* ส่วนซ้าย: การเลือกประเภทที่ค้นหา (แทนที่หมวดหมู่เดิม) */}
+          {/* ส่วนซ้าย: การเลือกประเภทที่ค้นหา */}
           <div className="search-type-tabs" role="tablist" aria-label="ประเภทการค้นหา">
             {searchTypeTabs.map((tab, idx) => {
               const isActive = searchType === tab.value;
@@ -210,21 +239,7 @@ const SearchPage = () => {
             })}
           </div>
 
-          {(searchQuery || activeCategory || sortBy !== "relevant" || searchType !== "all") && (
-            <button
-              type="button"
-              className="btn-clear-filters"
-              onClick={() => {
-                setSearchQuery("");
-                setActiveCategory(null);
-                setSearchType("all");
-                setSortBy("relevant");
-                setShowFilterPanel(false);
-              }}
-            >
-              ล้างตัวกรอง
-            </button>
-          )}
+          {/* (ปุ่มล้างตัวกรองทรงแคปซูลตรงกลาง ถูกลบออกตามคำขอเรียบร้อยแล้ว) */}
 
           {/* ส่วนขวา: ปุ่มเปิด-ปิด จัดเรียง/ตัวกรอง */}
           <div className="filter-toggle-wrap">
@@ -246,28 +261,34 @@ const SearchPage = () => {
           <div id="search-filter-panel" className="dropdown-filters-panel">
             <div className="filter-panel-grid">
               
-              {/* คอลัมน์เลือกหมวดหมู่ */}
+              {/* คอลัมน์เลือกหมวดหมู่ (สูงสุด 3 หมวดหมู่) */}
               <div className="panel-filter-column">
-                <span className="panel-column-title">🗂️ กรองตามหมวดหมู่</span>
+                <div className="panel-column-header">
+                  <span className="panel-column-title">กรองตามหมวดหมู่</span>
+                  <span className="panel-cat-limit-info"> (เลือกได้สูงสุด 3 หมวดหมู่)</span>
+                </div>
                 <div className="panel-categories-list">
                   <button 
                     type="button"
-                    className={`panel-cat-btn ${activeCategory === null ? "active" : ""}`}
-                    onClick={() => setActiveCategory(null)}
+                    className={`panel-cat-btn ${selectedCategories.length === 0 ? "active" : ""}`}
+                    onClick={() => setSelectedCategories([])}
                   >
                     ทั้งหมด
                   </button>
                   {categories.map((cat) => {
-                    const isActive = activeCategory === cat.name;
+                    const isSelected = selectedCategories.includes(cat.name);
+                    const isMaxReached = selectedCategories.length >= 3 && !isSelected;
                     return (
                       <button
                         key={cat.id}
                         type="button"
-                        className={`panel-cat-btn ${isActive ? "active" : ""}`}
-                        onClick={() => setActiveCategory(prev => prev === cat.name ? null : cat.name)}
+                        className={`panel-cat-btn ${isSelected ? "active" : ""} ${isMaxReached ? "disabled" : ""}`}
+                        onClick={() => handleCategorySelect(cat.name)}
+                        disabled={isMaxReached}
+                        title={isMaxReached ? "เลือกหมวดหมู่ได้สูงสุด 3 หมวดหมู่" : ""}
                       >
                         {cat.name}
-                        {isActive && <Check size={12} style={{ marginLeft: "4px" }} />}
+                        {isSelected && <Check size={12} style={{ marginLeft: "4px" }} />}
                       </button>
                     );
                   })}
@@ -276,7 +297,7 @@ const SearchPage = () => {
 
               {/* คอลัมน์จัดเรียงลำดับ */}
               <div className="panel-filter-column sort-column">
-                <span className="panel-column-title">↕️ เรียงลำดับตาม</span>
+                <span className="panel-column-title">เรียงลำดับตาม</span>
                 <div className="panel-sort-list">
                   {[
                     { label: "เกี่ยวข้องมากสุด", value: "relevant" },
@@ -299,7 +320,7 @@ const SearchPage = () => {
                   className="panel-clear-btn"
                   onClick={() => {
                     setSearchQuery("");
-                    setActiveCategory(null);
+                    setSelectedCategories([]);
                     setSearchType("all");
                     setSortBy("relevant");
                   }}
@@ -312,9 +333,8 @@ const SearchPage = () => {
           </div>
         )}
 
-        {/* Layout แสดงผลลัพธ์แบบเดี่ยวเต็ม 1 คอลัมน์ความกว้าง (ลบ Sidebar ออก) */}
+        {/* Layout แสดงผลการ์ดแบบ 2 คอลัมน์ต่อ 1 แถว */}
         <div className="search-body-layout-full">
-          
           <main className="search-results-area-full">
             {loading ? (
               <LoadingScreen compact message="กำลังค้นหานิยาย..." />
@@ -349,49 +369,55 @@ const SearchPage = () => {
                       <div className="novel-horiz-cover-full">
                         {novel.coverImage ? (
                           <img 
-                            src={novel.coverImage.replace("http://minio:9000", "http://localhost:9000")} 
+                            src={resolveCoverUrl(novel.coverImage)} 
                             alt={novel.title} 
                             loading="lazy"
                           />
                         ) : (
                           <div className="novel-cover-placeholder-full">📘</div>
                         )}
+                        {isFinished && (
+                          <span className="card-status-tag finished">
+                            จบแล้ว
+                          </span>
+                        )}
                       </div>
 
-                      {/* รายละเอียด */}
+                      {/* รายละเอียดการ์ด */}
                       <div className="novel-horiz-details-full">
-                        <div className="novel-horiz-header-full">
-                          <h3 className="novel-horiz-title-full">{novel.title}</h3>
-                          <span className="novel-horiz-author-full">✍️ {novel.author}</span>
+                        <div className="novel-grid-tags">
+                          {novel.categories.slice(0, 2).map((cat, cIdx) => (
+                            <span key={cIdx} className="grid-tag-item">{cat}</span>
+                          ))}
+                          {novel.categories.length > 2 && (
+                            <span className="grid-tag-item grid-tag-overflow">+{novel.categories.length - 2}</span>
+                          )}
                         </div>
 
-                        <p className="novel-horiz-synopsis-full">{novel.synopsis}</p>
+                        <h3 className="novel-horiz-title-full" title={novel.title}>{novel.title}</h3>
+
+                        <div className="novel-horiz-author-full">
+                          <Pencil size={12} className="novel-author-icon" /> <span>{novel.author}</span>
+                        </div>
+
+                        <p className="novel-horiz-synopsis-full" title={novel.synopsis || ""}>
+                          {novel.synopsis || ""}
+                        </p>
 
                         <div className="novel-horiz-footer-full">
-                          {/* Tags หมวดหมู่ */}
-                          <div className="novel-tags-full">
-                            {novel.categories.map((cat, cIdx) => (
-                              <span key={cIdx} className="novel-tag-item-full">{cat}</span>
-                            ))}
-                          </div>
-
-                          {/* สถิติใช้งาน Lucide-react เหมือนหน้าหมวดหมู่ */}
                           <div className="novel-meta-info-full">
-                            <div className="novel-horiz-stat-item-full" title="เพิ่มเข้าชั้นหนังสือ">
-                              <BookmarkPlus size={15} color="#db2777" />
-                              <span>{novel.stats.bookshelfCount.toLocaleString()}</span>
+                            <div className="novel-horiz-stat-item-full" title="เพิ่มเข้าชั้น">
+                              <Bookmark size={13} />
+                              <span>{formatNumber(novel.stats.bookshelfCount)}</span>
                             </div>
                             <div className="novel-horiz-stat-item-full" title="ยอดเข้าชม">
-                              <Eye size={15} color="#db2777" />
-                              <span>{novel.stats.views.toLocaleString()}</span>
+                              <Eye size={13} />
+                              <span>{formatNumber(novel.stats.views)}</span>
                             </div>
                             <div className="novel-horiz-stat-item-full" title="ยอดถูกใจ">
-                              <Heart size={15} color="#db2777" />
-                              <span>{novel.stats.likes.toLocaleString()}</span>
+                              <Heart size={13} />
+                              <span>{formatNumber(novel.stats.likes)}</span>
                             </div>
-                            <span className={`status-badge-full ${isFinished ? "finished" : "writing"}`}>
-                              {isFinished ? "จบแล้ว" : "กำลังเขียน"}
-                            </span>
                           </div>
                         </div>
                       </div>
@@ -401,8 +427,8 @@ const SearchPage = () => {
               </div>
             )}
           </main>
-
         </div>
+
       </div>
     </div>
   );

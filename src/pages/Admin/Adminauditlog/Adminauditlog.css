@@ -469,6 +469,28 @@
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   width: 100%;
+  scrollbar-width: thin;
+  scrollbar-color: #F472B6 #FFF0F8;
+  padding-bottom: 4px;
+}
+
+.admin-audit-table-wrapper::-webkit-scrollbar {
+  height: 6px;
+  display: block;
+}
+
+.admin-audit-table-wrapper::-webkit-scrollbar-track {
+  background: #FFF0F8;
+  border-radius: 999px;
+}
+
+.admin-audit-table-wrapper::-webkit-scrollbar-thumb {
+  background: #F472B6;
+  border-radius: 999px;
+}
+
+.admin-audit-table-wrapper::-webkit-scrollbar-thumb:hover {
+  background: #E91E8C;
 }
 
 .admin-audit-table {
@@ -477,18 +499,25 @@
   border-spacing: 0;
   text-align: left;
   font-size: 0.86rem;
-  min-width: 820px;
+  min-width: 1040px;
+  table-layout: fixed;
+}
+
+.admin-audit-table thead {
+  background-color: #fff0f6 !important;
+  border-bottom: 1.5px solid #fce7f3;
 }
 
 .admin-audit-table th {
-  background-color: #f8fafc;
-  color: #475569;
+  background-color: #fff0f6 !important;
+  color: #db2777 !important;
   font-weight: 700;
   padding: 14px 16px;
-  border-bottom: 1.5px solid #e2e8f0;
+  border-bottom: 1.5px solid #fce7f3;
   white-space: nowrap;
   font-size: 0.84rem;
   letter-spacing: 0.01em;
+  box-sizing: border-box;
 }
 
 .admin-audit-table td {
@@ -497,6 +526,20 @@
   color: #334155;
   vertical-align: middle;
   line-height: 1.45;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+/* 🟢 Requirement 1: Equal left and right margins for the table */
+.admin-audit-table th:first-child,
+.admin-audit-table td:first-child {
+  padding-left: 20px;
+}
+
+.admin-audit-table th:last-child,
+.admin-audit-table td:last-child {
+  padding-right: 20px;
+  overflow: visible;
 }
 
 .admin-audit-row {
@@ -597,23 +640,33 @@
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 
+/* 🟢 Requirement 2: Button border safety & non-clipping on resize */
 .btn-view-detail {
   background-color: #fdf2f8;
   color: #db2777;
-  border: 1px solid #fbcfe8;
+  border: 1.5px solid #fbcfe8;
   border-radius: 8px;
-  padding: 5px 12px;
+  padding: 5px 14px;
   font-size: 0.78rem;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
   white-space: nowrap;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 2;
+  box-shadow: 0 1px 2px rgba(219, 39, 119, 0.05);
 }
 
 .btn-view-detail:hover {
   background-color: #db2777;
   color: #ffffff;
   border-color: #db2777;
+  box-shadow: 0 2px 6px rgba(219, 39, 119, 0.2);
 }
 
 .text-center {
@@ -628,6 +681,8 @@
   gap: 8px;
   width: 100%;
   margin: 0 auto;
+  overflow: visible !important;
+  box-sizing: border-box;
 }
 
 /* Empty State */
@@ -1189,11 +1244,13 @@
   }
 
   .admin-audit-table-wrapper {
-    display: none;
+    display: block !important;
+    overflow-x: auto;
+    width: 100%;
   }
 
   .admin-audit-mobile-card-list {
-    display: flex;
+    display: none !important;
   }
 
   .admin-audit-pagination {

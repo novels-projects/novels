@@ -362,7 +362,10 @@
 }
 
 .search-overlay-section { display: flex; flex-direction: column; gap: 8px; }
+.search-overlay-header-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .search-overlay-title { font-size: 0.85rem; font-weight: 700; color: #64748b; margin: 0; }
+.search-overlay-view-all { font-size: 0.76rem; font-weight: 700; color: #db2777; cursor: pointer; transition: opacity 0.15s ease; white-space: nowrap; }
+.search-overlay-view-all:hover { text-decoration: underline; opacity: 0.85; }
 
 .search-overlay-recent-list { display: flex; flex-direction: column; gap: 6px; }
 .search-overlay-recent-item {
@@ -387,13 +390,16 @@
 .popular-badge { font-size: 0.88rem; font-weight: 800; color: var(--pink-500); width: 20px; text-align: center; }
 .popular-info { display: flex; flex-direction: column; min-width: 0; }
 .popular-title { font-size: 0.88rem; font-weight: 700; color: #1e293b; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.popular-meta { font-size: 0.72rem; color: #64748b; }
+.popular-meta { font-size: 0.72rem; color: #64748b; display: flex; align-items: center; gap: 5px; flex-wrap: wrap; margin-top: 1px; }
+.popular-meta-item { display: inline-flex; align-items: center; gap: 3px; }
+.popular-meta-dot { color: #cbd5e1; }
+.novel-author-icon, .popular-stat-icon { color: #F4B8DC; flex-shrink: 0; }
 
-.search-overlay-category-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.search-overlay-category-list { display: flex; flex-wrap: wrap; gap: 6px; max-height: 64px; overflow: hidden; }
 .search-overlay-cat-chip {
   background: #fdf2f8; color: #db2777; border: 1px solid #fbcfe8;
   border-radius: 12px; padding: 4px 10px; font-size: 0.75rem; font-weight: 600;
-  cursor: pointer; transition: all 0.15s ease;
+  cursor: pointer; transition: all 0.15s ease; white-space: nowrap;
 }
 .search-overlay-cat-chip:hover { background: #fbcfe8; color: #be185d; }
 

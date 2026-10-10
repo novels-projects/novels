@@ -279,6 +279,48 @@
   color: #94a3b8;
 }
 
+/* -------------------------------------------------------------
+   View Toggle Buttons (ตารางเลื่อนข้าง / การ์ดข้อมูล)
+   ------------------------------------------------------------- */
+.wr-view-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px;
+  background-color: #f1f5f9;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+}
+
+.wr-view-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  white-space: nowrap;
+  font-family: inherit;
+}
+
+.wr-view-btn:hover {
+  color: #0f172a;
+  background-color: rgba(255, 255, 255, 0.6);
+}
+
+.wr-view-btn.active {
+  background-color: #ffffff;
+  color: #db2777;
+  font-weight: 700;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+}
+
 /* Table Container (ตรงตาม Manageusers Template) */
 .wr-table-card {
   background: #ffffff;
@@ -288,10 +330,39 @@
   overflow: hidden;
 }
 
+.wr-table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: #F472B6 #FFF0F8;
+  padding-bottom: 4px;
+}
+
+.wr-table-responsive::-webkit-scrollbar {
+  height: 6px;
+  display: block;
+}
+
+.wr-table-responsive::-webkit-scrollbar-track {
+  background: #FFF0F8;
+  border-radius: 999px;
+}
+
+.wr-table-responsive::-webkit-scrollbar-thumb {
+  background: #F472B6;
+  border-radius: 999px;
+}
+
+.wr-table-responsive::-webkit-scrollbar-thumb:hover {
+  background: #E91E8C;
+}
+
 .wr-table {
   width: 100%;
   min-width: 960px;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
   text-align: left;
   table-layout: fixed;
 }
@@ -302,11 +373,26 @@
 }
 
 .wr-table th {
+  background-color: #fff0f6 !important;
   padding: 14px 16px;
   font-size: 0.88rem;
   color: #db2777 !important;
   font-weight: 700;
   white-space: nowrap;
+  border-bottom: 1.5px solid #fce7f3;
+  box-sizing: border-box;
+  letter-spacing: 0.01em;
+}
+
+.wr-table th:first-child,
+.wr-table td:first-child {
+  padding-left: 20px;
+}
+
+.wr-table th:last-child,
+.wr-table td:last-child {
+  padding-right: 20px;
+  overflow: visible;
 }
 
 .wr-table th.text-center,
@@ -329,8 +415,11 @@
   font-size: 0.88rem;
   color: #334155;
   vertical-align: middle;
+  line-height: 1.45;
   overflow-wrap: anywhere;
   word-break: break-word;
+  overflow: hidden;
+  box-sizing: border-box;
   min-width: 0;
 }
 
@@ -341,13 +430,6 @@
 .wr-table tbody tr:hover {
   background-color: #fff5f9 !important;
 }
-
-.wr-table th:nth-child(1), .wr-table td:nth-child(1) { width: 5%; }
-.wr-table th:nth-child(2), .wr-table td:nth-child(2) { width: 20%; }
-.wr-table th:nth-child(3), .wr-table td:nth-child(3) { width: 16%; }
-.wr-table th:nth-child(4), .wr-table td:nth-child(4) { width: 22%; }
-.wr-table th:nth-child(5), .wr-table td:nth-child(5) { width: 12%; }
-.wr-table th:nth-child(6), .wr-table td:nth-child(6) { width: 25%; text-align: right; }
 
 .wr-user-info-cell {
   display: flex;
@@ -411,6 +493,7 @@
   font-weight: 700;
   line-height: 1.2;
   white-space: nowrap;
+  vertical-align: middle;
 }
 
 .status-dot {
@@ -443,56 +526,83 @@
 .actions-cell {
   text-align: center !important;
   vertical-align: middle !important;
-  padding: 14px 12px;
+  padding: 14px 8px !important;
+  box-sizing: border-box !important;
+  overflow: visible !important;
 }
 
 .action-cell-content,
 .wr-btn-group {
   display: flex !important;
-  gap: 8px;
+  gap: 5px;
   align-items: center !important;
   justify-content: center !important;
   flex-wrap: nowrap;
   max-width: 100%;
-  margin: 0 auto;
+  margin: 0 auto !important;
+  position: relative;
+  top: 2px;
 }
 
 .btn-icon-action {
   background: #ffffff;
-  border: 1px solid #e2e8f0;
+  border: 1.5px solid #cbd5e1;
   border-radius: 8px;
-  padding: 6px 12px;
+  padding: 5px 10px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 5px;
   font-size: 0.8rem;
   font-weight: 600;
-  color: #64748b;
+  color: #475569;
   cursor: pointer;
   transition: all 0.15s ease;
   font-family: inherit;
   white-space: nowrap;
   flex-shrink: 0;
   width: auto;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+  box-sizing: border-box;
+}
+
+.btn-detail {
+  border-color: #bae6fd;
+  color: #0284c7;
+  background: #f0f9ff;
 }
 
 .btn-detail:hover:not(:disabled) {
   background: #e0f2fe;
-  color: #0284c7;
-  border-color: #bae6fd;
+  color: #0369a1;
+  border-color: #7dd3fc;
+  box-shadow: 0 2px 4px rgba(2, 132, 199, 0.15);
+}
+
+.btn-approve {
+  border-color: #86efac;
+  color: #15803d;
+  background: #f0fdf4;
 }
 
 .btn-approve:hover:not(:disabled) {
   background: #dcfce7;
-  color: #15803d;
-  border-color: #86efac;
+  color: #16a34a;
+  border-color: #4ade80;
+  box-shadow: 0 2px 4px rgba(22, 163, 74, 0.15);
+}
+
+.btn-reject {
+  border-color: #fca5a5;
+  color: #dc2626;
+  background: #fef2f2;
 }
 
 .btn-reject:hover:not(:disabled) {
   background: #fee2e2;
-  color: #dc2626;
-  border-color: #fca5a5;
+  color: #b91c1c;
+  border-color: #f87171;
+  box-shadow: 0 2px 4px rgba(220, 38, 38, 0.15);
 }
 
 /* States */
@@ -781,18 +891,77 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 11px;
+  padding: 11px 18px;
   border-radius: 10px;
   font-weight: 700;
-  font-size: 13.5px;
-  border: none;
+  font-size: 0.88rem;
+  border: 1.5px solid transparent;
   cursor: pointer;
+  transition: all 0.18s ease;
   font-family: inherit;
 }
 
 .wr-modal__action-btn:disabled {
   opacity: 0.6;
   cursor: default;
+}
+
+/* Green Approve Button */
+.wr-btn-action--approve {
+  background-color: #16a34a !important;
+  color: #ffffff !important;
+  border-color: #16a34a !important;
+  box-shadow: 0 3px 10px rgba(22, 163, 74, 0.22);
+}
+
+.wr-btn-action--approve:hover:not(:disabled) {
+  background-color: #15803d !important;
+  border-color: #15803d !important;
+  box-shadow: 0 4px 14px rgba(21, 128, 61, 0.35);
+  transform: translateY(-1px);
+}
+
+/* Soft Red Reject Button (Detail Modal) */
+.wr-btn-action--reject {
+  background-color: #fef2f2 !important;
+  color: #dc2626 !important;
+  border-color: #fca5a5 !important;
+  box-shadow: 0 2px 6px rgba(220, 38, 38, 0.06);
+}
+
+.wr-btn-action--reject:hover:not(:disabled) {
+  background-color: #fee2e2 !important;
+  color: #b91c1c !important;
+  border-color: #f87171 !important;
+  transform: translateY(-1px);
+}
+
+/* Solid Red Confirm Reject Button (Confirm Modal) */
+.wr-btn-action--confirm-reject {
+  background-color: #dc2626 !important;
+  color: #ffffff !important;
+  border-color: #dc2626 !important;
+  box-shadow: 0 3px 10px rgba(220, 38, 38, 0.25);
+}
+
+.wr-btn-action--confirm-reject:hover:not(:disabled) {
+  background-color: #b91c1c !important;
+  border-color: #b91c1c !important;
+  box-shadow: 0 4px 14px rgba(185, 28, 28, 0.35);
+  transform: translateY(-1px);
+}
+
+/* Neutral Slate Cancel Button */
+.wr-btn-action--cancel {
+  background-color: #f1f5f9 !important;
+  color: #475569 !important;
+  border: 1.5px solid #cbd5e1 !important;
+}
+
+.wr-btn-action--cancel:hover:not(:disabled) {
+  background-color: #e2e8f0 !important;
+  color: #1e293b !important;
+  border-color: #94a3b8 !important;
 }
 
 /* Confirm modal */
@@ -907,6 +1076,10 @@
   gap: 14px;
 }
 
+.wr-cards-mobile.wr-cards-active-view {
+  display: flex !important;
+}
+
 .wr-card-mobile {
   background: #ffffff;
   border: 1px solid #e2e8f0;
@@ -970,14 +1143,6 @@
     padding: 16px;
   }
 
-  .wr-table-responsive {
-    display: none;
-  }
-
-  .wr-cards-mobile {
-    display: flex;
-  }
-
   .wr-stats-grid {
     grid-template-columns: 1fr;
   }
@@ -985,11 +1150,29 @@
   .wr-toolbar {
     flex-direction: column;
     align-items: stretch;
+    gap: 12px;
+  }
+
+  .wr-search-and-clear {
+    width: 100%;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
   }
 
   .wr-search-box {
     width: 100%;
     min-width: 0;
+  }
+
+  .wr-view-toggle {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .wr-view-btn {
+    flex: 1;
+    justify-content: center;
   }
 }
 
@@ -1000,7 +1183,8 @@
 .actions-cell {
   text-align: center !important;
   vertical-align: middle !important;
-  padding: 14px 12px;
+  padding: 14px 8px !important;
+  overflow: visible !important;
 }
 
 .actions-cell .wr-btn-group {
@@ -1009,7 +1193,9 @@
   justify-content: center !important;
   width: 100% !important;
   margin: 0 auto !important;
-  gap: 8px;
+  gap: 5px;
+  position: relative;
+  top: 2px;
 }
 
 /* Larger Status Badge inside Modal */

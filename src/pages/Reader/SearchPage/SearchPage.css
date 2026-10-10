@@ -1,4 +1,4 @@
-/* ดีไซน์หน้าแสดงผลลัพธ์การค้นหาเวอร์ชันพรีเมียมแบบคอลัมน์เดี่ยวเต็มจอ */
+/* ดีไซน์หน้าแสดงผลลัพธ์การค้นหาเวอร์ชันพรีเมียมแบบคอลัมน์เดี่ยวและ 2 คอลัมน์ */
 :root {
   --pink-500: #e91e63;
   --pink-600: #db2777;
@@ -24,7 +24,7 @@
 }
 
 .search-page-container {
-  max-width: 960px; /* ลดความกว้างสูงสุดเพื่อให้เลย์เอาต์ 1 คอลัมน์ดูพอดีสายตา ไม่ยืดเกินไป */
+  max-width: 1200px;
   margin: 0 auto;
 }
 
@@ -105,7 +105,6 @@
   box-shadow: 0 4px 10px rgba(219, 39, 119, 0.2);
 }
 
-.btn-clear-filters,
 .panel-clear-btn {
   border: 1px solid rgba(219, 39, 119, 0.15);
   background: #fff7fb;
@@ -116,9 +115,9 @@
   font-weight: 700;
   cursor: pointer;
   transition: all 0.15s ease;
+  margin-top: 12px;
 }
 
-.btn-clear-filters:hover,
 .panel-clear-btn:hover {
   background: var(--pink-600);
   color: var(--white);
@@ -196,12 +195,24 @@
   gap: 12px;
 }
 
+.panel-column-header {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  border-bottom: 1.5px solid var(--slate-100);
+  padding-bottom: 6px;
+}
+
 .panel-column-title {
   font-size: 0.95rem;
   font-weight: 700;
   color: var(--slate-800);
-  border-bottom: 1.5px solid var(--slate-100);
-  padding-bottom: 6px;
+}
+
+.panel-cat-limit-info {
+  font-size: 0.78rem;
+  color: var(--pink-600);
+  font-weight: 600;
 }
 
 .panel-categories-list {
@@ -224,7 +235,7 @@
   align-items: center;
 }
 
-.panel-cat-btn:hover {
+.panel-cat-btn:hover:not(:disabled) {
   background: #e2e8f0;
 }
 
@@ -233,6 +244,12 @@
   color: var(--pink-600);
   font-weight: 700;
   box-shadow: inset 0 0 0 1px rgba(219, 39, 119, 0.25);
+}
+
+.panel-cat-btn:disabled,
+.panel-cat-btn.disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 /* คอลัมน์จัดเรียง */
@@ -266,7 +283,7 @@
   font-weight: 700;
 }
 
-/* ── 4. Layout 1 คอลัมน์เดี่ยวแบบขยายเต็มพื้นที่ ── */
+/* ── 4. Layout การ์ดแสดงผลลัพธ์ ── */
 .search-body-layout-full {
   width: 100%;
 }
@@ -312,7 +329,7 @@
   border: 1px solid #fbcfe8;
   border-radius: 50%;
   box-shadow: 0 4px 12px rgba(233, 30, 140, 0.08);
-  margin: 0 auto 16px auto; /* จัดวางบล็อกวงกลมให้อยู่กึ่งกลางหน้าจออย่างสมบูรณ์ */
+  margin: 0 auto 16px auto;
 }
 
 .search-empty-state h3 {
@@ -328,211 +345,201 @@
   font-size: 0.9rem;
 }
 
-/* ── 5. รายการการ์ดนิยายแบบยาว (Horizontal Cards) ── */
+/* ── 5. รายการการ์ดนิยายแบบ 2 คอลัมน์ต่อ 1 แถวเหมือนหน้าหมวดหมู่ ── */
 .novel-list-vertical-full {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
 }
 
 .novel-horiz-card-full {
   display: flex;
+  align-items: flex-start;
   background: var(--white);
-  border-radius: 20px;
+  border: 1px solid #f1f5f9;
+  border-radius: 18px;
   overflow: hidden;
-  border: 1.5px solid rgba(219, 39, 119, 0.05);
-  box-shadow: 0 4px 15px rgba(219, 39, 119, 0.015);
   cursor: pointer;
-  transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.02);
+  height: 100%;
 }
 
 .novel-horiz-card-full:hover {
-  transform: translateY(-3px);
-  border-color: rgba(219, 39, 119, 0.15);
-  box-shadow: 0 10px 25px rgba(219, 39, 119, 0.05);
+  transform: translateY(-2px);
+  box-shadow: 0 10px 24px rgba(233, 30, 140, 0.08);
+  border-color: #fbcfe8;
 }
 
 /* หน้าปกนิยาย */
 .novel-horiz-cover-full {
-  width: 140px;
-  min-width: 140px;
-  height: 196px;
-  background: var(--slate-100);
-  position: relative;
+  width: 100px;
+  min-width: 100px;
+  height: 140px;
+  border-radius: 12px;
+  background: var(--pink-50);
+  margin: 12px;
   overflow: hidden;
+  position: relative;
+  flex-shrink: 0;
 }
 
 .novel-horiz-cover-full img {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  transition: transform 0.4s ease;
-}
-
-.novel-horiz-card-full:hover .novel-horiz-cover-full img {
-  transform: scale(1.05);
+  display: block;
 }
 
 .novel-cover-placeholder-full {
   width: 100%;
   height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 2.2rem;
-  background: linear-gradient(135deg, #fbcfe8 0%, #f472b6 100%);
+  display: grid;
+  place-items: center;
+  font-size: 32px;
 }
 
 /* รายละเอียดนิยาย */
 .novel-horiz-details-full {
   flex: 1;
-  padding: 20px 24px;
+  padding: 12px 14px 12px 0;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
-  min-width: 0; /* ป้องกันเนื้อหาดันกรอบทะลุ */
-}
-
-.novel-horiz-header-full {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 16px;
-  margin-bottom: 6px;
+  justify-content: flex-start;
+  min-width: 0;
+  gap: 4px;
 }
 
 .novel-horiz-title-full {
-  font-size: 1.15rem;
-  font-weight: 700;
+  font-size: 15px;
+  font-weight: 800;
   color: var(--slate-900);
-  margin: 0;
-  transition: color 0.15s ease;
+  margin: 2px 0 0 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  line-height: 1.3;
 }
 
 .novel-horiz-card-full:hover .novel-horiz-title-full {
   color: var(--pink-600);
 }
 
-@media (max-width: 560px) {
-  .search-page {
-    padding-right: 12px;
-    padding-left: 12px;
-  }
-
-  .novel-horiz-card-full {
-    flex-direction: column;
-  }
-
-  .novel-horiz-cover-full {
-    width: 100%;
-    min-width: 0;
-    height: min(58vw, 220px);
-  }
-
-  .novel-horiz-details-full {
-    padding: 16px;
-  }
-
-  .novel-horiz-header-full {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 6px;
-  }
-
-  .novel-horiz-title-full {
-    white-space: normal;
-  }
-
-  .novel-meta-info-full {
-    gap: 10px;
-    flex-wrap: wrap;
-  }
+.novel-horiz-author-full {
+  font-size: 12px;
+  color: var(--slate-500);
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 2px;
+  background: none;
+  padding: 0;
+  border-radius: 0;
 }
 
-.novel-horiz-author-full {
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: var(--slate-500);
-  white-space: nowrap;
-  background: var(--slate-100);
-  padding: 4px 10px;
-  border-radius: 999px;
+.novel-author-icon {
+  color: var(--pink-border, #F4B8DC);
+  flex-shrink: 0;
 }
 
 .novel-horiz-synopsis-full {
-  font-size: 0.85rem;
+  font-size: 12px;
   color: var(--slate-500);
-  line-height: 1.5;
-  margin: 0 0 16px 0;
+  margin: 2px 0 0 0;
+  line-height: 1.45;
   display: -webkit-box;
-  -webkit-line-clamp: 2; /* แสดงแค่ 2 บรรทัด */
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
   text-overflow: ellipsis;
+  min-height: 35px;
 }
 
 /* ส่วนท้ายของการ์ด */
 .novel-horiz-footer-full {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  gap: 16px;
-  flex-wrap: wrap;
-  border-top: 1px dashed var(--slate-100);
-  padding-top: 14px;
+  margin-top: auto;
+  padding-top: 6px;
+  border-top: none;
 }
 
-/* Tags */
-.novel-tags-full {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-
-.novel-tag-item-full {
-  background: var(--rose-light);
-  color: var(--pink-600);
-  border: 1px solid rgba(219, 39, 119, 0.08);
-  border-radius: 6px;
-  padding: 2px 8px;
-  font-size: 0.75rem;
-  font-weight: 600;
-}
-
-/* สถิติเข้าชม */
 .novel-meta-info-full {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 12px;
+  flex-wrap: wrap;
+  font-size: 11.5px;
+  color: var(--slate-500);
+  font-weight: 500;
 }
 
 .novel-horiz-stat-item-full {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 4px;
-  font-size: 0.78rem;
-  color: var(--slate-500);
-  font-weight: 600;
 }
 
-/* badges */
-.status-badge-full {
-  font-size: 0.72rem;
+.novel-horiz-stat-item-full svg {
+  color: var(--pink-border, #F4B8DC);
+  flex-shrink: 0;
+}
+
+/* Badge สถานะจบแล้ว */
+.card-status-tag {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 10;
+  font-size: 10px;
   font-weight: 700;
   padding: 3px 8px;
-  border-radius: 6px;
-  text-transform: uppercase;
+  border-radius: 9999px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+  white-space: nowrap;
 }
 
-.status-badge-full.finished {
-  background: #d1fae5;
-  color: #065f46;
+.card-status-tag.finished {
+  background-color: #e7f5ec;
+  color: #2e9563;
 }
 
-.status-badge-full.writing {
-  background: #fef3c7;
-  color: #92400e;
+/* Responsive Media Queries */
+@media (max-width: 768px) {
+  .search-page {
+    padding: 24px 16px 60px;
+  }
+
+  .novel-list-vertical-full {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .novel-horiz-cover-full {
+    width: 85px;
+    min-width: 85px;
+    height: 120px;
+    margin: 10px;
+  }
+
+  .novel-horiz-details-full {
+    padding: 10px 10px 10px 0;
+  }
+}
+
+@media (max-width: 580px) {
+  .search-page {
+    padding-right: 12px;
+    padding-left: 12px;
+  }
+
+  .novel-list-vertical-full {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
 }

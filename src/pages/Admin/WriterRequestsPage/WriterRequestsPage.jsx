@@ -13,7 +13,9 @@ import {
   ShieldCheck,
   ChevronLeft,
   ChevronRight,
-  RotateCcw,
+  Table,
+  LayoutGrid,
+  Ban,
 } from 'lucide-react';
 import './WriterRequestsPage.css';
 
@@ -133,8 +135,8 @@ const ActionConfirmModal = ({ isOpen, action, userName, reason, onReasonChange, 
 
         {!isApprove && (
           <div className="wr-confirm-body" style={{ paddingTop: 0 }}>
-            <label className="wr-modal__info-label" htmlFor="rejection-reason" style={{ display: 'block', marginBottom: 6 }}>
-              เหตุผลที่ปฏิเสธ (ไม่บังคับ แต่แนะนำให้ระบุ เพื่อให้ผู้สมัครรู้ว่าต้องแก้อะไร)
+            <label className="wr-modal__info-label" htmlFor="rejection-reason" style={{ display: 'block', marginBottom: 6, fontWeight: 700 }}>
+              เหตุผลที่ปฏิเสธ <span style={{ color: '#dc2626' }}>*</span>
             </label>
             <textarea
               id="rejection-reason"
@@ -157,20 +159,27 @@ const ActionConfirmModal = ({ isOpen, action, userName, reason, onReasonChange, 
 
           <div className="wr-modal__actions">
             <button
-              className="wr-modal__action-btn wr-btn-action--reject"
+              type="button"
+              className="wr-modal__action-btn wr-btn-action--cancel"
               onClick={onCancel}
               disabled={busy}
             >
-              ยกเลิก
+              <span>ยกเลิก</span>
             </button>
             <button
-              className={`wr-modal__action-btn ${isApprove ? 'wr-btn-action--approve' : 'wr-btn-action--reject'}`}
-              style={!isApprove ? { background: '#dc2626', color: '#fff' } : undefined}
+              type="button"
+              className={`wr-modal__action-btn ${isApprove ? 'wr-btn-action--approve' : 'wr-btn-action--confirm-reject'}`}
               onClick={onConfirm}
               disabled={busy}
             >
-              {busy ? <Loader2 size={14} className="spin" /> : isApprove ? <Check size={14} /> : <X size={14} />}
-              {isApprove ? 'ยืนยันอนุมัติ' : 'ยืนยันปฏิเสธ'}
+              {busy ? (
+                <Loader2 size={15} className="spin" />
+              ) : isApprove ? (
+                <Check size={15} />
+              ) : (
+                <Ban size={15} />
+              )}
+              <span>{isApprove ? 'ยืนยันอนุมัติ' : 'ยืนยันปฏิเสธ'}</span>
             </button>
           </div>
         </div>
@@ -411,6 +420,7 @@ const WriterRequestsPage = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [viewMode, setViewMode] = useState('table'); // 'table' | 'card'
 
   // รองรับทั้ง response แบบเก่า (array ตรงๆ) และแบบใหม่ ({data, total, counts})
   // เผื่อ backend ยังทำ pagination จริงไม่เสร็จ จะได้ไม่พังระหว่างนี้
@@ -548,6 +558,14 @@ const WriterRequestsPage = () => {
   }, []);
 
   const runAction = async (writerId, action, reason) => {
+    if (action === 'reject' && !reason.trim()) {
+      setConfirmModal((prev) => ({
+        ...prev,
+        busy: false,
+        error: 'กรุณาระบุเหตุผลในการปฏิเสธคำขอ เพื่อให้ผู้สมัครรับทราบและนำไปแก้ไข',
+      }));
+      return;
+    }
     setConfirmModal((prev) => ({ ...prev, busy: true, error: '' }));
     try {
       const token = localStorage.getItem('token');
@@ -730,6 +748,28 @@ const WriterRequestsPage = () => {
                 onChange={(e) => changeSearchTerm(e.target.value)}
               />
             </div>
+
+            {/* ปุ่มปรับมุมมอง (ตารางเลื่อนข้าง / การ์ดข้อมูล) */}
+            <div className="wr-view-toggle" role="group" aria-label="ปรับมุมมองการแสดงผล">
+              <button
+                type="button"
+                className={`wr-view-btn ${viewMode === 'table' ? 'active' : ''}`}
+                onClick={() => setViewMode('table')}
+                title="แสดงผลแบบตารางเลื่อนข้าง (Scrollable Table)"
+              >
+                <Table size={15} />
+                <span>ตาราง</span>
+              </button>
+              <button
+                type="button"
+                className={`wr-view-btn ${viewMode === 'card' ? 'active' : ''}`}
+                onClick={() => setViewMode('card')}
+                title="แสดงผลแบบการ์ดข้อมูล (Mobile Cards)"
+              >
+                <LayoutGrid size={15} />
+                <span>การ์ด</span>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -748,99 +788,100 @@ const WriterRequestsPage = () => {
             </div>
           ) : (
             <>
-              {/* Desktop Responsive Table */}
-              <div className="wr-table-responsive">
-                <table className="wr-table">
-                  <thead>
-                    <tr>
-                      <th style={{ width: "4%" }}>#</th>
-                      <th style={{ width: "21%" }}>ผู้สมัคร</th>
-                      <th style={{ width: "15%" }}>นามปากกา</th>
-                      <th style={{ width: "20%" }}>อีเมลที่ใช้สมัคร</th>
-                      <th className="text-center" style={{ width: "14%" }}>สถานะ</th>
-                      <th className="text-center" style={{ width: "26%" }}>การจัดการ</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {paginatedRequests.map((req, index) => {
-                      const statusInfo = STATUS_INFO[req.status] || STATUS_INFO.pending;
-                      const isPending = !req.status || req.status === 'pending';
-                      const statusType = req.status === 'approved' ? 'active' : req.status === 'rejected' ? 'suspended' : 'pending';
-                      return (
-                        <tr key={req.writer_id}>
-                          <td className="wr-row-num">{(currentPage - 1) * itemsPerPage + index + 1}</td>
-                          <td>
-                            <div className="wr-user-info-cell">
-                              <UserAvatar
-                                src={req.pic_profile || req.avatar_url}
-                                name={req.username}
-                                className="wr-user-avatar-small"
-                              />
-                              <span className="wr-username-text">{displayName(req.username)}</span>
-                              {req.previous_attempt_count > 0 && (
-                                <span className="wr-reapply-badge" title="เคยยื่นสมัครมาก่อนหน้านี้">
-                                  สมัครครั้งที่ {req.previous_attempt_count + 1}
-                                </span>
-                              )}
-                            </div>
-                          </td>
-                          <td>{req.pen_name || <span className="wr-subtext">ไม่ระบุ</span>}</td>
-                          <td>
-                            {req.email_writer ? (
-                              <span>{req.email_writer}</span>
-                            ) : (
-                              <span className="wr-subtext">ไม่ระบุ</span>
+              {viewMode === 'table' ? (
+                /* Scrollable Table View */
+                <div className="wr-table-responsive">
+              <table className="wr-table">
+                <thead>
+                  <tr>
+                    <th className="text-center" style={{ width: "5%", minWidth: "45px" }}>#</th>
+                    <th style={{ width: "22%", minWidth: "190px" }}>ผู้สมัคร</th>
+                    <th style={{ width: "15%", minWidth: "130px" }}>นามปากกา</th>
+                    <th style={{ width: "20%", minWidth: "175px" }}>อีเมลที่ใช้สมัคร</th>
+                    <th className="text-center" style={{ width: "12%", minWidth: "110px" }}>สถานะ</th>
+                    <th className="text-center" style={{ width: "26%", minWidth: "290px" }}>การจัดการ</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {paginatedRequests.map((req, index) => {
+                    const statusInfo = STATUS_INFO[req.status] || STATUS_INFO.pending;
+                    const isPending = !req.status || req.status === 'pending';
+                    const statusType = req.status === 'approved' ? 'active' : req.status === 'rejected' ? 'suspended' : 'pending';
+                    return (
+                      <tr key={req.writer_id}>
+                        <td className="wr-row-num">{(currentPage - 1) * itemsPerPage + index + 1}</td>
+                        <td>
+                          <div className="wr-user-info-cell">
+                            <UserAvatar
+                              src={req.pic_profile || req.avatar_url}
+                              name={req.username}
+                              className="wr-user-avatar-small"
+                            />
+                            <span className="wr-username-text">{displayName(req.username)}</span>
+                            {req.previous_attempt_count > 0 && (
+                              <span className="wr-reapply-badge" title="เคยยื่นสมัครมาก่อนหน้านี้">
+                                สมัครครั้งที่ {req.previous_attempt_count + 1}
+                              </span>
                             )}
-                          </td>
-                          <td className="text-center">
-                            <span className={`status-badge status-${statusType}`}>
-                              <span className="status-dot"></span>
-                              {statusInfo.label}
-                            </span>
-                          </td>
-                          <td className="actions-cell text-center">
-                            <div className="wr-btn-group action-cell-content">
-                              <button
-                                className="btn-icon-action btn-detail"
-                                onClick={() => setDetailModal({ isOpen: true, user: req })}
-                                title="ดูรายละเอียดใบสมัคร"
-                              >
-                                <FileText size={14} />
-                                <span>ดูรายละเอียด</span>
-                              </button>
+                          </div>
+                        </td>
+                        <td>{req.pen_name || <span className="wr-subtext">ไม่ระบุ</span>}</td>
+                        <td>
+                          {req.email_writer ? (
+                            <span>{req.email_writer}</span>
+                          ) : (
+                            <span className="wr-subtext">ไม่ระบุ</span>
+                          )}
+                        </td>
+                        <td className="text-center">
+                          <span className={`status-badge status-${statusType}`}>
+                            <span className="status-dot"></span>
+                            {statusInfo.label}
+                          </span>
+                        </td>
+                        <td className="actions-cell text-center">
+                          <div className="wr-btn-group action-cell-content">
+                            <button
+                              className="btn-icon-action btn-detail"
+                              onClick={() => setDetailModal({ isOpen: true, user: req })}
+                              title="ดูรายละเอียดใบสมัคร"
+                            >
+                              <FileText size={14} />
+                              <span>ดูรายละเอียด</span>
+                            </button>
 
-                              {isPending && (
-                                <>
-                                  <button
-                                    className="btn-icon-action btn-approve"
-                                    onClick={() => openConfirm(req, 'approve')}
-                                    title="อนุมัติเป็นนักเขียน"
-                                  >
-                                    <Check size={14} />
-                                    <span>อนุมัติ</span>
-                                  </button>
+                            {isPending && (
+                              <>
+                                <button
+                                  className="btn-icon-action btn-approve"
+                                  onClick={() => openConfirm(req, 'approve')}
+                                  title="อนุมัติเป็นนักเขียน"
+                                >
+                                  <Check size={14} />
+                                  <span>อนุมัติ</span>
+                                </button>
 
-                                  <button
-                                    className="btn-icon-action btn-reject"
-                                    onClick={() => openConfirm(req, 'reject')}
-                                    title="ปฏิเสธคำขอ"
-                                  >
-                                    <X size={14} />
-                                    <span>ปฏิเสธ</span>
-                                  </button>
-                                </>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Mobile Cards View */}
-              <div className="wr-cards-mobile">
+                                <button
+                                  className="btn-icon-action btn-reject"
+                                  onClick={() => openConfirm(req, 'reject')}
+                                  title="ปฏิเสธคำขอ"
+                                >
+                                  <X size={14} />
+                                  <span>ปฏิเสธ</span>
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            /* Mobile Cards View */
+            <div className="wr-cards-mobile wr-cards-active-view">
                 {paginatedRequests.map((req, index) => {
                   const statusInfo = STATUS_INFO[req.status] || STATUS_INFO.pending;
                   const isPending = !req.status || req.status === 'pending';
@@ -908,6 +949,7 @@ const WriterRequestsPage = () => {
                   );
                 })}
               </div>
+              )}
 
               {/* Footer Pagination Template (Image 2 style) */}
               <div className="admin-table-footer">

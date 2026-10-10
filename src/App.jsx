@@ -1,6 +1,9 @@
 import React, { useEffect, useState, createContext, useContext } from "react";
 import {
-  BrowserRouter as Router,
+  createBrowserRouter,
+  createRoutesFromElements,
+  RouterProvider,
+  Outlet,
   Routes,
   Route,
   useNavigate,
@@ -817,6 +820,67 @@ const WriterRegisterPageRoute = () => {
   );
 };
 
+const AppRootLayout = () => {
+  return (
+    <>
+      <NavbarWrapper />
+      <Outlet />
+    </>
+  );
+};
+
+const router = createBrowserRouter(
+  createRoutesFromElements(
+    <Route element={<AppRootLayout />}>
+      {/* Reader & Public Routes (Allowed for all users & Admin) */}
+      <Route path="/" element={<RedirectAdminIfNeeded><HomePageRoute /></RedirectAdminIfNeeded>} />
+      <Route path="/novel/:id" element={<NovelDetailPage />} />
+      <Route path="/category" element={<Navigate to="/categories" replace />} />
+      <Route path="/categories" element={<CategoriesRoute />} />
+      <Route path="/search" element={<SearchPageRoute />} />
+      <Route path="/bookshelf" element={<RequireAuthRoute><BookshelfRoute /></RequireAuthRoute>} />
+      <Route path="/history" element={<RequireAuthRoute><HistoryRoute /></RequireAuthRoute>} />
+      <Route path="/following-writers" element={<RequireAuthRoute><FollowingWritersRoute /></RequireAuthRoute>} />
+      <Route path="/notifications" element={<RequireAuthRoute><NotificationRoute /></RequireAuthRoute>} />
+      <Route path="/settings" element={<RequireAuthRoute><ReaderSettingRoute /></RequireAuthRoute>} />
+      <Route path="/storytree/:novelId" element={<StoryTreeRoute />} />
+      <Route path="/reading/:novelId" element={<ReadingRoute />} />
+      <Route path="/reading/:novelId/:sceneId" element={<ReadingRoute />} />
+
+      {/* Public Writer Profile Pages */}
+      <Route path="/writer/profile/:id" element={<WriterProfileRoute />} />
+      <Route path="/writer/:id/profile" element={<WriterProfileRoute />} />
+
+      {/* Writer Private Workspace Routes (ต้องล็อกอิน + เป็นนักเขียนเท่านั้น) */}
+      <Route path="/writer/profile" element={<RequireWriterRoute><WriterProfileRoute /></RequireWriterRoute>} />
+      <Route path="/writer/settings" element={<Navigate to="/settings" replace />} />
+      <Route path="/writer/dashboard" element={<RequireWriterRoute><WriterDashboardRoute /></RequireWriterRoute>} />
+      <Route path="/writer/create" element={<RequireWriterRoute><CreateNovelRoute /></RequireWriterRoute>} />
+      <Route path="/writer/:novelId/chapters" element={<RequireWriterRoute><ChapterManagerRoute /></RequireWriterRoute>} />
+      <Route path="/writer/:novelId/scene/:sceneId" element={<RequireWriterRoute><SceneEditorRoute /></RequireWriterRoute>} />
+      <Route path="/writer/:novelId/storytree" element={<RequireWriterRoute><WriterStoryTreeRoute /></RequireWriterRoute>} />
+      <Route path="/writer/:novelId/analytics" element={<RequireWriterRoute><StatisticsGraphRoute /></RequireWriterRoute>} />
+      <Route path="/writer/storytree/:novelId" element={<RequireWriterRoute><LegacyWriterStoryTreeRedirect /></RequireWriterRoute>} />
+      <Route path="/writer/:novelId/edit" element={<RequireWriterRoute><EditNovelRoute /></RequireWriterRoute>} />
+        
+      {/* Admin Routes */}
+      <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
+      <Route path="/admin/dashboard" element={<RequireAdminRoute><AdminDashboardPage /></RequireAdminRoute>} />
+      <Route path="/admin/users" element={<RequireAdminRoute><Manageusers /></RequireAdminRoute>} />
+      <Route path="/admin/manage-users" element={<RequireAdminRoute><WriterRequestsPage /></RequireAdminRoute>} />
+      {/* 🟢 2. เพิ่ม Route หน้ารายงาน/แจ้งลบ & จัดการเนื้อหา */}
+      <Route path="/admin/reports" element={<RequireAdminRoute><AdminReportsDashboard /></RequireAdminRoute>} />
+      <Route path="/admin/content-reports" element={<RequireAdminRoute><AdminReportsDashboard /></RequireAdminRoute>} />
+      <Route path="/admin/categories" element={<RequireAdminRoute><AdminCategoryPage /></RequireAdminRoute>} />
+      <Route path="/admin/audit-logs" element={<RequireAdminRoute><Adminauditlog /></RequireAdminRoute>} />
+
+      {/* Auth Routes - ไม่มี Navbar */}
+      <Route path="/login-register" element={<AuthPageRoute />} />
+      <Route path="/registerwriter" element={<WriterRegisterPageRoute />} />
+    </Route>
+  )
+);
+
 // ======================================================
 // Main Application Component
 // ======================================================
@@ -856,58 +920,7 @@ function App() {
     return null;
   }
 
-  return (
-    <Router>
-      <NavbarWrapper />
-      <Routes>
-        {/* Reader & Public Routes (Allowed for all users & Admin) */}
-        <Route path="/" element={<RedirectAdminIfNeeded><HomePageRoute /></RedirectAdminIfNeeded>} />
-        <Route path="/novel/:id" element={<NovelDetailPage />} />
-        <Route path="/category" element={<Navigate to="/categories" replace />} />
-        <Route path="/categories" element={<CategoriesRoute />} />
-        <Route path="/search" element={<SearchPageRoute />} />
-        <Route path="/bookshelf" element={<RequireAuthRoute><BookshelfRoute /></RequireAuthRoute>} />
-        <Route path="/history" element={<RequireAuthRoute><HistoryRoute /></RequireAuthRoute>} />
-        <Route path="/following-writers" element={<RequireAuthRoute><FollowingWritersRoute /></RequireAuthRoute>} />
-        <Route path="/notifications" element={<RequireAuthRoute><NotificationRoute /></RequireAuthRoute>} />
-        <Route path="/settings" element={<RequireAuthRoute><ReaderSettingRoute /></RequireAuthRoute>} />
-        <Route path="/storytree/:novelId" element={<StoryTreeRoute />} />
-        <Route path="/reading/:novelId" element={<ReadingRoute />} />
-        <Route path="/reading/:novelId/:sceneId" element={<ReadingRoute />} />
-
-        {/* Public Writer Profile Pages */}
-        <Route path="/writer/profile/:id" element={<WriterProfileRoute />} />
-        <Route path="/writer/:id/profile" element={<WriterProfileRoute />} />
-
-        {/* Writer Private Workspace Routes (ต้องล็อกอิน + เป็นนักเขียนเท่านั้น) */}
-        <Route path="/writer/profile" element={<RequireWriterRoute><WriterProfileRoute /></RequireWriterRoute>} />
-        <Route path="/writer/settings" element={<Navigate to="/settings" replace />} />
-        <Route path="/writer/dashboard" element={<RequireWriterRoute><WriterDashboardRoute /></RequireWriterRoute>} />
-        <Route path="/writer/create" element={<RequireWriterRoute><CreateNovelRoute /></RequireWriterRoute>} />
-        <Route path="/writer/:novelId/chapters" element={<RequireWriterRoute><ChapterManagerRoute /></RequireWriterRoute>} />
-        <Route path="/writer/:novelId/scene/:sceneId" element={<RequireWriterRoute><SceneEditorRoute /></RequireWriterRoute>} />
-        <Route path="/writer/:novelId/storytree" element={<RequireWriterRoute><WriterStoryTreeRoute /></RequireWriterRoute>} />
-        <Route path="/writer/:novelId/analytics" element={<RequireWriterRoute><StatisticsGraphRoute /></RequireWriterRoute>} />
-        <Route path="/writer/storytree/:novelId" element={<RequireWriterRoute><LegacyWriterStoryTreeRedirect /></RequireWriterRoute>} />
-        <Route path="/writer/:novelId/edit" element={<RequireWriterRoute><EditNovelRoute /></RequireWriterRoute>} />
-          
-        {/* Admin Routes */}
-        <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
-        <Route path="/admin/dashboard" element={<RequireAdminRoute><AdminDashboardPage /></RequireAdminRoute>} />
-        <Route path="/admin/users" element={<RequireAdminRoute><Manageusers /></RequireAdminRoute>} />
-        <Route path="/admin/manage-users" element={<RequireAdminRoute><WriterRequestsPage /></RequireAdminRoute>} />
-        {/* 🟢 2. เพิ่ม Route หน้ารายงาน/แจ้งลบ & จัดการเนื้อหา */}
-        <Route path="/admin/reports" element={<RequireAdminRoute><AdminReportsDashboard /></RequireAdminRoute>} />
-        <Route path="/admin/content-reports" element={<RequireAdminRoute><AdminReportsDashboard /></RequireAdminRoute>} />
-        <Route path="/admin/categories" element={<RequireAdminRoute><AdminCategoryPage /></RequireAdminRoute>} />
-        <Route path="/admin/audit-logs" element={<RequireAdminRoute><Adminauditlog /></RequireAdminRoute>} />
-
-        {/* Auth Routes - ไม่มี Navbar */}
-        <Route path="/login-register" element={<AuthPageRoute />} />
-        <Route path="/registerwriter" element={<WriterRegisterPageRoute />} />
-      </Routes>
-    </Router>
-  );
+  return <RouterProvider router={router} />;
 }
 
 export default App;

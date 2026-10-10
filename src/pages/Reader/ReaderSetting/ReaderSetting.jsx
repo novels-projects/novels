@@ -71,7 +71,7 @@ export default function ReaderSetting() {
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
 
   // Field validation and messages
-  const [usernameMsg, setUsernameMsg] = useState({ type: "hint", text: "ใช้ตัวอักษร ตัวเลข และ _ ได้ ความยาว 3–20 ตัว" });
+  const [usernameMsg, setUsernameMsg] = useState({ type: "hint", text: "ใช้ตัวอักษร ตัวเลข และ _ ได้ ความยาว 3–50 ตัว" });
   const [emailMsg, setEmailMsg] = useState({ type: "hint", text: "" });
 
   // รายชื่อ Username ที่มีผู้อื่นใช้งานแล้วในระบบ (เริ่มต้นจากค่า seed มาตรฐานของระบบ)
@@ -395,8 +395,38 @@ export default function ReaderSetting() {
   // Sidebar Nav Highlighting & Tab selection
   // ------------------------------------------
   const handleScrollTo = (id) => {
+    if (id === activeSection) return false;
+    if (hasUnsavedChanges) {
+      setPendingNavigation(() => () => {
+        setActiveSection(id);
+      });
+      setIsUnsavedModalOpen(true);
+      return false;
+    }
     setActiveSection(id);
     return false;
+  };
+
+  // ------------------------------------------
+  // Discard All Unsaved Drafts Helper
+  // ------------------------------------------
+  const handleDiscardAllUnsaved = () => {
+    // 1. ยกเลิกการแก้ไขโปรไฟล์
+    handleCancelEditProfile();
+
+    // 2. ยกเลิกการแก้ไขรหัสผ่าน
+    handleCancelEditPassword();
+
+    // 3. รีเซ็ตการตั้งค่าการแจ้งเตือนกลับสลักเดิม
+    setNotifChapter(baseNotifChapter);
+    setNotifFollow(baseNotifFollow);
+    setNotifComment(baseNotifComment);
+    setNotifLike(baseNotifLike);
+    setNotifWriterFollow(baseNotifWriterFollow);
+    setNotifSystem(baseNotifSystem);
+
+    // 4. ปิดโมดัล
+    setIsUnsavedModalOpen(false);
   };
 
   // ------------------------------------------
@@ -412,7 +442,7 @@ export default function ReaderSetting() {
       setAvatarPreviewUrl("");
     }
     // รีเซ็ตข้อความ Validate
-    setUsernameMsg({ type: "hint", text: "ใช้ตัวอักษร ตัวเลข และ _ ได้ ความยาว 3–20 ตัว" });
+    setUsernameMsg({ type: "hint", text: "ใช้ตัวอักษร ตัวเลข และ _ ได้ ความยาว 3–50 ตัว" });
     setEmailMsg({ type: "hint", text: "" });
   };
 
@@ -430,7 +460,7 @@ export default function ReaderSetting() {
   const validateUsername = (val) => {
     setUsername(val);
     if (!val) {
-      setUsernameMsg({ type: "hint", text: "ใช้ตัวอักษร ตัวเลข และ _ ได้ ความยาว 3–20 ตัว" });
+      setUsernameMsg({ type: "hint", text: "ใช้ตัวอักษร ตัวเลข และ _ ได้ ความยาว 3–50 ตัว" });
       return;
     }
 
@@ -440,7 +470,7 @@ export default function ReaderSetting() {
       return;
     }
 
-    const ok = /^[a-zA-Z0-9_]{3,20}$/.test(val);
+    const ok = /^[a-zA-Z0-9_]{3,50}$/.test(val);
     if (ok) {
       if (val === baseUsername) {
         setUsernameMsg({ type: "ok", text: "ชื่อผู้ใช้ปัจจุบันของคุณ" });
@@ -448,7 +478,7 @@ export default function ReaderSetting() {
         setUsernameMsg({ type: "ok", text: "รูปแบบชื่อผู้ใช้ถูกต้อง" });
       }
     } else {
-      setUsernameMsg({ type: "err", text: "ใช้ได้แค่ A–Z, a–z, 0–9, _ ความยาว 3–20 ตัว" });
+      setUsernameMsg({ type: "err", text: "ใช้ได้แค่ A–Z, a–z, 0–9, _ ความยาว 3–50 ตัว" });
     }
   };
 
@@ -484,12 +514,10 @@ export default function ReaderSetting() {
     { id: "r-len", label: "อย่างน้อย 8 ตัวอักษร", test: (v) => v.length >= 8 },
     { id: "r-upper", label: "ตัวพิมพ์ใหญ่ (A–Z)", test: (v) => /[A-Z]/.test(v) },
     { id: "r-num", label: "ตัวเลข (0–9)", test: (v) => /[0-9]/.test(v) },
-    { id: "r-sym", label: "อักขระพิเศษ (!@#$...) ", test: (v) => /[^A-Za-z0-9]/.test(v) },
   ];
 
   const pwLevels = [
-    { label: "อ่อนแอมาก", color: "#EF4444", cls: "active-weak" },
-    { label: "พอใช้", color: "#F59E0B", cls: "active-fair" },
+    { label: "ปานกลาง", color: "#F59E0B", cls: "active-fair" },
     { label: "ดี", color: "#22C55E", cls: "active-good" },
     { label: "แข็งแกร่ง", color: "#15803D", cls: "active-strong" },
   ];
@@ -558,7 +586,7 @@ export default function ReaderSetting() {
     }
 
     // ตรวจสอบเงื่อนไข Username
-    const userOk = /^[a-zA-Z0-9_]{3,20}$/.test(username);
+    const userOk = /^[a-zA-Z0-9_]{3,50}$/.test(username);
     if (!userOk) {
       triggerToast("กรุณากรอกชื่อผู้ใช้ให้ถูกต้องตามรูปแบบ", "error");
       return;
@@ -628,7 +656,7 @@ export default function ReaderSetting() {
             setUsernameMsg({ type: "err", text: "ชื่อบัญชีนี้มีคนใช้แล้ว" });
             throw new Error("ชื่อบัญชีนี้มีคนใช้แล้ว");
           } else if (status === 400) {
-            setUsernameMsg({ type: "err", text: "ใช้ได้แค่ A–Z, a–z, 0–9, _ ความยาว 3–20 ตัว" });
+            setUsernameMsg({ type: "err", text: "ใช้ได้แค่ A–Z, a–z, 0–9, _ ความยาว 3–50 ตัว" });
             throw new Error("รูปแบบชื่อผู้ใช้ไม่ถูกต้อง");
           }
           const errorText = await userUpdateRes.text();
@@ -869,7 +897,7 @@ export default function ReaderSetting() {
               setUsernameMsg({ type: "err", text: "ชื่อบัญชีนี้มีคนใช้แล้ว" });
               throw new Error("ชื่อบัญชีนี้มีคนใช้แล้ว");
             } else if (status === 400) {
-              setUsernameMsg({ type: "err", text: "ใช้ได้แค่ A–Z, a–z, 0–9, _ ความยาว 3–20 ตัว" });
+              setUsernameMsg({ type: "err", text: "ใช้ได้แค่ A–Z, a–z, 0–9, _ ความยาว 3–50 ตัว" });
               throw new Error("รูปแบบชื่อผู้ใช้ไม่ถูกต้อง");
             }
             throw new Error("ไม่สามารถเปลี่ยนชื่อผู้ใช้ได้");
@@ -1178,21 +1206,6 @@ export default function ReaderSetting() {
                   </div>
                 </div>
 
-                {/* User ID (Read-only) */}
-                <div className="field">
-                  <div className="label">
-                    รหัสผู้ใช้ (User ID)
-                  </div>
-                  <div className="input-wrap">
-                    <input 
-                      className="input readonly-input"
-                      type="text" 
-                      value={userInfo.id}
-                      disabled
-                    />
-                  </div>
-                </div>
-
                 {/* Username Field */}
                 <div className="field">
                   <div className="label">
@@ -1200,12 +1213,13 @@ export default function ReaderSetting() {
                   </div>
                   <div className="input-wrap">
                     <input 
-                      className={`input ${!isEditingProfile ? "readonly-input" : ""} ${usernameMsg.type === "ok" ? "ok" : usernameMsg.type === "err" ? "err" : ""}`}
+                      className={`input ${!isEditingProfile ? "readonly-input" : "editable-input"} ${usernameMsg.type === "ok" ? "ok" : usernameMsg.type === "err" ? "err" : ""}`}
                       type="text" 
                       value={username}
                       onChange={(e) => validateUsername(e.target.value)}
                       placeholder="Username ของคุณ"
                       autoComplete="username"
+                      maxLength={50}
                       disabled={!isEditingProfile}
                     />
                   </div>
@@ -1224,7 +1238,7 @@ export default function ReaderSetting() {
                   </div>
                   <div className="input-wrap">
                     <input 
-                      className={`input ${!isEditingProfile ? "readonly-input" : ""} ${emailMsg.type === "ok" ? "ok" : emailMsg.type === "err" ? "err" : ""}`}
+                      className={`input ${!isEditingProfile ? "readonly-input" : "editable-input"} ${emailMsg.type === "ok" ? "ok" : emailMsg.type === "err" ? "err" : ""}`}
                       type="email" 
                       value={email}
                       onChange={(e) => validateEmail(e.target.value)}
@@ -1243,7 +1257,10 @@ export default function ReaderSetting() {
 
                 {/* Role (Read-only) */}
                 <div className="field">
-                  <div className="label">บทบาท (Role)</div>
+                  <div className="label">
+                    บทบาท (Role)
+                    {isEditingProfile && <span className="readonly-badge">(ไม่สามารถแก้ไขได้)</span>}
+                  </div>
                   <div className="input-wrap">
                     <input 
                       className="input readonly-input"
@@ -1261,7 +1278,10 @@ export default function ReaderSetting() {
 
                 {/* Status (Read-only) */}
                 <div className="field">
-                  <div className="label">สถานะบัญชี (Status)</div>
+                  <div className="label">
+                    สถานะบัญชี (Status)
+                    {isEditingProfile && <span className="readonly-badge">(ไม่สามารถแก้ไขได้)</span>}
+                  </div>
                   <div className="input-wrap">
                     <input 
                       className="input readonly-input"
@@ -1404,7 +1424,7 @@ export default function ReaderSetting() {
                       {newPassword && strengthInfo && (
                         <div className="pw-strength">
                           <div className="pw-bars">
-                            {[1, 2, 3, 4].map((i) => (
+                            {[1, 2, 3].map((i) => (
                               <div 
                                 key={i} 
                                 className={`pw-bar ${i <= strengthInfo.passed ? strengthInfo.level.cls : ""}`} 
@@ -1726,10 +1746,10 @@ export default function ReaderSetting() {
       {/* 🟢 UNSAVED CHANGES MODAL */}
       {isUnsavedModalOpen && (
         <div className="modal-bg open" onClick={() => { setIsUnsavedModalOpen(false); setPendingNavigation(null); }}>
-          <div className="modal" style={{ maxWidth: "560px" }} role="dialog" aria-modal="true" aria-labelledby="unsaved-modal-title" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header" style={{ justifyContent: "flex-start !important", flexDirection: "row !important", display: "flex !important" }}>
-              <div className="modal-header-icon" style={{ background: "#FFF0F8", color: "#E91E8C" }}>
-                <i className="ti ti-alert-triangle" aria-hidden="true" style={{ color: "#E91E8C", fontSize: "20px" }}></i>
+          <div className="modal unsaved-modal" role="dialog" aria-modal="true" aria-labelledby="unsaved-modal-title" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header unsaved-modal-header">
+              <div className="modal-header-icon unsaved-modal-icon">
+                <i className="ti ti-alert-triangle" aria-hidden="true"></i>
               </div>
               <div>
                 <div className="modal-title" id="unsaved-modal-title">มีข้อมูลที่ยังไม่ได้บันทึก</div>
@@ -1738,14 +1758,14 @@ export default function ReaderSetting() {
             </div>
             
             <div className="modal-body">
-              <div className="modal-warning" style={{ background: "#FFF0F8", borderColor: "#FFD5EC", color: "#C2185B" }}>
-                <i className="ti ti-info-circle" aria-hidden="true" style={{ color: "#C2185B" }}></i>
+              <div className="modal-warning unsaved-modal-warning">
+                <i className="ti ti-info-circle" aria-hidden="true"></i>
                 <div className="modal-warning-text">
                   ตรวจพบการปรับปรุงข้อมูลที่ค้างอยู่ หากออกไปทันทีโดยไม่บันทึก <strong>ข้อมูลส่วนตัวหรือการตั้งค่าที่แก้ไขไว้จะสูญหายทันที</strong>
                 </div>
               </div>
 
-              <div className="modal-actions" style={{ marginTop: "24px", display: "flex", flexWrap: "wrap", gap: "8px", justifyContent: "flex-end" }}>
+              <div className="modal-actions unsaved-modal-actions">
                 <button 
                   className="btn btn-gray" 
                   onClick={() => {
@@ -1756,14 +1776,17 @@ export default function ReaderSetting() {
                   <i className="ti ti-x" aria-hidden="true"></i>ยกเลิก
                 </button>
                 <button 
-                  className="btn btn-red" 
+                  className="btn btn-red-solid" 
                   onClick={() => {
-                    setIsUnsavedModalOpen(false);
-                    if (pendingNavigation) {
-                      pendingNavigation();
+                    const navCallback = pendingNavigation;
+                    handleDiscardAllUnsaved();
+                    setPendingNavigation(null);
+                    if (navCallback) {
+                      setTimeout(() => {
+                        navCallback();
+                      }, 0);
                     }
                   }}
-                  style={{ background: "#FFF5F5", borderColor: "#FEB2B2", color: "#C53030" }}
                 >
                   <i className="ti ti-logout" aria-hidden="true"></i>ออกโดยไม่บันทึก
                 </button>
@@ -1772,9 +1795,13 @@ export default function ReaderSetting() {
                   onClick={async () => {
                     const success = await handleSaveAllUnsaved();
                     if (success) {
+                      const navCallback = pendingNavigation;
                       setIsUnsavedModalOpen(false);
-                      if (pendingNavigation) {
-                        pendingNavigation();
+                      setPendingNavigation(null);
+                      if (navCallback) {
+                        setTimeout(() => {
+                          navCallback();
+                        }, 0);
                       }
                     }
                   }}
@@ -1789,39 +1816,16 @@ export default function ReaderSetting() {
 
       {/* ── 📌 หน้าต่างกล่อง Modal สำหรับปรับขนาด/ครอบรูปโปรไฟล์ ── */}
       {avatarToCrop && (
-        <div className="crop-modal-overlay" onClick={(e) => e.stopPropagation()} style={{
-          position: "fixed",
-          top: 0, left: 0, right: 0, bottom: 0,
-          background: "rgba(0, 0, 0, 0.6)",
-          display: "flex", justifyContent: "center", alignItems: "center",
-          zIndex: 99999, padding: "20px"
-        }}>
-          <div className="crop-modal-container" style={{
-            background: "#ffffff",
-            padding: "24px",
-            borderRadius: "20px",
-            width: "100%",
-            maxWidth: "500px",
-            boxShadow: "0 10px 25px rgba(0,0,0,0.2)",
-            display: "flex",
-            flexDirection: "column",
-            gap: "16px"
-          }}>
-            <h3 style={{ fontSize: "1.1rem", fontWeight: 800, margin: 0, color: "#1e293b", textAlign: "center" }}>📐 ปรับขนาดและครอบรูปโปรไฟล์</h3>
+        <div className="crop-modal-overlay" onClick={(e) => e.stopPropagation()}>
+          <div className="crop-modal-container">
+            <h3 className="crop-modal-title">📐 ปรับขนาดและครอบรูปโปรไฟล์</h3>
             
-            <div className="crop-cropper-wrapper" style={{
-              position: "relative",
-              width: "100%",
-              height: "280px",
-              background: "#334155",
-              borderRadius: "12px",
-              overflow: "hidden"
-            }}>
+            <div className="crop-cropper-wrapper">
               <Cropper
                 image={avatarToCrop}
                 crop={crop}
                 zoom={zoom}
-                aspect={1 / 1} // สัดส่วนรูปโปรไฟล์เป็นสี่เหลี่ยมจัตุรัส 1:1
+                aspect={1 / 1}
                 onCropChange={setCrop}
                 onCropComplete={(croppedArea, croppedAreaPixels) => setCroppedAreaPixels(croppedAreaPixels)}
                 onZoomChange={setZoom}
@@ -1829,8 +1833,8 @@ export default function ReaderSetting() {
             </div>
 
             {/* แถบควบคุมการซูม */}
-            <div className="crop-controls" style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-              <label style={{ fontSize: "0.85rem", fontWeight: 700, color: "#64748b", whiteSpace: "nowrap" }}>🔍 ซูมภาพ:</label>
+            <div className="crop-controls">
+              <label className="crop-zoom-label">🔍 ซูมภาพ:</label>
               <input
                 type="range"
                 value={zoom}
@@ -1839,15 +1843,14 @@ export default function ReaderSetting() {
                 step={0.1}
                 aria-label="Zoom"
                 onChange={(e) => setZoom(Number(e.target.value))}
-                style={{ flex: 1, cursor: "pointer" }}
+                className="crop-zoom-slider"
               />
             </div>
 
-            <div className="crop-modal-actions" style={{ display: "flex", justifyContent: "flex-end", gap: "10px", marginTop: "8px" }}>
+            <div className="crop-modal-actions">
               <button 
                 type="button" 
                 className="btn btn-outline"
-                style={{ padding: "8px 16px", borderRadius: "10px", fontSize: "0.85rem", fontWeight: 700 }}
                 onClick={() => setAvatarToCrop(null)}
                 disabled={isCroppingAvatar}
               >
@@ -1856,7 +1859,6 @@ export default function ReaderSetting() {
               <button 
                 type="button" 
                 className="btn btn-pink"
-                style={{ padding: "8px 16px", borderRadius: "10px", fontSize: "0.85rem", fontWeight: 700 }}
                 onClick={handleSaveAvatarCrop}
                 disabled={isCroppingAvatar}
               >

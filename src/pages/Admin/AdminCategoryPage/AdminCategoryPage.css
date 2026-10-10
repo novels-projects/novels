@@ -8,7 +8,7 @@
 }
 
 .admin-categories-content {
-  max-width: 1000px;
+  max-width: 900px;
   margin: 0 auto;
 }
 
@@ -211,7 +211,34 @@
   border: 1.5px solid #f1f5f9;
   box-shadow: 0 8px 24px rgba(15, 23, 42, 0.04), 0 2px 6px rgba(15, 23, 42, 0.02);
   overflow: hidden;
+}
+
+.admin-table-scroll-wrapper {
+  width: 100%;
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: #F472B6 #FFF0F8;
+  padding-bottom: 4px;
+}
+
+.admin-table-scroll-wrapper::-webkit-scrollbar {
+  height: 6px;
+  display: block;
+}
+
+.admin-table-scroll-wrapper::-webkit-scrollbar-track {
+  background: #FFF0F8;
+  border-radius: 999px;
+}
+
+.admin-table-scroll-wrapper::-webkit-scrollbar-thumb {
+  background: #F472B6;
+  border-radius: 999px;
+}
+
+.admin-table-scroll-wrapper::-webkit-scrollbar-thumb:hover {
+  background: #E91E8C;
 }
 
 .admin-table-loading {
@@ -251,7 +278,8 @@
 .admin-table {
   width: 100%;
   min-width: 680px;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
   text-align: left;
   table-layout: fixed;
 }
@@ -262,11 +290,26 @@
 }
 
 .admin-table th {
-  padding: 10px 14px;
+  background-color: #fff0f6 !important;
+  padding: 12px 14px;
   font-size: 0.84rem;
   color: #db2777 !important;
   font-weight: 700;
   white-space: nowrap;
+  border-bottom: 1.5px solid #fce7f3;
+  box-sizing: border-box;
+  letter-spacing: 0.01em;
+}
+
+.admin-table th:first-child,
+.admin-table td:first-child {
+  padding-left: 20px;
+}
+
+.admin-table th:last-child,
+.admin-table td:last-child {
+  padding-right: 20px;
+  overflow: visible !important;
 }
 
 /* Zebra rows & Soft pink hover */
@@ -279,13 +322,16 @@
 }
 
 .admin-table td {
-  padding: 8px 14px;
+  padding: 11px 14px;
   border-bottom: 1px solid #f9eff4;
   font-size: 0.84rem;
   color: #334155;
   vertical-align: middle;
+  line-height: 1.45;
   overflow-wrap: anywhere;
   word-break: break-word;
+  overflow: hidden;
+  box-sizing: border-box;
 }
 
 .admin-table tr:last-child td {
@@ -362,13 +408,16 @@
   justify-content: center !important;
   width: 100%;
   margin: 0 auto;
+  overflow: visible !important;
+  box-sizing: border-box;
+  flex-wrap: nowrap;
 }
 
 .btn-icon-action {
   background: #ffffff;
-  border: 1px solid #e2e8f0;
+  border: 1.5px solid #e2e8f0;
   border-radius: 6px;
-  padding: 4px 10px;
+  padding: 5px 11px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -379,6 +428,11 @@
   cursor: pointer;
   transition: all 0.15s ease;
   font-family: inherit;
+  box-sizing: border-box;
+  position: relative;
+  z-index: 2;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .btn-edit-user:hover:not(:disabled) {

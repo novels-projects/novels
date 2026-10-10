@@ -10,8 +10,11 @@ import ReactFlow, {
   useNodesState,
   useEdgesState,
   MarkerType,
+  BaseEdge,
+  EdgeLabelRenderer,
+  getSmoothStepPath,
 } from "reactflow";
-import { ArrowLeft, ChevronUp, ChevronDown, Info, Palette, Flame, GitFork } from "lucide-react";
+import { ArrowLeft, ChevronUp, ChevronDown, Info, Palette, Flame, GitFork, Eye, AlertTriangle, AlertCircle, Users, Trophy, Lock, BookOpen, FileText, Sparkles, Layers, RefreshCw, BarChart2, X } from "lucide-react";
 import axios from "axios";
 import "reactflow/dist/style.css";
 import "./StatisticsGraph.css";
@@ -26,9 +29,9 @@ const NODE_VERTICAL_GAP = 250;
 const CANVAS_MARGIN = 80;
 
 const VISITOR_SHADES = {
-  HIGH: { bg: "rgb(253, 203, 233)", border: "#CF8FA8", text: "#4A2635", label: "ผู้ชมมาก" },
-  MEDIUM: { bg: "#fadfea", border: "#E2B6C6", text: "#5C4650", label: "ผู้ชมปานกลาง" },
-  LOW: { bg: "rgb(253, 240, 245)", border: "#E8D5DE", text: "#5C4650", label: "ผู้ชมน้อย" },
+  HIGH: { bg: "#F3B7D2", border: "#D95791", text: "#54213A", label: "ผู้ชมมาก" },
+  MEDIUM: { bg: "#F9D7E6", border: "#E9A5C3", text: "#63364B", label: "ผู้ชมปานกลาง" },
+  LOW: { bg: "#FFF2F8", border: "#EBCBD9", text: "#704C5D", label: "ผู้ชมน้อย" },
 };
 
 // ---------------------------------------------------------------------------
@@ -51,12 +54,24 @@ const formatPercentage = (val) => {
 const getErrorMessage = (err, fallback = "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง") => {
   if (!err) return fallback;
   if (axios.isCancel(err)) return null;
-  return (
+
+  const status = err.response?.status;
+  if (status === 403) {
+    return "forbidden";
+  }
+
+  const rawMsg =
     err.response?.data?.error?.message ||
+    (typeof err.response?.data?.error === "string" ? err.response?.data?.error : null) ||
     err.response?.data?.message ||
     err.message ||
-    fallback
-  );
+    fallback;
+
+  if (typeof rawMsg === "string" && rawMsg.toLowerCase().includes("forbidden")) {
+    return "forbidden";
+  }
+
+  return rawMsg;
 };
 
 const normalizeId = (value) => {
@@ -65,8 +80,29 @@ const normalizeId = (value) => {
 };
 
 const stripHtml = (value) => {
-  if (typeof value !== "string") return value;
-  return value.replace(/<\/?[^>]+(>|$)/g, " ").replace(/\s+/g, " ").trim();
+  if (typeof value !== "string" || !value) return "";
+  let text = value;
+  if (typeof document !== "undefined") {
+    try {
+      const doc = new DOMParser().parseFromString(value, "text/html");
+      text = doc.body.textContent || doc.body.innerText || "";
+    } catch {
+      text = value.replace(/<[^>]+>/g, " ");
+    }
+  } else {
+    text = value.replace(/<[^>]+>/g, " ");
+  }
+
+  return text
+    .replace(/\u00a0/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/\s+/g, " ")
+    .trim();
 };
 
 const getEndingTypeColor = (typeStr) => {
@@ -93,14 +129,19 @@ const getEndingTypeColor = (typeStr) => {
 };
 
 const getNodeId = (node) => normalizeId(node?.ID ?? node?.id ?? node?.SceneID ?? node?.scene_id);
-const isPublishedSceneAndChapter = (node) =>
-  String(node?.status ?? node?.Status ?? "").trim().toLowerCase() === "published";
+const isPublishedSceneAndChapter = (node) => {
+  const status = String(node?.status ?? node?.Status ?? "").trim().toLowerCase();
+  const isPub = node?.is_published ?? node?.IsPublished ?? node?.isPublished;
+  return status === "published" || isPub === true || isPub === 1 || String(isPub).toLowerCase() === "true";
+};
 const isReaderAccessibleNovel = (novel) => {
+  if (!novel) return false;
   const status = String(novel?.status ?? novel?.Status ?? "").trim().toLowerCase();
-  return (novel?.is_published ?? novel?.IsPublished) === true &&
-    (novel?.is_banned ?? novel?.IsBanned) !== true &&
-    status !== "suspended" &&
-    status !== "banned";
+  const isPub = novel?.is_published ?? novel?.IsPublished;
+  const isPublished = isPub === true || isPub === 1 || String(isPub).toLowerCase() === "true" || status === "published";
+  const isBan = novel?.is_banned ?? novel?.IsBanned;
+  const isBanned = isBan === true || isBan === 1 || String(isBan).toLowerCase() === "true" || status === "suspended" || status === "banned";
+  return isPublished && !isBanned;
 };
 
 const getNodeType = (node) => {
@@ -117,7 +158,7 @@ const getNodeType = (node) => {
 const getNodeTitle = (node) => stripHtml(node?.Title || node?.title || node?.Label || node?.label || `ฉากที่ ${getNodeId(node)}`);
 const getNodeChapter = (node) => stripHtml(node?.ChapterTitle || node?.chapter_title || node?.chapter || node?.chapterName || node?.chapter_name || "");
 
-// 🟢 Custom Node Component (Requirement 8 - Update drop-off labels)
+// 🟢 Custom Node Component (AnalyticsNode)
 const AnalyticsNode = ({ data }) => {
   const isSelected = data.isSelected;
   const isEnding = data.isEnding;
@@ -128,16 +169,15 @@ const AnalyticsNode = ({ data }) => {
   if (data.visitors >= (data.highMax || 1600)) shade = VISITOR_SHADES.HIGH;
   else if (data.visitors >= (data.midMax || 800)) shade = VISITOR_SHADES.MEDIUM;
 
+  const accentColor = isSelected ? "#D95791" : (isMaxDrop ? "#E11D48" : (isHighExit ? "#F59E0B" : shade.border));
+
   const nodeStyle = {
     backgroundColor: shade.bg,
     color: shade.text,
     position: "relative",
-    borderColor: isSelected ? "#2563eb" : (isMaxDrop ? "#ef4444" : (isHighExit ? "#f97316" : shade.border)),
-    borderWidth: isSelected ? "2px" : "1.5px",
+    borderColor: accentColor,
+    borderWidth: isSelected ? "2.5px" : (isMaxDrop || isHighExit ? "2px" : "1.5px"),
   };
-
-  const type = stripHtml(data.type || "").toLowerCase();
-  const typeIcon = type === "start" || type === "starting" ? "▶ " : (type === "ending" || type === "end" ? "🏆 " : "");
 
   return (
     <div
@@ -146,72 +186,357 @@ const AnalyticsNode = ({ data }) => {
       } ${data.hasActiveSelection && !isSelected ? "dimmed" : ""}`}
       style={nodeStyle}
     >
-      <Handle type="target" position={Position.Top} style={{ background: isSelected ? "#2563eb" : (isMaxDrop ? "#ef4444" : (isHighExit ? "#f97316" : shade.border)), width: 8, height: 8 }} />
+      <Handle type="target" position={Position.Top} style={{ background: accentColor, width: 8, height: 8 }} />
 
-      {/* Badge สัญลักษณ์ไฟทรงวงกลมสีแดงมุมขวาบน สำหรับฉากที่มีอัตราผู้ชมออกสูงสุด */}
-      {isMaxDrop && (
-        <div 
-          className="wsg-node-badge-circle max-drop"
-          title={`ฉากที่มีอัตราผู้ชมออกสูงสุด: ${formatPercentage(data.exitRate)} - ฉากที่ต้องปรับปรุง`}
-        >
-          <Flame size={12} strokeWidth={2.5} color="#ffffff" style={{ flexShrink: 0 }} />
-          <span style={{ fontSize: "0.58rem", fontWeight: 800, lineHeight: 1, marginTop: "1px" }}>
-            {formatPercentage(data.exitRate)}
-          </span>
-        </div>
-      )}
-
-      {/* Badge สัญลักษณ์เตือนทรงวงกลมสีส้มมุมขวาบน สำหรับฉากที่มีอัตราผู้ชมออกจากฉากสูง (≥ 25%) */}
-      {isHighExit && (
-        <div 
-          className="wsg-node-badge-circle high-exit"
-          title={`จุดที่มีอัตราผู้ชมออกจากฉากสูง (≥25%): ${formatPercentage(data.exitRate)}`}
-        >
-          <span style={{ fontSize: "0.65rem", lineHeight: 1 }}>⚠️</span>
-          <span style={{ fontSize: "0.58rem", fontWeight: 800, lineHeight: 1, marginTop: "1px" }}>
-            {formatPercentage(data.exitRate)}
-          </span>
-        </div>
-      )}
-
-      <div className="wsg-node-header">
+      {/* 1. แถวบน: Capsule Pill ฉากทางซ้าย + Capsule Pill ระดับผู้ชมทางขวา */}
+      <div className="wsg-node-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+        {/* ฉากที่ X.X (ปรับระยะ padding และ line-height เพื่อจัดให้อยู่กึ่งกลางแนวตั้งพอดีช่อง) */}
         <span 
-          className="wsg-node-label" 
           style={{ 
-            backgroundColor: isMaxDrop ? "#fee2e2" : (isHighExit ? "#ffedd5" : "rgba(0, 0, 0, 0.05)"), 
-            color: isMaxDrop ? "#dc2626" : (isHighExit ? "#c2410c" : shade.text),
-            fontWeight: 800
+            backgroundColor: "#ffffff",
+            border: `1.5px solid ${shade.border}`,
+            color: shade.text,
+            fontSize: "0.76rem", 
+            fontWeight: 800, 
+            padding: "4px 10px 2px 10px",
+            borderRadius: "16px",
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.03)",
+            lineHeight: 1.25
           }}
         >
-          {typeIcon}{data.labelNum || "ฉาก"}
+          {data.labelNum || "ฉากนิยาย"}
         </span>
 
-        <div className="wsg-node-status-badge">
-          <span style={{ fontSize: "0.7rem", fontWeight: 600, color: shade.text, opacity: 0.85 }}>
-            {shade.label}
-          </span>
-        </div>
+        {/* ป้ายบอกระดับผู้ชม (ผู้ชมมาก / ผู้ชมปานกลาง / ผู้ชมน้อย) */}
+        <span 
+          style={{ 
+            backgroundColor: "rgba(255, 255, 255, 0.65)",
+            color: shade.text,
+            fontSize: "0.72rem", 
+            fontWeight: 700, 
+            padding: "3px 10px",
+            borderRadius: "16px",
+            display: "inline-flex",
+            alignItems: "center",
+            lineHeight: 1,
+            boxShadow: "0 1px 2px rgba(0,0,0,0.02)"
+          }}
+        >
+          {shade.label}
+        </span>
       </div>
       
-      <h4 className="wsg-node-title" title={data.title} style={{ color: shade.text, fontWeight: 800 }}>
-        {data.title || "ไม่มีชื่อฉาก"}
-      </h4>
+      {/* 2. ส่วนกลาง: ชื่อฉาก + ตัวอย่างเนื้อหา (รองรับ React Quill HTML / Unescape &nbsp;) */}
+      <div style={{ marginBottom: "8px" }}>
+        <h4 
+          className="wsg-node-title" 
+          title={data.title} 
+          style={{ 
+            color: shade.text, 
+            fontWeight: 800, 
+            fontSize: "0.95rem", 
+            margin: "0 0 3px 0",
+            lineHeight: 1.25,
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap"
+          }}
+        >
+          {data.title || "ไม่มีชื่อฉาก"}
+        </h4>
+
+        <p 
+          style={{ 
+            margin: 0, 
+            fontSize: "0.74rem", 
+            color: shade.text, 
+            opacity: 0.7,
+            fontWeight: 500,
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap"
+          }}
+          title={data.preview || "ไม่มีข้อความตัวอย่างเนื้อหา"}
+        >
+          {data.preview || "ไม่มีข้อความตัวอย่างเนื้อหา"}
+        </p>
+      </div>
       
-      <div className="wsg-node-stats" style={{ color: shade.text, fontWeight: 700 }}>
-        <div className="wsg-node-stat-item">
-          <span style={{ opacity: 0.85, color: shade.text, fontWeight: 700 }}>ผู้ชม:</span>
-          <strong style={{ color: shade.text, fontWeight: 800 }}>{formatNumber(data.visitors)}</strong>
-        </div>
-        <div className="wsg-node-stat-item">
-          <span style={{ opacity: 0.85, color: shade.text, fontWeight: 700 }}>Exit Rate:</span>
-          <strong style={{ color: isMaxDrop ? "#dc2626" : (isHighExit ? "#ea580c" : shade.text), fontWeight: 800 }}>
-            {isEnding ? "-" : formatPercentage(data.exitRate)}
+      {/* 3. เส้นแบ่งแนวนอนเรียบเนียน (ลบเส้นประออก) */}
+      <div style={{ borderTop: "1px solid rgba(84, 33, 58, 0.12)", margin: "6px 0 8px 0" }} />
+
+      {/* 4. แถวล่าง: [ 👁️ ผู้ชม 1,203 ]  |  [ Exit Rate: สัญลักษณ์แจ้งเตือน + % ] */}
+      <div 
+        className="wsg-node-stats" 
+        style={{ 
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          color: shade.text, 
+          fontSize: "0.78rem"
+        }}
+      >
+        {/* ด้านซ้าย: 👁️ ผู้ชม 1,203 */}
+        <div style={{ display: "inline-flex", alignItems: "center", gap: "5px", lineHeight: 1 }}>
+          <Eye size={15} strokeWidth={2.2} style={{ color: shade.text, opacity: 0.85, flexShrink: 0, display: "block" }} />
+          <span style={{ opacity: 0.8, fontWeight: 600, fontSize: "0.76rem", lineHeight: 1, display: "inline-block" }}>ผู้ชม</span>
+          <strong style={{ color: shade.text, fontWeight: 800, fontSize: "0.85rem", lineHeight: 1, display: "inline-block" }}>
+            {formatNumber(data.visitors)}
           </strong>
+        </div>
+
+        {/* เส้นแบ่งแนวตั้งกลางแถวล่าง */}
+        <div 
+          style={{ 
+            width: "1px", 
+            height: "16px", 
+            backgroundColor: "rgba(84, 33, 58, 0.18)",
+            margin: "0 6px"
+          }} 
+        />
+
+        {/* ด้านขวา: Exit Rate + สัญลักษณ์แจ้งเตือนหลังคำว่า Exit Rate */}
+        <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+          <span style={{ opacity: 0.8, fontWeight: 600 }}>Exit Rate</span>
+
+          {/* สัญลักษณ์แจ้งเตือน ออกสูงสุด (🔥) หลังคำว่า Exit Rate */}
+          {isMaxDrop && (
+            <span 
+              style={{ 
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "2px",
+                backgroundColor: "#E11D48",
+                color: "#ffffff",
+                padding: "1px 6px",
+                borderRadius: "10px",
+                fontSize: "0.7rem",
+                fontWeight: 800,
+                boxShadow: "0 2px 5px rgba(225, 29, 72, 0.3)"
+              }}
+              title={`ฉากที่มีอัตราผู้ชมออกสูงสุด: ${formatPercentage(data.exitRate)}`}
+            >
+              <Flame size={11} strokeWidth={2.5} color="#ffffff" style={{ flexShrink: 0 }} />
+              <span>{formatPercentage(data.exitRate)}</span>
+            </span>
+          )}
+
+          {/* สัญลักษณ์แจ้งเตือน ออกสูง ≥25% (⚠️) หลังคำว่า Exit Rate */}
+          {isHighExit && (
+            <span 
+              style={{ 
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "2px",
+                backgroundColor: "#F59E0B",
+                color: "#ffffff",
+                padding: "1px 6px",
+                borderRadius: "10px",
+                fontSize: "0.7rem",
+                fontWeight: 800,
+                boxShadow: "0 2px 5px rgba(245, 158, 11, 0.3)"
+              }}
+              title={`จุดที่มีอัตราผู้ชมออกจากฉากสูง (≥25%): ${formatPercentage(data.exitRate)}`}
+            >
+              <AlertTriangle size={10} strokeWidth={2.5} color="#ffffff" style={{ flexShrink: 0 }} />
+              <span>{formatPercentage(data.exitRate)}</span>
+            </span>
+          )}
+
+          {/* กรณี Exit Rate ปกติ (<25%) */}
+          {!isMaxDrop && !isHighExit && (
+            <strong style={{ color: shade.text, fontWeight: 800, fontSize: "0.88rem" }}>
+              {isEnding ? "-" : formatPercentage(data.exitRate)}
+            </strong>
+          )}
         </div>
       </div>
 
-      <Handle type="source" position={Position.Bottom} style={{ background: isSelected ? "#2563eb" : (isMaxDrop ? "#ef4444" : (isHighExit ? "#f97316" : shade.border)), width: 8, height: 8 }} />
+      <Handle type="source" position={Position.Bottom} style={{ background: accentColor, width: 8, height: 8 }} />
     </div>
+  );
+};
+
+let cachedAnalyticsPathElement = null;
+const getPointOnAnalyticsSvgPath = (pathD, ratio = 0.5) => {
+  if (typeof document === "undefined" || !pathD) return null;
+  try {
+    if (!cachedAnalyticsPathElement) {
+      cachedAnalyticsPathElement = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    }
+    cachedAnalyticsPathElement.setAttribute("d", pathD);
+    const totalLen = cachedAnalyticsPathElement.getTotalLength();
+    if (!totalLen || isNaN(totalLen)) return null;
+    const pt = cachedAnalyticsPathElement.getPointAtLength(totalLen * ratio);
+    return { x: pt.x, y: pt.y, totalLen };
+  } catch (e) {
+    return null;
+  }
+};
+
+// 🟢 Custom Edge Component (AnalyticsEdge) - จัดวางข้อความทางเลือกให้อยู่ในช่องข้อความบนเส้นเชื่อม 100%
+const AnalyticsEdge = ({
+  id,
+  sourceX,
+  sourceY,
+  targetX,
+  targetY,
+  sourcePosition,
+  targetPosition,
+  style = {},
+  markerEnd,
+  label,
+  data,
+  selected,
+}) => {
+  const outIndex = data?.outIndex ?? 0;
+  const outCount = data?.outCount ?? 1;
+  const inIndex = data?.inIndex ?? 0;
+  const inCount = data?.inCount ?? 1;
+  const allEdges = data?.allEdges || [];
+  const allNodes = data?.allNodes || [];
+  const source = data?.source;
+  const target = data?.target;
+
+  let adjustedSourceX = sourceX;
+  let adjustedTargetX = targetX;
+
+  if (outCount > 1) {
+    const maxWidth = Math.min(180, (outCount - 1) * 36);
+    const step = maxWidth / (outCount - 1);
+    adjustedSourceX = (sourceX - maxWidth / 2) + outIndex * step;
+  }
+
+  if (inCount > 1) {
+    const maxWidth = Math.min(180, (inCount - 1) * 36);
+    const step = maxWidth / (inCount - 1);
+    adjustedTargetX = (targetX - maxWidth / 2) + inIndex * step;
+  }
+
+  const samePairEdges = allEdges.filter(
+    (e) => String(e.source) === String(source) && String(e.target) === String(target)
+  );
+  const pairIndex = samePairEdges.findIndex((e) => String(e.id) === String(id));
+  const pairCount = samePairEdges.length;
+
+  const baseOffset = 28;
+  const outStep = 32;
+  const pairStep = 32;
+  const edgeOffset = baseOffset + (outIndex * outStep) + ((pairIndex > 0 ? pairIndex : 0) * pairStep);
+
+  const [edgePath, defaultLabelX, defaultLabelY] = getSmoothStepPath({
+    sourceX: adjustedSourceX,
+    sourceY,
+    sourcePosition,
+    targetX: adjustedTargetX,
+    targetY,
+    targetPosition,
+    borderRadius: 14,
+    offset: edgeOffset,
+  });
+
+  const badgeWidth = 140;
+  const badgeHeight = 24;
+
+  let baseRatio = 0.5;
+  if (outCount > 1) {
+    const step = 0.48 / Math.max(1, outCount - 1);
+    baseRatio = 0.26 + outIndex * step;
+  } else if (pairCount > 1) {
+    const step = 0.48 / Math.max(1, pairCount - 1);
+    baseRatio = 0.26 + pairIndex * step;
+  }
+
+  const candidateRatios = [
+    baseRatio,
+    baseRatio - 0.06, baseRatio + 0.06,
+    baseRatio - 0.12, baseRatio + 0.12,
+    baseRatio - 0.18, baseRatio + 0.18,
+    0.5, 0.4, 0.6, 0.3, 0.7, 0.25, 0.75
+  ].filter((r) => r >= 0.12 && r <= 0.88);
+
+  let labelX = defaultLabelX;
+  let labelY = defaultLabelY;
+  let selectedPt = null;
+
+  const isPointInsideAnyNode = (px, py) => {
+    for (const node of allNodes) {
+      const nx = node.position?.x ?? node.x ?? 0;
+      const ny = node.position?.y ?? node.y ?? 0;
+
+      const left = nx - 10 - badgeWidth / 2;
+      const right = nx + 260 + 10 + badgeWidth / 2;
+      const top = ny - 10 - badgeHeight / 2;
+      const bottom = ny + 118 + 10 + badgeHeight / 2;
+
+      if (px >= left && px <= right && py >= top && py <= bottom) {
+        return true;
+      }
+    }
+    return false;
+  };
+
+  for (const ratio of candidateRatios) {
+    const pt = getPointOnAnalyticsSvgPath(edgePath, ratio);
+    if (pt) {
+      if (!isPointInsideAnyNode(pt.x, pt.y)) {
+        selectedPt = pt;
+        break;
+      }
+      if (!selectedPt) selectedPt = pt;
+    }
+  }
+
+  if (selectedPt) {
+    labelX = selectedPt.x;
+    labelY = selectedPt.y;
+  }
+
+  return (
+    <>
+      <BaseEdge id={id} path={edgePath} style={style} markerEnd={markerEnd} />
+      {label && (
+        <EdgeLabelRenderer>
+          <div
+            style={{
+              position: "absolute",
+              transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
+              pointerEvents: "all",
+              zIndex: 1000,
+            }}
+            className="nodrag nopan"
+          >
+            <div 
+              className={`wsg-edge-label-wrap ${selected ? "highlighted" : ""}`}
+              style={{
+                backgroundColor: "#ffffff",
+                border: `1.5px solid ${style.stroke || "#64748b"}`,
+                borderRadius: "10px",
+                padding: "4px 10px",
+                fontSize: "0.75rem",
+                fontWeight: 700,
+                color: "#1e293b",
+                boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
+                whiteSpace: "nowrap",
+                maxWidth: "260px",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                textAlign: "center",
+              }}
+              title={typeof label === "string" ? label : undefined}
+            >
+              {label}
+            </div>
+          </div>
+        </EdgeLabelRenderer>
+      )}
+    </>
   );
 };
 
@@ -259,17 +584,22 @@ const getSceneTypeBadge = (typeStr) => {
   );
 };
 
+const nodeTypes = {
+  analyticsNode: AnalyticsNode,
+};
+
+const edgeTypes = {
+  analyticsEdge: AnalyticsEdge,
+};
+
 function StatisticsGraph() {
   const { novelId } = useParams();
   const navigate = useNavigate();
-
-  const nodeTypes = useMemo(() => ({
-    analyticsNode: AnalyticsNode,
-  }), []);
   
   const [novelTitle, setNovelTitle] = useState("นิยายของฉัน");
   const [treeData, setTreeData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isDataLoaded, setIsDataLoaded] = useState(false);
   const [error, setError] = useState(null);
   const [isNovelReaderAccessible, setIsNovelReaderAccessible] = useState(false);
   
@@ -301,8 +631,14 @@ function StatisticsGraph() {
   const [highlightedChoiceId, setHighlightedChoiceId] = useState(null);
   const [hasInteractedWithNode, setHasInteractedWithNode] = useState(false);
 
-  // Legend Collapse State
+  // Legend & Modal Popup States
   const [isLegendOpen, setIsLegendOpen] = useState(true);
+  const [isModalDismissed, setIsModalDismissed] = useState(false);
+
+  useEffect(() => {
+    setIsDataLoaded(false);
+    setIsModalDismissed(false);
+  }, [novelId]);
 
   // Clean up abort controllers on unmount
   useEffect(() => {
@@ -324,6 +660,7 @@ function StatisticsGraph() {
     mainAbortRef.current = controller;
 
     setIsLoading(true);
+    setIsDataLoaded(false);
     setError(null);
     setIsEdgeLoading(true);
     setEdgeError(null);
@@ -341,6 +678,10 @@ function StatisticsGraph() {
         axios.get(`${API_BASE_URL}/api/v1/writer/novels/${novelId}/analytics/edges`, { headers, signal: controller.signal }),
         axios.get(`${API_BASE_URL}/api/me/novels`, { headers, signal: controller.signal }),
       ]);
+
+      if (controller.signal.aborted || mainAbortRef.current !== controller) {
+        return;
+      }
       
       // Process story tree
       if (treeSettled.status === "fulfilled") {
@@ -385,24 +726,51 @@ function StatisticsGraph() {
       }
 
       if (novelsSettled.status === "fulfilled") {
-        const responseData = novelsSettled.value.data?.data || novelsSettled.value.data || {};
-        const novels = responseData?.novels || [];
+        const rawNovelsData = novelsSettled.value.data;
+        const responseData = rawNovelsData?.data || rawNovelsData || {};
+        const novels = Array.isArray(rawNovelsData)
+          ? rawNovelsData
+          : Array.isArray(responseData)
+          ? responseData
+          : Array.isArray(responseData?.novels)
+          ? responseData.novels
+          : Array.isArray(rawNovelsData?.novels)
+          ? rawNovelsData.novels
+          : [];
         const currentNovel = Array.isArray(novels)
           ? novels.find((novel) => normalizeId(novel?.novel_id ?? novel?.ID ?? novel?.id) === normalizeId(novelId))
           : null;
-        setIsNovelReaderAccessible(isReaderAccessibleNovel(currentNovel));
+        let accessible = isReaderAccessibleNovel(currentNovel);
+        if (!accessible && currentNovel === null) {
+          const tree = treeSettled.status === "fulfilled" ? (treeSettled.value.data?.data || treeSettled.value.data) : null;
+          if (tree && isReaderAccessibleNovel(tree)) {
+            accessible = true;
+          } else if (scenesAnalyticsSettled.status === "fulfilled" && ((Array.isArray(scenesAnalyticsSettled.value.data?.data) && scenesAnalyticsSettled.value.data.data.length > 0) || (Array.isArray(scenesAnalyticsSettled.value.data) && scenesAnalyticsSettled.value.data.length > 0))) {
+            accessible = true;
+          }
+        }
+        setIsNovelReaderAccessible(accessible);
       } else if (!axios.isCancel(novelsSettled.reason)) {
-        console.error("Novel publication status fetch error:", novelsSettled.reason);
-        setError(getErrorMessage(novelsSettled.reason, "ไม่สามารถตรวจสอบสถานะการเผยแพร่นิยายได้"));
+        const hasAnalyticsData = scenesAnalyticsSettled.status === "fulfilled" || analyticsSettled.status === "fulfilled";
+        if (hasAnalyticsData) {
+          setIsNovelReaderAccessible(true);
+        } else {
+          console.error("Novel publication status fetch error:", novelsSettled.reason);
+          setError(getErrorMessage(novelsSettled.reason, "ไม่สามารถตรวจสอบสถานะการเผยแพร่นิยายได้"));
+        }
       }
     } catch (err) {
+      if (controller.signal.aborted || mainAbortRef.current !== controller) return;
       if (!axios.isCancel(err)) {
         console.error("Error fetching analytics data:", err);
         setError(getErrorMessage(err, "ไม่สามารถดึงข้อมูลนิยายและสถิติได้ กรุณาลองใหม่อีกครั้ง"));
       }
     } finally {
-      setIsLoading(false);
-      setIsEdgeLoading(false);
+      if (!controller.signal.aborted && mainAbortRef.current === controller) {
+        setIsLoading(false);
+        setIsEdgeLoading(false);
+        setIsDataLoaded(true);
+      }
     }
   }, [novelId]);
 
@@ -488,12 +856,16 @@ function StatisticsGraph() {
     fetchData();
   }, [fetchData]);
 
-  const rawNodes = treeData?.Nodes ?? treeData?.nodes ?? [];
+  const rawNodes = useMemo(() => {
+    if (Array.isArray(treeData)) return treeData;
+    return treeData?.Nodes ?? treeData?.nodes ?? treeData?.data?.nodes ?? [];
+  }, [treeData]);
+
   // ใช้รายการ Scene และ Edge จาก Analytics API ซึ่ง Backend กรอง Reachability ตาม Reader Flow แล้ว
   // เพื่อไม่คำนวณหรือทำซ้ำกติกา Reachability ในหน้า Analytics
   const reachableSceneIds = useMemo(
     () => new Set((Array.isArray(allScenesAnalytics) ? allScenesAnalytics : [])
-      .map((scene) => normalizeId(scene?.scene_id ?? scene?.SceneID))
+      .map((scene) => normalizeId(scene?.scene_id ?? scene?.SceneID ?? scene?.id ?? scene?.ID))
       .filter(Boolean)),
     [allScenesAnalytics]
   );
@@ -501,9 +873,11 @@ function StatisticsGraph() {
   const uniqueNodes = useMemo(() => {
     const seen = new Set();
     if (!isNovelReaderAccessible) return [];
+    const hasReachabilityData = reachableSceneIds.size > 0;
     return rawNodes.filter((scene) => {
       const id = getNodeId(scene);
-      if (!id || seen.has(id) || !isPublishedSceneAndChapter(scene) || !reachableSceneIds.has(id)) return false;
+      if (!id || seen.has(id) || !isPublishedSceneAndChapter(scene)) return false;
+      if (hasReachabilityData && !reachableSceneIds.has(id)) return false;
       seen.add(id);
       return true;
     });
@@ -826,12 +1200,16 @@ function StatisticsGraph() {
 
       const isMaxDrop = !isEnding && maxExitRate >= 25 && exitRate === maxExitRate;
 
+      const rawContent = scene?.content ?? scene?.Content ?? scene?.summary ?? scene?.Summary ?? scene?.description ?? scene?.Description ?? scene?.preview ?? scene?.Preview ?? "";
+      const previewText = stripHtml(rawContent);
+
       finalNodes.push({
         id: sceneId,
         type: "analyticsNode",
         position: { x: finalX, y: finalY },
         data: {
           title: getNodeTitle(scene),
+          preview: previewText,
           labelNum: pos ? pos.display : "ฉากนิยาย",
           visitors: analytics.visitors,
           exitRate: analytics.exitRate,
@@ -847,9 +1225,30 @@ function StatisticsGraph() {
     });
 
     // Requirements 2, 3 & 4: Process edges with choice_id matching and proper 0% / loading / error / missing state rules
+    const outgoingCount = {};
+    const incomingCount = {};
+    edgeList.forEach((edge) => {
+      const src = normalizeId(edge.source);
+      const tgt = normalizeId(edge.target);
+      outgoingCount[src] = (outgoingCount[src] || 0) + 1;
+      incomingCount[tgt] = (incomingCount[tgt] || 0) + 1;
+    });
+
+    const outgoingIndex = {};
+    const incomingIndex = {};
+
     edgeList.forEach((edge) => {
       const src = edge.source;
       const tgt = edge.target;
+      const normSrc = normalizeId(src);
+      const normTgt = normalizeId(tgt);
+
+      const outIdx = outgoingIndex[normSrc] || 0;
+      outgoingIndex[normSrc] = outIdx + 1;
+
+      const inIdx = incomingIndex[normTgt] || 0;
+      incomingIndex[normTgt] = inIdx + 1;
+
       const choiceName = edge.label || "";
       const edgeChoiceId = normalizeId(
         edge.data?.choice_id ??
@@ -889,7 +1288,7 @@ function StatisticsGraph() {
       // Requirement 4: Edge percentage displays
       let edgeLabelDisplay = choiceName;
       let strokeWidth = 2.5;
-      let strokeColor = "#CBD5E1";
+      let strokeColor = "#C9A7B8";
       let hasData = false;
       let pctValue = null;
 
@@ -912,17 +1311,19 @@ function StatisticsGraph() {
           edgeLabelDisplay = choiceName ? `${choiceName} (${formattedPct})` : formattedPct;
 
           if (pctValue >= 60) {
-            strokeWidth = 4.5;
+            strokeWidth = 3.8;
             strokeColor = "#10B981";
           } else if (pctValue >= 30) {
-            strokeWidth = 3.5;
+            strokeWidth = 2.8;
             strokeColor = "#F59E0B";
           } else {
-            strokeWidth = 2.5;
-            strokeColor = "#94A3B8";
+            strokeWidth = 2.0;
+            strokeColor = "#64748B";
           }
         } else {
           edgeLabelDisplay = choiceName ? `${choiceName} (-)` : "-";
+          strokeColor = "#64748B";
+          strokeWidth = 2.0;
         }
       }
 
@@ -939,7 +1340,7 @@ function StatisticsGraph() {
         source: src,
         target: tgt,
         label: edgeLabelDisplay,
-        type: "smoothstep",
+        type: "analyticsEdge",
         animated: false,
         style: {
           stroke: strokeColor,
@@ -949,7 +1350,19 @@ function StatisticsGraph() {
           type: MarkerType.ArrowClosed,
           color: strokeColor,
         },
-        data: { pct: pctValue, hasData, choiceId: edgeChoiceId },
+        data: {
+          pct: pctValue,
+          hasData,
+          choiceId: edgeChoiceId,
+          allEdges: edgeList,
+          allNodes: finalNodes,
+          source: src,
+          target: tgt,
+          outIndex: outIdx,
+          outCount: outgoingCount[normSrc] || 1,
+          inIndex: inIdx,
+          inCount: incomingCount[normTgt] || 1,
+        },
       });
     });
 
@@ -966,6 +1379,10 @@ function StatisticsGraph() {
       setRfEdges(positionedElements.edges);
     }
   }, [positionedElements, treeData, setRfNodes, setRfEdges]);
+
+  const hasGraphNodes = Boolean((positionedElements?.nodes?.length > 0) || (rfNodes?.length > 0));
+  const displayNodes = rfNodes.length > 0 ? rfNodes : positionedElements.nodes;
+  const displayEdges = rfEdges.length > 0 ? rfEdges : positionedElements.edges;
 
   const onNodeClick = useCallback((event, node) => {
     setHasInteractedWithNode(true);
@@ -996,7 +1413,10 @@ function StatisticsGraph() {
   const focusNode = useCallback((sceneId) => {
     if (!reactFlowInstance || !sceneId) return;
 
-    const targetNode = reactFlowInstance.getNode(sceneId) || rfNodes.find((node) => node.id === sceneId);
+    const targetNode =
+      reactFlowInstance.getNode(sceneId) ||
+      rfNodes.find((node) => node.id === sceneId) ||
+      positionedElements.nodes.find((node) => node.id === sceneId);
     if (!targetNode) return;
 
     requestAnimationFrame(() => {
@@ -1010,7 +1430,7 @@ function StatisticsGraph() {
         { zoom: 1.1, duration: 500 }
       );
     });
-  }, [reactFlowInstance, rfNodes]);
+  }, [reactFlowInstance, rfNodes, positionedElements]);
 
   const onPreviousSceneClick = useCallback((sceneId) => {
     if (!sceneId) return;
@@ -1163,17 +1583,187 @@ function StatisticsGraph() {
     return result;
   }, [overallAnalytics]);
 
-  if (isLoading) {
+  if (isLoading || (!isDataLoaded && !error)) {
     return <LoadingScreen message="กำลังโหลดสถิติกราฟนิยาย..." />;
   }
 
   if (error) {
+    const isForbidden =
+      String(error).toLowerCase().includes("forbidden") ||
+      String(error).toLowerCase().includes("403") ||
+      String(error).toLowerCase().includes("unauthorized") ||
+      String(error).toLowerCase().includes("no permission");
+
+    if (isForbidden && !isModalDismissed) {
+      return (
+        <div className="wsg-page">
+          {/* Topbar */}
+          <header className="wsg-topbar">
+            <div className="wsg-topbar__left">
+              <button 
+                type="button"
+                className="wsg-topbar__back"
+                onClick={() => navigate(`/writer/${novelId}/chapters`)}
+                title="ย้อนกลับไปหน้ารายชื่อตอน"
+              >
+                <ArrowLeft size={16} />
+                <span>ย้อนกลับ</span>
+              </button>
+              <div className="wsg-topbar__divider-v" />
+              <h2 className="wsg-topbar__title" title={novelTitle}>
+                เรื่อง: {novelTitle.length > 28 ? `${novelTitle.slice(0, 28)}...` : novelTitle}
+              </h2>
+            </div>
+          </header>
+
+          <div 
+            onClick={(e) => {
+              if (e.target === e.currentTarget) {
+                setIsModalDismissed(true);
+              }
+            }}
+            style={{
+              position: "fixed",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: "rgba(15, 23, 42, 0.45)",
+              backdropFilter: "blur(4px)",
+              WebkitBackdropFilter: "blur(4px)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              zIndex: 9999,
+              padding: "20px"
+            }}
+          >
+            <div style={{
+              backgroundColor: "#ffffff",
+              padding: "40px 32px 32px 32px",
+              borderRadius: "24px",
+              border: "1.5px solid #fbcfe8",
+              boxShadow: "0 20px 40px rgba(0, 0, 0, 0.2)",
+              maxWidth: "520px",
+              width: "100%",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: "16px",
+              textAlign: "center",
+              position: "relative"
+            }}>
+              {/* ปุ่มกากบาทสำหรับปิด Pop-up Modal */}
+              <button
+                type="button"
+                onClick={() => setIsModalDismissed(true)}
+                title="ปิดหน้าต่างนี้"
+                style={{
+                  position: "absolute",
+                  top: "16px",
+                  right: "16px",
+                  background: "#f1f5f9",
+                  border: "none",
+                  borderRadius: "50%",
+                  width: "32px",
+                  height: "32px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: "#64748b",
+                  cursor: "pointer",
+                  transition: "all 0.2s ease"
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = "#e2e8f0";
+                  e.currentTarget.style.color = "#0f172a";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = "#f1f5f9";
+                  e.currentTarget.style.color = "#64748b";
+                }}
+              >
+                <X size={18} />
+              </button>
+              <div style={{
+                width: "64px",
+                height: "64px",
+                borderRadius: "50%",
+                backgroundColor: "#fce7f3",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center"
+              }}>
+                <Lock size={28} color="#be185d" />
+              </div>
+              
+              <h3 style={{ margin: 0, fontSize: "20px", fontWeight: 800, color: "#0f172a" }}>
+                ยังไม่มีข้อมูลสถิติสำหรับนิยายเรื่องนี้
+              </h3>
+              
+              <p style={{ margin: 0, fontSize: "14px", color: "#64748b", lineHeight: 1.6 }}>
+                นิยายหรือฉากเรื่องนี้ยังไม่ได้ถูกเผยแพร่ให้ผู้อ่านเข้าถึงได้ ระบบจะเริ่มรวบรวมและแสดงสถิติต่างๆ เมื่อมีฉากที่เปิดเผยแพร่ (Published) และมีผู้อ่านเข้าอ่านเนื้อหาแล้ว
+              </p>
+
+              <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", justifyContent: "center", marginTop: "8px" }}>
+                <button
+                  type="button"
+                  onClick={() => navigate(`/writer/${novelId}/chapters`)}
+                  style={{
+                    padding: "10px 20px",
+                    borderRadius: "14px",
+                    border: "none",
+                    background: "linear-gradient(135deg, #db2777 0%, #be185d 100%)",
+                    color: "#ffffff",
+                    fontWeight: 700,
+                    fontSize: "14px",
+                    cursor: "pointer",
+                    boxShadow: "0 4px 12px rgba(219, 39, 119, 0.25)",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "6px"
+                  }}
+                >
+                  <Layers size={16} /> ไปหน้าจัดการตอนเพื่อเผยแพร่
+                </button>
+                <button
+                  type="button"
+                  onClick={() => navigate(`/writer/${novelId}/storytree`)}
+                  style={{
+                    padding: "10px 20px",
+                    borderRadius: "14px",
+                    border: "1.5px solid #cbd5e1",
+                    background: "#ffffff",
+                    color: "#475569",
+                    fontWeight: 700,
+                    fontSize: "14px",
+                    cursor: "pointer",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "6px"
+                  }}
+                >
+                  <GitFork size={16} /> ไปหน้าโครงสร้างเนื้อเรื่อง
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="wsg-page">
         <div className="wst-loading-state">
-          <p className="wst-error-text">{error}</p>
-          <button className="wst-error-button" onClick={fetchData}>
-            โหลดใหม่อีกครั้ง
+          <AlertCircle size={36} color="#ef4444" style={{ marginBottom: "8px" }} />
+          <p className="wst-error-text" style={{ fontSize: "16px", fontWeight: "700", color: "#0f172a", margin: "0 0 8px 0" }}>
+            ไม่สามารถดึงข้อมูลสถิติได้
+          </p>
+          <p style={{ fontSize: "13.5px", color: "#64748b", margin: "0 0 20px 0", maxWidth: "380px", textAlign: "center" }}>
+            {error}
+          </p>
+          <button className="wst-error-button" onClick={fetchData} style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
+            <RefreshCw size={15} /> โหลดใหม่อีกครั้ง
           </button>
         </div>
       </div>
@@ -1241,7 +1831,10 @@ function StatisticsGraph() {
         {/* การ์ด 1: ยอดวิวรวม */}
         <div className="wsg-kpi-card-large">
           <div className="wsg-kpi-card-header">
-            <span className="wsg-kpi-label-new">👁️ ยอดวิวรวม</span>
+            <span className="wsg-kpi-label-new">
+              <Eye size={16} strokeWidth={2.2} style={{ color: "#2563eb", flexShrink: 0 }} />
+              <span>ยอดวิวรวม</span>
+            </span>
           </div>
           <div>
             <div className="wsg-kpi-val-large">
@@ -1254,7 +1847,10 @@ function StatisticsGraph() {
         {/* การ์ด 2: จำนวนคนอ่านจริง */}
         <div className="wsg-kpi-card-large">
           <div className="wsg-kpi-card-header">
-            <span className="wsg-kpi-label-new">👥 จำนวนคนอ่าน</span>
+            <span className="wsg-kpi-label-new">
+              <Users size={16} strokeWidth={2.2} style={{ color: "#0d9488", flexShrink: 0 }} />
+              <span>จำนวนคนอ่าน</span>
+            </span>
           </div>
           <div>
             <div className="wsg-kpi-val-large color-teal">
@@ -1267,7 +1863,10 @@ function StatisticsGraph() {
         {/* การ์ด 3: คนอ่านจบกี่คน / กี่ % */}
         <div className="wsg-kpi-card-large">
           <div className="wsg-kpi-card-header">
-            <span className="wsg-kpi-label-new">🏆 คนอ่านจบ</span>
+            <span className="wsg-kpi-label-new">
+              <Trophy size={16} strokeWidth={2.2} style={{ color: "#7c3aed", flexShrink: 0 }} />
+              <span>คนอ่านจบ</span>
+            </span>
           </div>
           <div>
             <div className="wsg-kpi-val-large color-purple">
@@ -1284,7 +1883,10 @@ function StatisticsGraph() {
         {/* การ์ด 4: จบแบบไหนบ้าง (เป็น %) */}
         <div className="wsg-kpi-card-large wsg-kpi-card-endings">
           <div className="wsg-kpi-card-header">
-            <span className="wsg-kpi-label-new">🏁 จบแบบไหนบ้าง (เป็น %)</span>
+            <span className="wsg-kpi-label-new">
+              <GitFork size={16} strokeWidth={2.2} style={{ color: "#db2777", flexShrink: 0 }} />
+              <span>จบแบบไหนบ้าง (เป็น %)</span>
+            </span>
           </div>
           <div className="wsg-endings-scroll-list">
             {mappedEndings.length === 0 ? (
@@ -1597,8 +2199,8 @@ function StatisticsGraph() {
                                     ปุ่ม: "{choice.label || "ไม่มีข้อความ"}"
                                   </span>
                                   {isTop && (
-                                    <span className="wsg-top-choice-badge" style={{ backgroundColor: "#d97706", color: "#ffffff", padding: "3px 8px", borderRadius: "12px", fontSize: "0.65rem", fontWeight: 800 }}>
-                                      🏆 ปุ่มที่นิยมที่สุด
+                                    <span className="wsg-top-choice-badge" style={{ backgroundColor: "#d97706", color: "#ffffff", padding: "3px 8px", borderRadius: "12px", fontSize: "0.65rem", fontWeight: 800, display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                                      <Trophy size={12} color="#ffffff" /> ปุ่มที่นิยมที่สุด
                                     </span>
                                   )}
                                 </div>
@@ -1628,7 +2230,7 @@ function StatisticsGraph() {
                       </div>
                     ) : (
                       <div className="wsg-empty-choices" style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "30px 10px" }}>
-                        <span style={{ fontSize: "2rem" }}>🔗</span>
+                        <GitFork size={28} color="#94a3b8" />
                         <p style={{ fontSize: "0.85rem", color: "#64748b", margin: 0, marginTop: "8px" }}>ฉากนี้ไม่มีปุ่มทางเลือก</p>
                       </div>
                     )}
@@ -1644,8 +2246,12 @@ function StatisticsGraph() {
           {/* ข้อความแนะนำเมื่อยังไม่ได้เลือกโหนดฉาก และยังไม่เคยคลิกเลือกโหนดมาก่อนในรอบการเข้าหน้านี้ */}
           {!hasInteractedWithNode && !selectedSceneId && (
             <div className="wsg-canvas-hint-pill">
-              <span className="wsg-canvas-hint-icon">💡</span>
-              <span className="wsg-canvas-hint-text">เลือกฉากที่เผยแพร่และผู้อ่านเข้าถึงได้ในแผนผัง เพื่อดูสถิติและการตัดสินใจเชิงลึก</span>
+              <Sparkles size={15} style={{ color: "#f59e0b", flexShrink: 0 }} />
+              <span className="wsg-canvas-hint-text">
+                {!hasGraphNodes
+                  ? "ยังไม่มีฉากที่เปิดเผยแพร่ให้นักอ่านเข้าถึงได้"
+                  : "เลือกฉากในแผนผังเพื่อดูสถิติและการตัดสินใจของนักอ่าน"}
+              </span>
             </div>
           )}
 
@@ -1657,7 +2263,7 @@ function StatisticsGraph() {
               onClick={() => setIsCollapsed(false)}
               title="เปิดแถบรายละเอียดสถิติฉาก"
             >
-              <span>📊</span>
+              <BarChart2 size={16} style={{ color: "#db2777", flexShrink: 0 }} />
               <span>เปิดสถิติฉาก</span>
             </button>
           )}
@@ -1666,8 +2272,9 @@ function StatisticsGraph() {
             {/* 🟢 Legend Overlay แบบ Dropdown ที่สามารถกดซ่อน/แสดงได้ (แบ่ง 3 ส่วนชัดเจน) */}
             {(() => {
               const totalVis = overallAnalytics?.unique_readers ?? 0;
-              const hMax = totalVis > 0 ? Math.round(totalVis * 0.66) : 1;
-              const mMax = totalVis > 0 ? Math.round(totalVis * 0.33) : 1;
+              let hMax = totalVis > 0 ? Math.max(2, Math.round(totalVis * 0.66)) : 2;
+              let mMax = totalVis > 0 ? Math.max(1, Math.round(totalVis * 0.33)) : 1;
+              if (mMax >= hMax) mMax = Math.max(1, hMax - 1);
 
               return (
                 <div className={`wsg-legend-overlay ${isLegendOpen ? "is-open" : "is-collapsed"}`}>
@@ -1727,23 +2334,25 @@ function StatisticsGraph() {
                         </div>
                         <div className="wsg-legend-overlay__row">
                           <div className="wsg-legend-row-left">
-                            <span className="wsg-node-badge-circle max-drop" style={{ position: "static", width: 26, height: 26, boxShadow: "none", pointerEvents: "none" }}>
+                            <span className="wsg-node-badge-pill max-drop" style={{ position: "static", padding: "2px 6px", fontSize: "0.6rem", pointerEvents: "none" }}>
                               <Flame size={11} strokeWidth={2.5} color="#ffffff" style={{ flexShrink: 0 }} />
+                              <span>สูงสุด</span>
                             </span>
                             <span className="wsg-legend-label-text">ออกสูงสุด (Exit Rate)</span>
                           </div>
                         </div>
                         <div className="wsg-legend-overlay__row">
                           <div className="wsg-legend-row-left">
-                            <span className="wsg-node-badge-circle high-exit" style={{ position: "static", width: 26, height: 26, boxShadow: "none", pointerEvents: "none" }}>
-                              <span style={{ fontSize: "0.55rem" }}>⚠️</span>
+                            <span className="wsg-node-badge-pill high-exit" style={{ position: "static", padding: "2px 6px", fontSize: "0.6rem", pointerEvents: "none" }}>
+                              <AlertTriangle size={11} strokeWidth={2.5} color="#ffffff" style={{ flexShrink: 0 }} />
+                              <span>≥25%</span>
                             </span>
                             <span className="wsg-legend-label-text">ออกสูง ≥ 25%</span>
                           </div>
                         </div>
                       </div>
 
-                      {/* 3. เส้นเชื่อมทางเลือก */}
+                      {/* 3. เส้นเชื่อมทางเลือก (ปรับสีให้ตรงกับในกราฟ 100%) */}
                       <div className="wsg-legend-overlay__section">
                         <div className="wsg-legend-section-header">
                           <GitFork size={15} strokeWidth={2.2} color="#db2777" />
@@ -1751,21 +2360,21 @@ function StatisticsGraph() {
                         </div>
                         <div className="wsg-legend-overlay__row">
                           <div className="wsg-legend-row-left">
-                            <span className="wsg-legend-line" style={{ height: "4px", backgroundColor: "#10B981" }} />
+                            <span className="wsg-legend-line" style={{ height: "3.8px", backgroundColor: "#10B981" }} />
                             <span className="wsg-legend-label-text">นิยมสูง</span>
                           </div>
                           <span className="wsg-legend-value-text">≥ 60%</span>
                         </div>
                         <div className="wsg-legend-overlay__row">
                           <div className="wsg-legend-row-left">
-                            <span className="wsg-legend-line" style={{ height: "3.5px", backgroundColor: "#F59E0B" }} />
+                            <span className="wsg-legend-line" style={{ height: "2.8px", backgroundColor: "#F59E0B" }} />
                             <span className="wsg-legend-label-text">ปานกลาง</span>
                           </div>
                           <span className="wsg-legend-value-text">30%–59%</span>
                         </div>
                         <div className="wsg-legend-overlay__row">
                           <div className="wsg-legend-row-left">
-                            <span className="wsg-legend-line" style={{ height: "3px", backgroundColor: "#94A3B8" }} />
+                            <span className="wsg-legend-line" style={{ height: "2px", backgroundColor: "#64748B" }} />
                             <span className="wsg-legend-label-text">เลือกน้อย</span>
                           </div>
                           <span className="wsg-legend-value-text">&lt; 30%</span>
@@ -1777,23 +2386,175 @@ function StatisticsGraph() {
               );
             })()}
 
-            {rfNodes.length === 0 ? (
-              <div className="wsg-empty-sidebar">
-                <p className="wsg-empty-text">ยังไม่มีฉากในโครงสร้างนิยาย</p>
-              </div>
-            ) : (
-              <ReactFlow
-                nodes={rfNodes}
-                edges={rfEdges}
-                nodeTypes={nodeTypes}
-                onInit={setReactFlowInstance}
-                onNodeClick={onNodeClick}
-                onEdgeClick={onEdgeClick}
-                onPaneClick={onPaneClick}
-                fitView
-                minZoom={0.2}
-                maxZoom={2}
+            {isDataLoaded && !isLoading && !hasGraphNodes && !isModalDismissed && (
+              <div 
+                onClick={(e) => {
+                  if (e.target === e.currentTarget) {
+                    setIsModalDismissed(true);
+                  }
+                }}
+                style={{
+                  position: "fixed",
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  backgroundColor: "rgba(15, 23, 42, 0.45)",
+                  backdropFilter: "blur(4px)",
+                  WebkitBackdropFilter: "blur(4px)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  zIndex: 9999,
+                  padding: "20px"
+                }}
               >
+                <div style={{
+                  backgroundColor: "#ffffff",
+                  padding: "36px 32px 32px 32px",
+                  borderRadius: "24px",
+                  border: "1.5px solid #fbcfe8",
+                  boxShadow: "0 20px 40px rgba(0, 0, 0, 0.2)",
+                  maxWidth: "480px",
+                  width: "100%",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  gap: "14px",
+                  textAlign: "center",
+                  position: "relative"
+                }}>
+                  {/* ปุ่มกากบาทสำหรับปิด Pop-up Modal */}
+                  <button
+                    type="button"
+                    onClick={() => setIsModalDismissed(true)}
+                    title="ปิดหน้าต่างนี้"
+                    style={{
+                      position: "absolute",
+                      top: "14px",
+                      right: "14px",
+                      background: "#f1f5f9",
+                      border: "none",
+                      borderRadius: "50%",
+                      width: "32px",
+                      height: "32px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      color: "#64748b",
+                      cursor: "pointer",
+                      transition: "all 0.2s ease"
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = "#e2e8f0";
+                      e.currentTarget.style.color = "#0f172a";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = "#f1f5f9";
+                      e.currentTarget.style.color = "#64748b";
+                    }}
+                  >
+                    <X size={18} />
+                  </button>
+
+                  <div style={{
+                    width: "56px",
+                    height: "56px",
+                    borderRadius: "50%",
+                    backgroundColor: "#fce7f3",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center"
+                  }}>
+                    {rawNodes.length === 0 ? (
+                      <FileText size={26} color="#be185d" />
+                    ) : (!isNovelReaderAccessible ? (
+                      <BookOpen size={26} color="#be185d" />
+                    ) : (
+                      <Lock size={26} color="#be185d" />
+                    ))}
+                  </div>
+
+                  <h3 style={{ margin: 0, fontSize: "18px", fontWeight: 800, color: "#0f172a" }}>
+                    {rawNodes.length === 0
+                      ? "ยังไม่ได้สร้างฉากในนิยายเรื่องนี้"
+                      : (!isNovelReaderAccessible
+                        ? "นิยายยังอยู่ในสถานะฉบับร่าง (Draft)"
+                        : "ยังไม่มีฉากที่เปิดเผยแพร่ให้ผู้อ่านเข้าถึงได้")}
+                  </h3>
+
+                  <p style={{ margin: 0, fontSize: "13.5px", color: "#64748b", lineHeight: 1.6 }}>
+                    {rawNodes.length === 0
+                      ? "คุณยังไม่ได้สร้างฉากใดๆ ในนิยายเรื่องนี้ เริ่มต้นสร้างตอนและฉากแรกได้ในหน้าจัดการตอน"
+                      : (!isNovelReaderAccessible
+                        ? "หน้านี้จะแสดงสถิติการอ่านและการเลือกเส้นทางเมื่อนิยายเรื่องนี้ได้รับการเผยแพร่เรียบร้อยแล้ว"
+                        : "คุณมีฉากในระบบแล้ว แต่ฉากเหล่านั้นยังอยู่ในสถานะฉบับร่าง (Draft) หรือยังไม่ได้ถูกเผยแพร่ ระบบสถิติจะแสดงผลเฉพาะฉากที่เผยแพร่แล้วเท่านั้น")}
+                  </p>
+
+                  <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", justifyContent: "center", marginTop: "6px" }}>
+                    <button
+                      type="button"
+                      onClick={() => navigate(`/writer/${novelId}/chapters`)}
+                      style={{
+                        padding: "9px 18px",
+                        borderRadius: "12px",
+                        border: "none",
+                        background: "linear-gradient(135deg, #db2777 0%, #be185d 100%)",
+                        color: "#ffffff",
+                        fontWeight: 700,
+                        fontSize: "13.5px",
+                        cursor: "pointer",
+                        boxShadow: "0 4px 12px rgba(219, 39, 119, 0.2)",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "6px"
+                      }}
+                    >
+                      {rawNodes.length === 0 ? (
+                        <>ไปสร้างฉากใหม่ในหน้าจัดการตอน</>
+                      ) : (
+                        <>ไปหน้าจัดการตอนและเผยแพร่</>
+                      )}
+                    </button>
+                    {rawNodes.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/writer/${novelId}/storytree`)}
+                        style={{
+                          padding: "9px 18px",
+                          borderRadius: "12px",
+                          border: "1.5px solid #cbd5e1",
+                          background: "#ffffff",
+                          color: "#475569",
+                          fontWeight: 700,
+                          fontSize: "13.5px",
+                          cursor: "pointer",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "6px"
+                        }}
+                      >
+                        <GitFork size={16} /> ไปหน้าโครงสร้างเนื้อเรื่อง
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <ReactFlow
+              nodes={displayNodes}
+              edges={displayEdges}
+              nodeTypes={nodeTypes}
+              edgeTypes={edgeTypes}
+              onInit={setReactFlowInstance}
+              onNodeClick={onNodeClick}
+              onEdgeClick={onEdgeClick}
+              onPaneClick={onPaneClick}
+              fitView
+              minZoom={0.2}
+              maxZoom={2}
+            >
                 <Background variant={BackgroundVariant.Dots} gap={24} size={1.2} color="#e2e8f0" />
                 <Controls showInteractive={false} />
                 <MiniMap 
@@ -1806,7 +2567,6 @@ function StatisticsGraph() {
                   maskColor="rgba(250, 249, 246, 0.6)"
                 />
               </ReactFlow>
-            )}
           </div>
         </div>
       </div>

@@ -400,13 +400,13 @@ const Manageusers = () => {
                   <table className="users-admin-table">
                     <thead>
                       <tr>
-                        <th>#</th>
-                        <th>ชื่อผู้ใช้</th>
-                        <th>อีเมล</th>
-                        <th>บทบาท</th>
-                        <th>สถานะบัญชี</th>
-                        <th>คำขอนักเขียน</th>
-                        <th>
+                        <th className="th-col-num" style={{ width: "5%", minWidth: "46px" }}>#</th>
+                        <th className="th-col-username" style={{ width: "20%", minWidth: "190px" }}>ชื่อผู้ใช้</th>
+                        <th className="th-col-email" style={{ width: "19%", minWidth: "180px" }}>อีเมล</th>
+                        <th className="th-col-role" style={{ width: "11%", minWidth: "100px", textAlign: "center" }}>บทบาท</th>
+                        <th className="th-col-status" style={{ width: "11%", minWidth: "110px", textAlign: "center" }}>สถานะบัญชี</th>
+                        <th className="th-col-writer-app" style={{ width: "11%", minWidth: "115px", textAlign: "center" }}>คำขอนักเขียน</th>
+                        <th className="th-col-date" style={{ width: "11%", minWidth: "120px" }}>
                           <div className="th-date-wrapper">
                             <span>สมัครเมื่อ</span>
                             <button
@@ -420,7 +420,7 @@ const Manageusers = () => {
                             </button>
                           </div>
                         </th>
-                        <th className="text-center">จัดการ</th>
+                        <th className="th-col-actions text-center" style={{ width: "12%", minWidth: "140px", textAlign: "center" }}>จัดการ</th>
                       </tr>
                     </thead>
                     <tbody>

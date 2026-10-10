@@ -13,6 +13,7 @@ import AdminModeBanner from "../../../components/AdminModeBanner/AdminModeBanner
 import LoadingScreen from "../../../components/LoadingScreen/LoadingScreen";
 import { ShieldAlert, ChevronDown, Pencil, Map, Bookmark, Heart, MoreVertical, RotateCcw, Flag, Play, CheckCircle2, MapPin, Trophy } from "lucide-react";
 import { getBannedRegistry, cleanBanReason, extractBanDetails } from "../../../utils/novelStatus";
+import { showToast } from "../../../utils/toast";
 // Removed authUtils import per user request
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
@@ -781,6 +782,10 @@ const fetchFirstSceneAndNavigate = async (previewSuffix) => {
   };
 
   const handleBookmark = async (isBookmarked) => {
+    if (isPreview) {
+      showToast("อยู่ในโหมดทดลองอ่าน", { type: "info" });
+      return;
+    }
     if (!id) return;
     const token = localStorage.getItem("token");
     if (!token) {
@@ -827,6 +832,10 @@ const fetchFirstSceneAndNavigate = async (previewSuffix) => {
   };
 
   const handleLike = async (isLiked) => {
+    if (isPreview) {
+      showToast("อยู่ในโหมดทดลองอ่าน", { type: "info" });
+      return;
+    }
     if (!id) return;
     const token = localStorage.getItem("token");
     if (!token) {
@@ -1027,7 +1036,7 @@ const fetchFirstSceneAndNavigate = async (previewSuffix) => {
       {isPreview && (
         <div className="novel-detail__preview-banner">
           <span className="novel-detail__preview-banner-label">
-            👁️ คุณกำลังอยู่ในโหมดทดลองอ่าน
+            คุณกำลังอยู่ในโหมดทดลองอ่าน
           </span>
           <button
             type="button"
@@ -1106,14 +1115,20 @@ const fetchFirstSceneAndNavigate = async (previewSuffix) => {
                 {novel.author.displayName}
               </button>
 
-              {!isPreview && !isAdmin && !isOwnNovel && authorId ? (
+              {(isPreview || (!isAdmin && !isOwnNovel)) && authorId ? (
                 <FollowButton
                   writerId={authorId}
                   writerName={novel.author.displayName}
                   avatarUrl={novel.author.avatarUrl}
                   novels={[{ id: novel.id, title: novel.title, cover: novel.coverImage }]}
                   isFollowing={isFollowingAuthor}
-                  onFollowChange={setIsFollowingAuthor}
+                  onFollowChange={(val) => {
+                    if (isPreview) {
+                      showToast("อยู่ในโหมดทดลองอ่าน", { type: "info" });
+                      return;
+                    }
+                    setIsFollowingAuthor(val);
+                  }}
                   size="small"
                 />
               ) : null}
@@ -1162,84 +1177,84 @@ const fetchFirstSceneAndNavigate = async (previewSuffix) => {
                   </button>
 
                   {/* 3. ปุ่มเพิ่มเข้าชั้นหนังสือ */}
-                  {!isPreview && (
-                    <button
-                      type="button"
-                      className={`action-bar-btn action-bar-btn--bookmark ${novel.isBookmarked ? "is-active" : ""}`}
-                      onClick={() => handleBookmark(!novel.isBookmarked)}
-                      disabled={bookmarkProcessing}
-                      aria-pressed={novel.isBookmarked}
-                    >
-                      <Bookmark size={15} fill={novel.isBookmarked ? "currentColor" : "none"} />
-                      <span>{bookmarkProcessing ? "กำลังบันทึก..." : (novel.isBookmarked ? "อยู่ในชั้นหนังสือ" : "เพิ่มเข้าชั้นหนังสือ")}</span>
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    className={`action-bar-btn action-bar-btn--bookmark ${novel.isBookmarked ? "is-active" : ""}`}
+                    onClick={() => handleBookmark(!novel.isBookmarked)}
+                    disabled={bookmarkProcessing}
+                    aria-pressed={novel.isBookmarked}
+                  >
+                    <Bookmark size={15} fill={novel.isBookmarked ? "currentColor" : "none"} />
+                    <span>{bookmarkProcessing ? "กำลังบันทึก..." : (novel.isBookmarked ? "อยู่ในชั้นหนังสือ" : "เพิ่มเข้าชั้นหนังสือ")}</span>
+                  </button>
 
                   {/* 4. ปุ่มถูกใจ ♡ */}
-                  {!isPreview && (
-                    <button
-                      type="button"
-                      className={`action-bar-btn action-bar-btn--icon-only action-bar-btn--like ${novel.isLiked ? "is-active" : ""}`}
-                      onClick={() => handleLike(!novel.isLiked)}
-                      disabled={likeProcessing}
-                      title={novel.isLiked ? "ยกเลิกถูกใจ" : "กดถูกใจ"}
-                      aria-label={novel.isLiked ? "ยกเลิกถูกใจ" : "กดถูกใจ"}
-                      aria-pressed={novel.isLiked}
-                    >
-                      <Heart size={18} fill={novel.isLiked ? "currentColor" : "none"} />
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    className={`action-bar-btn action-bar-btn--icon-only action-bar-btn--like ${novel.isLiked ? "is-active" : ""}`}
+                    onClick={() => handleLike(!novel.isLiked)}
+                    disabled={likeProcessing}
+                    title={novel.isLiked ? "ยกเลิกถูกใจ" : "กดถูกใจ"}
+                    aria-label={novel.isLiked ? "ยกเลิกถูกใจ" : "กดถูกใจ"}
+                    aria-pressed={novel.isLiked}
+                  >
+                    <Heart size={18} fill={novel.isLiked ? "currentColor" : "none"} />
+                  </button>
 
                   {/* 5. ปุ่ม ⋮ (Menu: เริ่มอ่านใหม่ / รายงานเรื่อง) */}
-                  {!isPreview && (
-                    <div className="action-bar-more-wrap" ref={moreMenuRef}>
-                      <button
-                        type="button"
-                        className={`action-bar-btn action-bar-btn--icon-only action-bar-btn--more ${showMoreMenu ? "is-active" : ""}`}
-                        onClick={() => setShowMoreMenu((prev) => !prev)}
-                        title="เมนูเพิ่มเติม"
-                        aria-label="เมนูเพิ่มเติม"
-                        aria-expanded={showMoreMenu}
-                      >
-                        <MoreVertical size={18} />
-                      </button>
+                  <div className="action-bar-more-wrap" ref={moreMenuRef}>
+                    <button
+                      type="button"
+                      className={`action-bar-btn action-bar-btn--icon-only action-bar-btn--more ${showMoreMenu ? "is-active" : ""}`}
+                      onClick={() => setShowMoreMenu((prev) => !prev)}
+                      title="เมนูเพิ่มเติม"
+                      aria-label="เมนูเพิ่มเติม"
+                      aria-expanded={showMoreMenu}
+                    >
+                      <MoreVertical size={18} />
+                    </button>
 
-                      {showMoreMenu && (
-                        <div className="action-bar-dropdown-menu" role="menu">
-                          {isLoggedIn && (
-                            <button
-                              type="button"
-                              className="dropdown-menu-item"
-                              onClick={() => {
-                                setShowMoreMenu(false);
-                                handleRestartConfirmOpen();
-                              }}
-                              role="menuitem"
-                            >
-                              <RotateCcw size={15} />
-                              <span>เริ่มอ่านใหม่</span>
-                            </button>
-                          )}
+                    {showMoreMenu && (
+                      <div className="action-bar-dropdown-menu" role="menu">
+                        {isLoggedIn && (
                           <button
                             type="button"
-                            className="dropdown-menu-item dropdown-menu-item--report"
+                            className="dropdown-menu-item"
                             onClick={() => {
                               setShowMoreMenu(false);
-                              if (!isLoggedIn) {
-                                navigate("/login-register");
+                              if (isPreview) {
+                                showToast("อยู่ในโหมดทดลองอ่าน", { type: "info" });
                               } else {
-                                setShowReportModal(true);
+                                handleRestartConfirmOpen();
                               }
                             }}
                             role="menuitem"
                           >
-                            <Flag size={15} />
-                            <span>รายงานเรื่อง</span>
+                            <RotateCcw size={15} />
+                            <span>เริ่มอ่านใหม่</span>
                           </button>
-                        </div>
-                      )}
-                    </div>
-                  )}
+                        )}
+                        <button
+                          type="button"
+                          className="dropdown-menu-item dropdown-menu-item--report"
+                          onClick={() => {
+                            setShowMoreMenu(false);
+                            if (isPreview) {
+                              showToast("อยู่ในโหมดทดลองอ่าน", { type: "info" });
+                            } else if (!isLoggedIn) {
+                              navigate("/login-register");
+                            } else {
+                              setShowReportModal(true);
+                            }
+                          }}
+                          role="menuitem"
+                        >
+                          <Flag size={15} />
+                          <span>รายงานเรื่อง</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 {/* Card "อ่านล่าสุด" สำหรับนักอ่านที่เคยอ่านแล้ว */}
@@ -1323,14 +1338,6 @@ const fetchFirstSceneAndNavigate = async (previewSuffix) => {
                   onEndingCollectionClick={handleEndingCollection}
                   onContinueRead={handleRead}
                   onSceneClick={(sceneId) => navigate(`/reading/${novel.id}/${sceneId}`)}
-                />
-              </div>
-            ) : isPreview ? (
-              <div className="novel-detail__progress">
-                <NovelProgressBar
-                  novelId={novel.id}
-                  isPreview={true}
-                  onSceneClick={(sceneId) => navigate(`/reading/${novel.id}/${sceneId}?preview=true`)}
                 />
               </div>
             ) : null}

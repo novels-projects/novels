@@ -22,6 +22,8 @@ import {
     BookOpen,
     LogIn,
     Bell,
+    Pencil,
+    Eye,
 } from "lucide-react";
 import "./Navbar.css";
 import { useAuthUser, useNotifications, useNavSearch } from "../../hooks/useNavbar.jsx";
@@ -546,7 +548,7 @@ const Navbar = () => {
                                             <>
                                                 {recentSearches.length > 0 && (
                                                     <div className="search-overlay-section">
-                                                        <h4 className="search-overlay-title">🕒 ค้นหาล่าสุด</h4>
+                                                        <h4 className="search-overlay-title">ค้นหาล่าสุด</h4>
                                                         <div className="search-overlay-recent-list">
                                                             {recentSearches.map((item, idx) => (
                                                                 <div key={idx} className="search-overlay-recent-item">
@@ -569,7 +571,7 @@ const Navbar = () => {
 
                                                 {popularNovels.length > 0 && (
                                                     <div className="search-overlay-section">
-                                                        <h4 className="search-overlay-title">🔥 กำลังเป็นที่นิยม</h4>
+                                                        <h4 className="search-overlay-title">กำลังเป็นที่นิยม</h4>
                                                         <div className="search-overlay-popular-list">
                                                             {popularNovels.map((novel, idx) => {
                                                                 const views = novel.views || novel.view_count || 0;
@@ -587,7 +589,15 @@ const Navbar = () => {
                                                                         <div className="popular-info">
                                                                             <span className="popular-title">{novel.title}</span>
                                                                             <span className="popular-meta">
-                                                                                ✍️ {novel.pen_name || novel.penName || "ไม่ระบุ"} • 👁️ {fv} ยอดอ่าน
+                                                                                <span className="popular-meta-item">
+                                                                                    <Pencil size={11} className="novel-author-icon" />
+                                                                                    <span>{novel.pen_name || novel.penName || "ไม่ระบุ"}</span>
+                                                                                </span>
+                                                                                <span className="popular-meta-dot">•</span>
+                                                                                <span className="popular-meta-item">
+                                                                                    <Eye size={11} className="popular-stat-icon" />
+                                                                                    <span>{fv} ยอดอ่าน</span>
+                                                                                </span>
                                                                             </span>
                                                                         </div>
                                                                     </div>
@@ -599,16 +609,27 @@ const Navbar = () => {
 
                                                 {categories.length > 0 && (
                                                     <div className="search-overlay-section">
-                                                        <h4 className="search-overlay-title">🗂️ สำรวจหมวดหมู่</h4>
+                                                        <div className="search-overlay-header-row">
+                                                            <h4 className="search-overlay-title">สำรวจหมวดหมู่</h4>
+                                                            <span
+                                                                className="search-overlay-view-all"
+                                                                onClick={() => {
+                                                                    setSearchFocused(false);
+                                                                    navigate("/categories");
+                                                                }}
+                                                            >
+                                                                ดูทั้งหมด
+                                                            </span>
+                                                        </div>
                                                         <div className="search-overlay-category-list">
                                                             {categories.map((cat, idx) => (
                                                                 <button
-                                                                    key={idx}
+                                                                    key={cat.id || idx}
                                                                     type="button"
                                                                     className="search-overlay-cat-chip"
                                                                     onClick={() => {
                                                                         setSearchFocused(false);
-                                                                        navigate("/categories");
+                                                                        navigate(`/categories?search=${encodeURIComponent(cat.name || cat.title)}`);
                                                                     }}
                                                                 >
                                                                     {cat.name || cat.title}

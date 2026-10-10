@@ -13,8 +13,10 @@ import "./CreateNovelPage.css";
 import MultiSelect from "../../../components/MultiSelect/MultiSelect";
 import CoverUpload from "../../../components/CoverUpload/CoverUpload";
 import Toggle from "../../../components/Toggle/Toggle";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useBlocker } from "react-router-dom";
+import UnsavedChangesModal from "../../../components/UnsavedChangesModal/UnsavedChangesModal";
 import { getNovelStatusInfo } from "../../../utils/novelStatus";
+import { showTopToast } from "../../../utils/toast";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
 
@@ -55,29 +57,64 @@ const getStatusLabel = ({ isCompleted, isPublished }) => {
     return getNovelStatusInfo({ is_completed: isCompleted, is_published: isPublished }).label;
 };
 
+const QUILL_MODULES = {
+    toolbar: [
+        [{ header: [1, 2, 3, false] }],
+        ["bold", "italic", "underline", "strike"],
+        [{ color: [] }, { background: [] }],
+        [{ list: "ordered" }, { list: "bullet" }],
+        [{ align: [] }],
+        ["link", "image", "clean"],
+    ],
+};
+
+const QUILL_FORMATS = [
+    "header",
+    "bold", "italic", "underline", "strike",
+    "color", "background",
+    "list", "align",
+    "link",
+    "image",
+];
+
 // ── Validation rules ─────────────────────────────────────────
 const validate = (form) => {
     const errors = {};
     if (!form.title.trim()) {
         errors.title = "กรุณากรอกชื่อเรื่อง";
+    } else if (form.title.length > 100) {
+        errors.title = "ชื่อเรื่องต้องไม่เกิน 100 ตัวอักษร";
     }
     if (!form.tagline.trim()) {
         errors.tagline = "กรุณากรอกคำโปรย";
-    }
-    if (form.tagline.length > 200) {
+    } else if (form.tagline.length > 200) {
         errors.tagline = "คำโปรยต้องไม่เกิน 200 ตัวอักษร";
     }
     if (form.categories.length === 0) {
         errors.categories = "กรุณาเลือกหมวดหมู่อย่างน้อย 1 หมวด";
+    } else if (form.categories.length > 3) {
+        errors.categories = "เลือกหมวดหมู่ได้ไม่เกิน 3 หมวดหมู่";
     }
     
-    // 💡 ปรับปรุง: ตรวจสอบความปลอดภัยกรณีที่ฟอร์ม description ยังคงว่างเปล่า
+    // 💡 ปรับปรุง: ตรวจสอบความปลอดภัยกรณีที่มีข้อความ หรือมีรูปภาพแทรกอยู่
     const plainDescription = form.description ? form.description.replace(/<(.|\n)*?>/g, "").trim() : "";
-    if (!plainDescription) {
+    const hasImage = /<img\b[^>]*>/i.test(form.description || "");
+    if (!plainDescription && !hasImage) {
         errors.description = "กรุณากรอกแนะนำเรื่อง";
     }
     
     return errors;
+};
+
+const isQuillContentEmpty = (html) => {
+    if (!html || typeof html !== "string") return true;
+    if (/<img\b[^>]*>/i.test(html)) return false;
+    const plain = html
+        .replace(/<[^>]*>/g, "")
+        .replace(/&nbsp;/gi, "")
+        .replace(/\s+/g, "")
+        .trim();
+    return plain.length === 0;
 };
 
 // ════════════════════════════════════════════════════════════
@@ -92,6 +129,37 @@ const CreateNovelPage = () => {
     const [categoriesError, setCategoriesError] = useState(null);
     const navigate = useNavigate();
     const [showCancelModal, setShowCancelModal] = useState(false);
+    const isSubmittedSuccessRef = React.useRef(false);
+
+    const isDirty = React.useMemo(() => {
+        if (isSubmitting || isSubmittedSuccessRef.current) return false;
+        return (
+            form.title.trim() !== "" ||
+            form.tagline.trim() !== "" ||
+            form.categories.length > 0 ||
+            !isQuillContentEmpty(form.description) ||
+            form.coverFile !== null ||
+            form.coverPreview !== null ||
+            form.isPublished !== false ||
+            form.isCompleted !== false
+        );
+    }, [form, isSubmitting]);
+
+    const blocker = useBlocker(
+        ({ currentLocation, nextLocation }) =>
+            !isSubmittedSuccessRef.current && isDirty && currentLocation.pathname !== nextLocation.pathname
+    );
+
+    useEffect(() => {
+        const handleBeforeUnload = (e) => {
+            if (isDirty) {
+                e.preventDefault();
+                e.returnValue = "";
+            }
+        };
+        window.addEventListener("beforeunload", handleBeforeUnload);
+        return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+    }, [isDirty]);
 
     useEffect(() => {
         const loadCategories = async () => {
@@ -242,8 +310,13 @@ const CreateNovelPage = () => {
                 throw new Error(errorData.message || errorData.error || "ไม่สามารถบันทึกข้อมูลนิยายลงระบบได้");
             }
 
-            alert("✅ สร้างนิยายและบันทึกข้อมูลครบถ้วนเรียบร้อย!");
+            isSubmittedSuccessRef.current = true;
+            showTopToast("สร้างนิยายสำเร็จ!", {
+                description: `สร้างนิยายเรื่อง "${form.title}" เรียบร้อยแล้ว`,
+                type: "success",
+            });
             navigate("/writer/dashboard");
+            return;
             
         } catch (error) {
             console.error("Submit Error:", error);
@@ -256,14 +329,20 @@ const CreateNovelPage = () => {
 
     // ── Cancel with confirmation ───────────────────────
     const handleCancel = () => {
+        if (!isDirty) {
+            navigate("/writer/dashboard");
+            return;
+        }
         setShowCancelModal(true);
     };
 
     const handleConfirmCancel = () => {
+        isSubmittedSuccessRef.current = true;
         setShowCancelModal(false);
         navigate("/writer/dashboard");
     };
 
+    const titleLen = form.title ? form.title.length : 0;
     const taglineLen = form.tagline ? form.tagline.length : 0;
 
     // ════════════════════════════════════════════════════════
@@ -278,14 +357,18 @@ const CreateNovelPage = () => {
             {/* ── Main card ── */}
             <div className="cnp__form-wrap">
                 <div className="cnp__card">
-                    {submissionError && (
-                        <div className="cnp__error-banner" role="alert" style={{ marginBottom: "16px" }}>
-                            {submissionError}
-                        </div>
-                    )}
-
                     {/* ── Card section header ── */}
                     <div className="cnp__section-header">
+                        {submissionError && (
+                            <div className="cnp__error-banner" role="alert">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="cnp__error-banner-icon">
+                                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                                    <line x1="12" y1="9" x2="12" y2="13"></line>
+                                    <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                                </svg>
+                                <span>{submissionError}</span>
+                            </div>
+                        )}
                         <h2 className="cnp__section-title">รายละเอียดนิยาย</h2>
                         <p className="cnp__section-sub">ข้อมูลเหล่านี้จะแสดงให้นักอ่านเห็นในหน้ารายละเอียดนิยาย</p>
                     </div>
@@ -305,15 +388,20 @@ const CreateNovelPage = () => {
                                     id="inp-title"
                                     type="text"
                                     className={`cnp__input ${errors.title ? "cnp__input--error" : ""}`}
-                                    placeholder="ตั้งชื่อเรื่องของคุณ...."
+                                    placeholder="ตั้งชื่อเรื่องของคุณ..."
                                     value={form.title}
                                     onChange={(e) => setField("title", e.target.value)}
                                     maxLength={100}
                                     aria-required="true"
                                 />
-                                {errors.title && (
-                                    <p className="cnp__error" role="alert">{errors.title}</p>
-                                )}
+                                <div className="cnp__char-row">
+                                    <p className={`cnp__char-count ${titleLen > 90 ? "cnp__char-count--warn" : ""}`}>
+                                        {titleLen} / 100 ตัวอักษร
+                                    </p>
+                                    {errors.title && (
+                                        <p className="cnp__error" role="alert">{errors.title}</p>
+                                    )}
+                                </div>
                             </div>
 
                             {/* ── คำโปรย ── */}
@@ -324,7 +412,7 @@ const CreateNovelPage = () => {
                                 <textarea
                                     id="inp-tagline"
                                     className={`cnp__textarea cnp__textarea--sm ${errors.tagline ? "cnp__input--error" : ""}`}
-                                    placeholder="บอกเล่าเรื่องราวของคุณสั้นๆ"
+                                    placeholder="บอกเล่าเรื่องราวของคุณสั้นๆ..."
                                     value={form.tagline}
                                     onChange={(e) => setField("tagline", e.target.value)}
                                     maxLength={200}
@@ -349,8 +437,8 @@ const CreateNovelPage = () => {
                                     options={categoryOptions}
                                     value={form.categories}
                                     onChange={(val) => setField("categories", val)}
-                                    placeholder={categoriesLoading ? "กำลังโหลดหมวดหมู่..." : "เลือกหมวดหมู่..."}
-                                    max={5}
+                                    placeholder={categoriesLoading ? "กำลังโหลดหมวดหมู่..." : "เลือกหมวดหมู่ (ไม่เกิน 3 หมวด)..."}
+                                    max={3}
                                 />
                                 {categoriesError && (
                                     <p className="cnp__info" style={{ color: "#d97706" }} role="alert">
@@ -370,9 +458,11 @@ const CreateNovelPage = () => {
                                 <div className={`cnp__quill-wrap ${errors.description ? "cnp__quill-wrap--error" : ""}`}>
                                     <ReactQuill
                                         theme="snow"
+                                        modules={QUILL_MODULES}
+                                        formats={QUILL_FORMATS}
                                         value={form.description}
                                         onChange={(value) => setField("description", value)}
-                                        placeholder="แนะนำเรื่องราวเกี่ยวกับนิยายของคุณ...."
+                                        placeholder="แนะนำเรื่องราวเกี่ยวกับนิยายของคุณ..."
                                         className="cnp__quill"
                                     />
                                 </div>
@@ -505,6 +595,14 @@ const CreateNovelPage = () => {
                     </div>
                 </div>
             )}
+
+
+            {/* Unsaved Changes Modal */}
+            <UnsavedChangesModal
+                isOpen={blocker.state === "blocked"}
+                onStay={() => blocker.reset()}
+                onLeave={() => blocker.proceed()}
+            />
         </div>
     );
 };

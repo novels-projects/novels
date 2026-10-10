@@ -42,6 +42,7 @@
   gap: 48px;
   align-items: stretch;
   margin-bottom: 40px;
+  max-width: 100%;
 }
 
 /* Aside: cover card — sticky so it travels with the scroll instead of
@@ -58,6 +59,7 @@
 .novel-detail__info {
   flex: 1;
   min-width: 0;
+  max-width: 100%;
   display: flex;
   flex-direction: column;
 }
@@ -74,6 +76,12 @@
   padding: 28px 32px;
   margin-bottom: 20px;
   flex-shrink: 0;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .novel-detail__header-card > *:last-child {
@@ -86,6 +94,7 @@
   gap: 8px;
   flex-wrap: wrap;
   margin-bottom: 12px;
+  max-width: 100%;
 }
 
 /* .genre-tag has its own margin-right/margin-bottom for pages that don't
@@ -94,6 +103,9 @@
    with a dangling margin on the last tag in each row). */
 .novel-detail__tags .genre-tag {
   margin: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Title */
@@ -104,7 +116,9 @@
   color: var(--ink);
   line-height: 1.15;
   overflow-wrap: anywhere;
+  word-break: break-word;
   margin-bottom: 14px;
+  max-width: 100%;
 }
 
 /* Author row */
@@ -113,6 +127,8 @@
   align-items: center;
   gap: 10px;
   margin-bottom: 20px;
+  flex-wrap: wrap;
+  max-width: 100%;
 }
 
 .novel-detail__author-avatar {
@@ -147,6 +163,9 @@
   color: #1e293b;
   transition: color 0.15s ease;
   text-align: left;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  max-width: 100%;
 }
 
 .novel-detail__author-avatar:disabled,
@@ -170,7 +189,12 @@
   color: var(--gray-600);
   line-height: 1.8;
   margin-bottom: 24px;
+  width: 100%;
   max-width: 100%;
+  box-sizing: border-box;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  white-space: pre-line;
 }
 
 /* Progress card */
@@ -287,6 +311,12 @@
   border: 1.5px solid var(--gray-100);
   border-radius: 16px;
   padding: 28px 32px;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .novel-detail__section-title {
@@ -297,6 +327,8 @@
   margin-bottom: 16px;
   padding-bottom: 12px;
   border-bottom: 1px solid var(--gray-100);
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .novel-detail__synopsis-detail {
@@ -306,6 +338,20 @@
   line-height: 1.85;
   margin-bottom: 20px;
   overflow-wrap: anywhere;
+  word-break: break-word;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.novel-detail__synopsis-detail img {
+  max-width: 100%;
+  height: auto;
+}
+
+.novel-detail__synopsis-detail p {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  max-width: 100%;
 }
 
 /* ── Responsive ── */

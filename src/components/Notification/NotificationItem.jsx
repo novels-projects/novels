@@ -82,10 +82,18 @@ export default function NotificationItem({
           <div
             className="notification-avatar"
             style={{
-              background: notification.actor?.avatarColor || "#E91E8C",
+              background: notification.actor?.avatar ? "transparent" : (notification.actor?.avatarColor || "#E91E8C"),
             }}
           >
-            {actorName.charAt(0)}
+            {notification.actor?.avatar ? (
+              <img
+                src={notification.actor.avatar}
+                alt={actorName}
+                className="notification-avatar-img"
+              />
+            ) : (
+              actorName.charAt(0)
+            )}
           </div>
 
           <span className="notification-type-badge">

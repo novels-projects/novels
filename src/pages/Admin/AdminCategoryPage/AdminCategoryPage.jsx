@@ -383,62 +383,64 @@ export default function AdminCategoryPage() {
                         </div>
                     ) : (
                         <>
-                            <table className="admin-table">
-                                <thead>
-                                    <tr>
-                                        <th style={{ width: "12%" }}># ID</th>
-                                        <th style={{ width: "45%" }}>ชื่อหมวดหมู่</th>
-                                        <th 
-                                            className="sortable-col" 
-                                            onClick={toggleSort}
-                                            title="คลิกเพื่อเรียงลำดับตามจำนวนนิยาย"
-                                            style={{ width: "23%" }}
-                                        >
-                                            จำนวนนิยาย
-                                            {sortOrder === "desc" && <span className="sort-indicator"> ▼</span>}
-                                            {sortOrder === "asc" && <span className="sort-indicator"> ▲</span>}
-                                        </th>
-                                        <th className="text-center align-center" style={{ width: "20%" }}>การจัดการ</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {paginatedCategories.map((item) => (
-                                        <tr key={item.category_id}>
-                                            <td className="id-col">{item.category_id}</td>
-                                            <td className="name-col">
-                                                <span className="category-tag-badge">
-                                                    {item.name}
-                                                </span>
-                                            </td>
-                                            <td className="count-col">
-                                                <span className={`novel-count-text${(item.novelCount ?? 0) === 0 ? " is-empty" : ""}`}>
-                                                    {item.novelCount ?? 0} เรื่อง
-                                                </span>
-                                            </td>
-                                            <td className="actions-col text-center align-center">
-                                                <div className="actions-cell action-cell-content">
-                                                    <button 
-                                                        className="btn-icon-action btn-edit-user"
-                                                        onClick={() => openMutationModal("edit", item)}
-                                                        title="แก้ไขหมวดหมู่"
-                                                    >
-                                                        <Edit size={14} />
-                                                        <span>แก้ไข</span>
-                                                    </button>
-                                                    <button 
-                                                        className="btn-icon-action btn-delete-user"
-                                                        onClick={() => openDeleteModal(item)}
-                                                        title="ลบหมวดหมู่"
-                                                    >
-                                                        <Trash2 size={14} />
-                                                        <span>ลบ</span>
-                                                    </button>
-                                                </div>
-                                            </td>
+                            <div className="admin-table-scroll-wrapper">
+                                <table className="admin-table">
+                                    <thead>
+                                        <tr>
+                                            <th style={{ width: "12%", minWidth: "70px" }}># ID</th>
+                                            <th style={{ width: "36%", minWidth: "160px" }}>ชื่อหมวดหมู่</th>
+                                            <th 
+                                                className="sortable-col" 
+                                                onClick={toggleSort}
+                                                title="คลิกเพื่อเรียงลำดับตามจำนวนนิยาย"
+                                                style={{ width: "24%", minWidth: "130px" }}
+                                            >
+                                                จำนวนนิยาย
+                                                {sortOrder === "desc" && <span className="sort-indicator"> ▼</span>}
+                                                {sortOrder === "asc" && <span className="sort-indicator"> ▲</span>}
+                                            </th>
+                                            <th className="text-center align-center" style={{ width: "28%", minWidth: "160px" }}>การจัดการ</th>
                                         </tr>
-                                    ))}
-                                </tbody>
-                            </table>
+                                    </thead>
+                                    <tbody>
+                                        {paginatedCategories.map((item) => (
+                                            <tr key={item.category_id}>
+                                                <td className="id-col">{item.category_id}</td>
+                                                <td className="name-col">
+                                                    <span className="category-tag-badge">
+                                                        {item.name}
+                                                    </span>
+                                                </td>
+                                                <td className="count-col">
+                                                    <span className={`novel-count-text${(item.novelCount ?? 0) === 0 ? " is-empty" : ""}`}>
+                                                        {item.novelCount ?? 0} เรื่อง
+                                                    </span>
+                                                </td>
+                                                <td className="actions-col text-center align-center">
+                                                    <div className="actions-cell action-cell-content">
+                                                        <button 
+                                                            className="btn-icon-action btn-edit-user"
+                                                            onClick={() => openMutationModal("edit", item)}
+                                                            title="แก้ไขหมวดหมู่"
+                                                        >
+                                                            <Edit size={14} />
+                                                            <span>แก้ไข</span>
+                                                        </button>
+                                                        <button 
+                                                            className="btn-icon-action btn-delete-user"
+                                                            onClick={() => openDeleteModal(item)}
+                                                            title="ลบหมวดหมู่"
+                                                        >
+                                                            <Trash2 size={14} />
+                                                            <span>ลบ</span>
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
 
                             {/* Footer Pagination Template (Image 2 style) */}
                             <div className="admin-table-footer">

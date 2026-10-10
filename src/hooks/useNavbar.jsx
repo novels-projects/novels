@@ -233,10 +233,40 @@ export function useNavSearch() {
                         (a, b) => (b.views || b.view_count || 0) - (a.views || a.view_count || 0)
                     );
                     setPopularNovels(sorted.slice(0, 5));
-                }
-                if (catRes.ok) {
-                    const d = await catRes.json();
-                    setCategories((d.categories || d.data || []).slice(0, 5));
+
+                    if (catRes.ok) {
+                        const catData = await catRes.json();
+                        const rawCats = catData.categories || catData.data || [];
+
+                        // นับจำนวนนิยายที่เผยแพร่แล้วในแต่ละหมวดหมู่
+                        const counts = {};
+                        published.forEach((novel) => {
+                            const raw = novel.categories || novel.Categories || novel.category_ids || [];
+                            const cleanCats = Array.isArray(raw)
+                                ? raw.map((c) => {
+                                      if (!c) return "";
+                                      if (typeof c === "string") return c.trim();
+                                      return String(c.name || c.Title || c.title || c.label || "").trim();
+                                  }).filter(Boolean)
+                                : [];
+                            cleanCats.forEach((name) => {
+                                counts[name] = (counts[name] || 0) + 1;
+                            });
+                        });
+
+                        const processedCats = (Array.isArray(rawCats) ? rawCats : []).map((c) => {
+                            const catName = String(c.name || c.title || c.label || "").trim();
+                            return {
+                                id: c.category_id || c.id,
+                                name: catName,
+                                count: counts[catName] || 0,
+                            };
+                        });
+
+                        // เรียงลำดับจากหมวดหมู่ที่มีนิยายเยอะสุดไปน้อยสุด
+                        processedCats.sort((a, b) => b.count - a.count);
+                        setCategories(processedCats);
+                    }
                 }
             } catch (e) {
                 console.warn("useNavSearch: load overlay data error:", e);
