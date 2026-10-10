@@ -65,6 +65,10 @@
   overflow: hidden;
 }
 
+.se-sidebar-overlay {
+  display: none;
+}
+
 /* ══════════════════════════════════════════
    Top Header Bar
 ══════════════════════════════════════════ */
@@ -116,7 +120,7 @@
 
 .cm-sidebar-toggle-btn,
 .se-header__sidebar-toggle {
-  display: inline-flex;
+  display: none;
   align-items: center;
   gap: 6px;
   border-radius: 9999px;
@@ -1718,6 +1722,20 @@
     color: #475569;
   }
 
+  .se-sidebar-overlay {
+    display: block;
+    position: fixed;
+    top: 56px;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(15, 23, 42, 0.45);
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+    z-index: 899;
+  }
+
+  .cm-sidebar-toggle-btn,
   .se-header__sidebar-toggle {
     display: inline-flex !important;
   }

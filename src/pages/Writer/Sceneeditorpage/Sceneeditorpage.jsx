@@ -1947,6 +1947,17 @@ const SceneEditorPage = ({
     return () => window.removeEventListener("novel-data-updated", handleDataUpdate);
   }, [fetchSceneData]);
 
+  // ปิดแถบรายการตอนและฉากอัตโนมัติเมื่อขยายหน้าจอเกิน 768px (กลับสู่โหมด Desktop ที่แถบแสดงปกติ)
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth > 768) {
+        setIsTreeSidebarOpen(false);
+      }
+    };
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
   useEffect(() => {
     if (!isLoading) {
       const timer = setTimeout(() => {
@@ -2835,6 +2846,13 @@ const SceneEditorPage = ({
       )}
 
       <div className="se-body">
+        {isTreeSidebarOpen && (
+          <div
+            className="se-sidebar-overlay"
+            onClick={() => setIsTreeSidebarOpen(false)}
+            aria-hidden="true"
+          />
+        )}
         {/* Sidebar Wrapper */}
         <div className={`se-sidebar-wrapper ${isTreeSidebarOpen ? "open" : ""}`}>
           <button 
