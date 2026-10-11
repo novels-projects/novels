@@ -153,6 +153,9 @@ func (s *AuthService) RefreshToken(ctx context.Context, req dto.RefreshRequest) 
 	if user == nil {
 		return nil, errors.New("user not found")
 	}
+	if err := validateUserStatusForLogin(user); err != nil {
+		return nil, err
+	}
 
 	accessToken, err := s.createToken(user, accessTokenDuration, s.jwtSecret)
 	if err != nil {

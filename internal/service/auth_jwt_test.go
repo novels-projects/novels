@@ -35,7 +35,7 @@ func (r *jwtTestAuthRepository) GetByID(context.Context, uint) (*models.User, er
 	return r.user, nil
 }
 
-func newJWTTestAuth(t *testing.T) (config.Config, *service.AuthService, *models.User) {
+func newJWTTestAuth(t *testing.T) (config.Config, *service.AuthService, *models.User, *jwtTestAuthRepository) {
 	t.Helper()
 	viper.Reset()
 	t.Cleanup(viper.Reset)
@@ -60,11 +60,11 @@ func newJWTTestAuth(t *testing.T) (config.Config, *service.AuthService, *models.
 		Status:       "active",
 	}
 	repo := &jwtTestAuthRepository{user: user}
-	return cfg, service.NewAuthService(repo, cfg.JWTSecret, cfg.JWTRefreshSecret), user
+	return cfg, service.NewAuthService(repo, cfg.JWTSecret, cfg.JWTRefreshSecret), user, repo
 }
 
 func TestLoginAccessTokenVerifiesWithConfiguredMiddlewareSecret(t *testing.T) {
-	cfg, authService, user := newJWTTestAuth(t)
+	cfg, authService, user, _ := newJWTTestAuth(t)
 	middleware.SetJWTSecret(cfg.JWTSecret)
 
 	response, err := authService.Login(context.Background(), dto.LoginRequest{
@@ -93,7 +93,7 @@ func TestLoginAccessTokenVerifiesWithConfiguredMiddlewareSecret(t *testing.T) {
 }
 
 func TestRefreshEndpointVerifiesRefreshTokenAndIssuesUsableTokens(t *testing.T) {
-	cfg, authService, user := newJWTTestAuth(t)
+	cfg, authService, user, _ := newJWTTestAuth(t)
 	middleware.SetJWTSecret(cfg.JWTSecret)
 
 	loginResponse, err := authService.Login(context.Background(), dto.LoginRequest{
@@ -149,7 +149,7 @@ func TestRefreshEndpointVerifiesRefreshTokenAndIssuesUsableTokens(t *testing.T) 
 }
 
 func TestJWTVerificationRejectsNonHS256Algorithms(t *testing.T) {
-	cfg, authService, _ := newJWTTestAuth(t)
+	cfg, authService, _, _ := newJWTTestAuth(t)
 	middleware.SetJWTSecret(cfg.JWTSecret)
 	token := jwt.NewWithClaims(jwt.SigningMethodHS384, jwt.MapClaims{
 		"user_id": 42,
@@ -190,5 +190,61 @@ func TestJWTVerificationRejectsNonHS256Algorithms(t *testing.T) {
 	}
 	if _, err := authService.RefreshToken(context.Background(), dto.RefreshRequest{RefreshToken: refreshToken}); err == nil {
 		t.Fatal("refresh flow should reject a non-HS256 token")
+	}
+}
+
+func TestRefreshTokenChecksCurrentAccountStatusAndValidity(t *testing.T) {
+	tests := []struct {
+		name          string
+		tokenExpiry   time.Time
+		accountStatus string
+		missingUser   bool
+		wantError     bool
+	}{
+		{name: "active account refreshes", tokenExpiry: time.Now().Add(time.Hour), accountStatus: "active"},
+		{name: "suspended account is rejected", tokenExpiry: time.Now().Add(time.Hour), accountStatus: "suspended", wantError: true},
+		{name: "missing user is rejected", tokenExpiry: time.Now().Add(time.Hour), accountStatus: "active", missingUser: true, wantError: true},
+		{name: "expired token is rejected", tokenExpiry: time.Now().Add(-time.Minute), accountStatus: "active", wantError: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg, authService, user, repo := newJWTTestAuth(t)
+			user.Status = tt.accountStatus
+			if tt.missingUser {
+				repo.user = nil
+			}
+			token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+				"user_id": user.ID,
+				"role":    user.Role,
+				"exp":     tt.tokenExpiry.Unix(),
+			})
+			refreshToken, err := token.SignedString([]byte(cfg.JWTRefreshSecret))
+			if err != nil {
+				t.Fatalf("failed to sign refresh token: %v", err)
+			}
+
+			response, err := authService.RefreshToken(context.Background(), dto.RefreshRequest{RefreshToken: refreshToken})
+			if (err != nil) != tt.wantError {
+				t.Fatalf("RefreshToken() error = %v, wantError %v", err, tt.wantError)
+			}
+			if tt.wantError {
+				if response != nil {
+					t.Fatal("RefreshToken() returned tokens for a rejected refresh")
+				}
+				return
+			}
+			if response == nil || response.Token == "" || response.RefreshToken == "" {
+				t.Fatal("RefreshToken() did not issue both tokens for an active account")
+			}
+		})
+	}
+}
+
+func TestRefreshTokenRejectsMalformedToken(t *testing.T) {
+	_, authService, _, _ := newJWTTestAuth(t)
+
+	if response, err := authService.RefreshToken(context.Background(), dto.RefreshRequest{RefreshToken: "not-a-jwt"}); err == nil || response != nil {
+		t.Fatalf("RefreshToken() = (%v, %v), want nil response and error", response, err)
 	}
 }

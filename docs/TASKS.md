@@ -131,6 +131,22 @@
 
 ---
 
+## T8 — ปิด Gap ของ Refresh, Report Notification และ Publish Regression
+- **สถานะ:** `IMPLEMENTED — TARGETED TESTS PASSED; FULL DB INTEGRATION SUITE NOT RUN` (DB test credentials/isolation unavailable)
+- **ประเภท:** Backend behavior + automated tests
+- **อ้างอิง:** Spec 009 authentication; Spec 017 `R-STRUCT-10 → AC-STRUCT-10`; Spec 018 `R-PUBLISH-02/03`; Spec 023 `R-REPORT-05/06 → AC-REPORT-05/06`
+- **งาน:**
+  1. ตรวจสถานะบัญชีปัจจุบันก่อนออก token ใน RefreshToken; suspended account ต้องไม่ refresh
+  2. เมื่อจัดการ report (`resolved`/`rejected`) แจ้งผู้รายงานและเจ้าของนิยายไม่เกินหนึ่ง notification ต่อผู้รับ ภายใน transaction เดิม
+  3. เพิ่ม tests สำหรับ refresh ปกติ/ถูกปฏิเสธ และ report transitions/ผู้รับ/สถานะ
+  4. เพิ่ม regression test ยืนยันว่าไม่มี start scene แล้วยัง publish ได้
+- **ข้อจำกัด:** ไม่เปลี่ยน auth middleware, token storage/revocation, schema/migration, สิทธิ์ยื่น appeal, appeal/unban workflow หรือ severity ที่ Spec ยังไม่ตัดสิน; ไม่แก้ SRS/Spec
+- **ไฟล์ที่คาดว่าจะเปลี่ยน:** `docs/TASKS.md`, `internal/service/auth_service.go`, `internal/service/auth_jwt_test.go`, `internal/repository/report_repo.go`, `internal/repository/report_repo_test.go`, `internal/service/scene_publish_service_test.go`
+- **AC:** (ก) refresh ตรวจ current user status และปฏิเสธ suspended/missing/invalid/expired token; (ข) report ที่ resolve/reject แจ้งทั้ง reporter และ novel author โดยไม่ซ้ำ แม้เป็นคนเดียวกัน พร้อมสถานะ report/novel ถูกต้อง; (ค) ไม่มี start scene เป็น warning และยัง publish ได้
+- **Verify:** PASS: targeted service/handler/dto/config tests, DB-independent repository tests, compile-only `go test ./... -run '^$'`, and `git diff --check`; NOT RUN: `go test ./...` because integration tests require `TEST_POSTGRES_USER` and isolated DB availability could not be confirmed; no schema, middleware, or Spec changes
+
+---
+
 ## สรุป: Task ที่ต้องขออนุมัติเพิ่มก่อนเริ่ม
 
 | Task | ต้องอนุมัติอะไร | สถานะ |
@@ -145,5 +161,3 @@
 | **T6** | — (review เท่านั้น; commit ต้องขอ) | `READY` |
 
 **ลำดับที่แนะนำ:** T0 → T1 (ทำคู่กันได้) → T3 → (T4 และ T2) → T5 · T6 → T7
-
-

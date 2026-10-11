@@ -60,6 +60,29 @@ func canResolvePendingReport(novelStatus string, novelIsPublished bool) bool {
 		(novelStatus == "suspended" && !novelIsPublished)
 }
 
+type reportNotification struct {
+	userID  int
+	message string
+}
+
+func insertReportNotifications(ctx context.Context, tx *sql.Tx, novelID int, notifications ...reportNotification) error {
+	notifiedUsers := make(map[int]struct{}, len(notifications))
+	for _, notification := range notifications {
+		if _, exists := notifiedUsers[notification.userID]; exists {
+			continue
+		}
+		if _, err := tx.ExecContext(ctx,
+			`INSERT INTO notifications (user_id, type, reference_id, reference_type, message, is_read, created_at)
+			 VALUES ($1, 'system', $2, 'novel', $3, false, NOW())`,
+			notification.userID, novelID, notification.message,
+		); err != nil {
+			return err
+		}
+		notifiedUsers[notification.userID] = struct{}{}
+	}
+	return nil
+}
+
 func NewReportRepository(db *sql.DB) ReportRepository {
 	return &sqlReportRepository{db: db}
 }
@@ -272,12 +295,7 @@ func (r *sqlReportRepository) UpdateReportStatus(ctx context.Context, reportID i
 
 			// แจ้งเตือนหานักเขียนว่าได้รับการปลดแบนแล้ว
 			writerMsg := "คำขอปลดแบนสำหรับนิยายเรื่อง '" + novelTitle + "' ของคุณได้รับการอนุมัติเรียบร้อยแล้ว เหตุผล: " + strings.TrimSpace(req.Reason)
-			_, err = tx.ExecContext(ctx,
-				`INSERT INTO notifications (user_id, type, reference_id, reference_type, message, is_read, created_at) 
-				 VALUES ($1, 'system', $2, 'novel', $3, false, NOW())`,
-				writerUserID, novelID, writerMsg,
-			)
-			if err != nil {
+			if err := insertReportNotifications(ctx, tx, novelID, reportNotification{userID: writerUserID, message: writerMsg}); err != nil {
 				return err
 			}
 		} else if currentReportStatus == "pending" {
@@ -285,13 +303,12 @@ func (r *sqlReportRepository) UpdateReportStatus(ctx context.Context, reportID i
 				return errors.New("report approval requires published or suspended novel")
 			}
 			if !shouldSuspendNovelForReport(novelStatus, novelIsPublished) {
+				writerMsg := "นิยายเรื่อง '" + novelTitle + "' ที่มีรายงานได้รับการตรวจสอบแล้ว เหตุผล: " + strings.TrimSpace(req.Reason)
 				reporterMsg := "การรายงานนิยายเรื่อง '" + novelTitle + "' ของคุณได้รับการดำเนินการแล้ว เหตุผล: " + strings.TrimSpace(req.Reason)
-				_, err = tx.ExecContext(ctx,
-					`INSERT INTO notifications (user_id, type, reference_id, reference_type, message, is_read, created_at)
-					 VALUES ($1, 'system', $2, 'novel', $3, false, NOW())`,
-					reporterID, novelID, reporterMsg,
-				)
-				if err != nil {
+				if err := insertReportNotifications(ctx, tx, novelID,
+					reportNotification{userID: writerUserID, message: writerMsg},
+					reportNotification{userID: reporterID, message: reporterMsg},
+				); err != nil {
 					return err
 				}
 				return tx.Commit()
@@ -305,22 +322,11 @@ func (r *sqlReportRepository) UpdateReportStatus(ctx context.Context, reportID i
 			}
 
 			writerMsg := "นิยายเรื่อง '" + novelTitle + "' ของคุณถูกระงับการเผยแพร่ เหตุผล: " + strings.TrimSpace(req.Reason)
-			_, err = tx.ExecContext(ctx,
-				`INSERT INTO notifications (user_id, type, reference_id, reference_type, message, is_read, created_at)
-				 VALUES ($1, 'system', $2, 'novel', $3, false, NOW())`,
-				writerUserID, novelID, writerMsg,
-			)
-			if err != nil {
-				return err
-			}
-
 			reporterMsg := "การรายงานนิยายเรื่อง '" + novelTitle + "' ของคุณได้รับการดำเนินการแล้ว เหตุผล: " + strings.TrimSpace(req.Reason)
-			_, err = tx.ExecContext(ctx,
-				`INSERT INTO notifications (user_id, type, reference_id, reference_type, message, is_read, created_at)
-				 VALUES ($1, 'system', $2, 'novel', $3, false, NOW())`,
-				reporterID, novelID, reporterMsg,
-			)
-			if err != nil {
+			if err := insertReportNotifications(ctx, tx, novelID,
+				reportNotification{userID: writerUserID, message: writerMsg},
+				reportNotification{userID: reporterID, message: reporterMsg},
+			); err != nil {
 				return err
 			}
 		}
@@ -334,23 +340,17 @@ func (r *sqlReportRepository) UpdateReportStatus(ctx context.Context, reportID i
 		if currentReportStatus == "appeal_pending" {
 			// นักเขียนขอปลดแบน แต่แอดมินปฏิเสธ (ไม่ยอมปลดแบนให้)
 			writerMsg := "คำขอปลดแบนสำหรับนิยายเรื่อง '" + novelTitle + "' ถูกปฏิเสธ เหตุผล: " + strings.TrimSpace(req.Reason)
-			_, err = tx.ExecContext(ctx,
-				`INSERT INTO notifications (user_id, type, reference_id, reference_type, message, is_read, created_at) 
-				 VALUES ($1, 'system', $2, 'novel', $3, false, NOW())`,
-				writerUserID, novelID, writerMsg,
-			)
-			if err != nil {
+			if err := insertReportNotifications(ctx, tx, novelID, reportNotification{userID: writerUserID, message: writerMsg}); err != nil {
 				return err
 			}
 		} else {
 			// คนอ่านรายงานเข้ามา แต่แอดมินตรวจแล้วไม่ผิด
 			reporterMsg := "การรายงานนิยายเรื่อง '" + novelTitle + "' ของคุณถูกปฏิเสธ เหตุผล: " + strings.TrimSpace(req.Reason)
-			_, err = tx.ExecContext(ctx,
-				`INSERT INTO notifications (user_id, type, reference_id, reference_type, message, is_read, created_at) 
-				 VALUES ($1, 'system', $2, 'novel', $3, false, NOW())`,
-				reporterID, novelID, reporterMsg,
-			)
-			if err != nil {
+			writerMsg := "นิยายเรื่อง '" + novelTitle + "' ที่มีรายงานได้รับการตรวจสอบแล้ว และรายงานถูกปฏิเสธ เหตุผล: " + strings.TrimSpace(req.Reason)
+			if err := insertReportNotifications(ctx, tx, novelID,
+				reportNotification{userID: reporterID, message: reporterMsg},
+				reportNotification{userID: writerUserID, message: writerMsg},
+			); err != nil {
 				return err
 			}
 		}
