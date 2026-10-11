@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import "./NovelDetailPage.css";
 
@@ -10,7 +10,7 @@ import EndingCollection from "../../../components/EndingCollection/EndingCollect
 import Comments from "../../../components/Comments/Comments";
 import ReaderReportButton from "../../../components/ReaderReportButton/ReaderReportButton";
 import AdminModeBanner from "../../../components/AdminModeBanner/AdminModeBanner";
-import LoadingScreen from "../../../components/LoadingScreen/LoadingScreen";
+import { NovelDetailSkeleton, DataLoadError, ButtonSpinner } from "../../../components/Skeleton";
 import { ShieldAlert, ChevronDown, Pencil, Map, Bookmark, Heart, MoreVertical, RotateCcw, Flag, Play, CheckCircle2, MapPin, Trophy } from "lucide-react";
 import { getBannedRegistry, cleanBanReason, extractBanDetails } from "../../../utils/novelStatus";
 import { showToast } from "../../../utils/toast";
@@ -369,20 +369,27 @@ const NovelDetailPage = () => {
 
       const payload = await response.json().catch(() => null);
       const commentsData = payload?.comments || payload?.data?.comments || [];
-      setComments(Array.isArray(commentsData) ? commentsData : []);
+      const list = Array.isArray(commentsData) ? commentsData : [];
+      setComments(list);
+      setNovel((prev) => ({
+        ...prev,
+        stats: {
+          ...prev.stats,
+          comments: list.length,
+        },
+      }));
     } catch (err) {
       console.warn("Failed to load novel comments:", err);
       setComments([]);
     }
   };
 
-  useEffect(() => {
-    const fetchNovel = async () => {
-      if (!id) {
-        setError("ไม่พบรหัสนิยาย");
-        setLoading(false);
-        return;
-      }
+  const fetchNovel = useCallback(async () => {
+    if (!id) {
+      setError("ไม่พบรหัสนิยาย");
+      setLoading(false);
+      return;
+    }
 
       setLoading(true);
       setError(null);
@@ -672,10 +679,24 @@ const NovelDetailPage = () => {
       } finally {
         setLoading(false);
       }
-    };
-
-    fetchNovel();
   }, [id]);
+
+  useEffect(() => {
+    fetchNovel();
+  }, [fetchNovel]);
+
+  // เลื่อนหน้าจอไปที่ส่วนคอมเมนต์เมื่อเปิดด้วย #comments
+  useEffect(() => {
+    if (location.hash === "#comments") {
+      const scrollTimer = setTimeout(() => {
+        const commentsEl = document.getElementById("comments") || document.querySelector(".novel-detail__comments-section");
+        if (commentsEl) {
+          commentsEl.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+      }, 400);
+      return () => clearTimeout(scrollTimer);
+    }
+  }, [location.hash, loading]);
 
   // ใช้ร่วมกันระหว่างเคส admin กับเคส non-admin ที่ไม่มี nextSceneId บันทึกไว้
   // (เดิมสองเคสนี้ fetch story-tree แล้วดึง first_scene_id ด้วยโค้ดชุดเดียวกันซ้ำสองรอบ)
@@ -1006,20 +1027,24 @@ const fetchFirstSceneAndNavigate = async (previewSuffix) => {
     : (novel.userProgress?.percentage || 0);
 
   if (loading) {
-    return <LoadingScreen />;
+    return (
+      <div className="novel-detail">
+        <NovelDetailSkeleton />
+      </div>
+    );
   }
 
   if (error) {
     return (
       <div className="novel-detail">
         <div className="novel-detail__container">
-          <div className="novel-detail__state-card novel-detail__state-card--error">
-            <div className="novel-detail__state-icon" aria-hidden="true">⚠️</div>
-            <p className="novel-detail__state-text">เกิดข้อผิดพลาด: {error}</p>
-            <button className="novel-detail__banned-btn" onClick={() => navigate("/")}>
-              กลับหน้าหลัก
-            </button>
-          </div>
+          <DataLoadError
+            title="เกิดข้อผิดพลาดในการโหลดนิยาย"
+            message={error}
+            onRetry={fetchNovel}
+            onBack={() => navigate("/")}
+            backText="กลับหน้าหลัก"
+          />
         </div>
       </div>
     );
@@ -1148,7 +1173,7 @@ const fetchFirstSceneAndNavigate = async (previewSuffix) => {
                     disabled={readLoading}
                     aria-label={hasReadBefore ? "อ่านต่อ" : "อ่านเลย"}
                   >
-                    <Play size={14} fill="currentColor" />
+                    {readLoading ? <ButtonSpinner /> : <Play size={14} fill="currentColor" />}
                     <span>{readLoading ? "กำลังเปิด..." : (hasReadBefore ? "อ่านต่อ" : "อ่านเลย")}</span>
                   </button>
 
@@ -1184,7 +1209,7 @@ const fetchFirstSceneAndNavigate = async (previewSuffix) => {
                     disabled={bookmarkProcessing}
                     aria-pressed={novel.isBookmarked}
                   >
-                    <Bookmark size={15} fill={novel.isBookmarked ? "currentColor" : "none"} />
+                    {bookmarkProcessing ? <ButtonSpinner /> : <Bookmark size={15} fill={novel.isBookmarked ? "currentColor" : "none"} />}
                     <span>{bookmarkProcessing ? "กำลังบันทึก..." : (novel.isBookmarked ? "อยู่ในชั้นหนังสือ" : "เพิ่มเข้าชั้นหนังสือ")}</span>
                   </button>
 
@@ -1434,6 +1459,14 @@ const fetchFirstSceneAndNavigate = async (previewSuffix) => {
         <Comments
           comments={comments}
           currentUserId={getCurrentUserId()}
+          currentUser={getCurrentUser()}
+          novelAuthor={{
+            userId: novel.author?.user_id,
+            writerId: novel.author?.writer_id || novel.author?.id,
+            displayName: novel.author?.displayName,
+            penName: novel.author?.penName,
+            avatarUrl: novel.author?.avatarUrl,
+          }}
           commentText={commentText}
           isSubmitting={commentSubmitting}
           onCommentTextChange={(e) => setCommentText(e.target.value)}

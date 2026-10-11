@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Search, X, ArrowUpDown, ArrowLeft, AlertTriangle, Feather } from "lucide-react";
-import WriterCard from "../../../components/WriterCard/WriterCard"; // เรียกใช้ Component ย่อยที่แยกออกมา
-import LoadingScreen from "../../../components/LoadingScreen/LoadingScreen";
+import WriterCard from "../../../components/WriterCard/WriterCard";
+import { Skeleton, DataLoadError } from "../../../components/Skeleton";
 import "./FollowingWriters.css";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
@@ -337,7 +337,35 @@ export default function FollowingWriters() {
   if (sort === "recent") visible = [...visible].sort((a,b) => (b.latestUpdateTimestamp ?? 0) - (a.latestUpdateTimestamp ?? 0));
 
   if (loading) {
-    return <LoadingScreen />;
+    return (
+      <div className="following-page">
+        <div className="following-page__sticky-header">
+          <div className="following-page__top">
+            <div className="following-page__heading">
+              <button className="backBtn" onClick={() => navigate(-1)} aria-label="ย้อนกลับ">
+                <ArrowLeft size={18} />
+              </button>
+              <div className="following-page__labels">
+                <div className="following-page__eyebrow">นักเขียนของฉัน</div>
+                <div className="following-page__title">นักเขียนที่ติดตาม</div>
+              </div>
+            </div>
+            <div className="following-page__count">กำลังโหลด...</div>
+          </div>
+        </div>
+        <div className="following-page__container" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '20px', padding: '24px 0' }}>
+          {Array.from({ length: 6 }).map((_, idx) => (
+            <div key={idx} style={{ background: '#fff', borderRadius: '16px', padding: '20px', border: '1px solid #f0eef4', display: 'flex', gap: '16px', alignItems: 'center' }}>
+              <Skeleton variant="circular" width="56px" height="56px" />
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <Skeleton width="60%" height="18px" />
+                <Skeleton width="40%" height="13px" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
   }
 
   return (

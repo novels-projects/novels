@@ -22,10 +22,79 @@
 .novel-detail__comment-form {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
   margin-bottom: 28px;
   position: relative;
   z-index: 1;
+}
+
+.novel-detail__comment-composer-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  background: var(--reader-surface-soft, rgba(253, 242, 248, 0.7));
+  border: 1px solid var(--reader-border, rgba(244, 114, 182, 0.2));
+  border-radius: 14px;
+}
+
+.novel-detail__composer-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  overflow: hidden;
+  flex-shrink: 0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  border: 1.5px solid var(--reader-border, rgba(244, 114, 182, 0.3));
+}
+
+.novel-detail__composer-avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.novel-detail__composer-avatar-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 15px;
+  font-family: 'Sarabun', sans-serif;
+}
+
+.novel-detail__composer-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.novel-detail__composer-name {
+  font-family: 'Sarabun', sans-serif;
+  font-size: 13.5px;
+  color: var(--reader-text, #374151);
+}
+
+.novel-detail__composer-name strong {
+  color: var(--pink-600, #db2777);
+  font-weight: 700;
+}
+
+.novel-detail__composer-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(236, 72, 153, 0.1);
+  color: var(--pink-600, #db2777);
+  font-weight: 600;
+  font-family: 'Sarabun', sans-serif;
 }
 
 .novel-detail__comment-actions {
@@ -128,6 +197,15 @@
   background: var(--reader-accent-soft, rgb(249, 198, 219));
 }
 
+.novel-detail__comment-card--author {
+  border-color: rgba(244, 114, 182, 0.35) !important;
+  background: rgba(253, 242, 248, 0.6) !important;
+}
+
+.novel-detail__comment-card--you {
+  border-color: rgba(191, 219, 254, 0.45);
+}
+
 .novel-detail__comment-avatar {
   width: 46px;
   height: 46px;
@@ -143,12 +221,26 @@
   font-weight: 700;
   color: #ffffff;
   flex-shrink: 0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 
 .novel-detail__comment-avatar-img {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  display: block;
+}
+
+.novel-detail__comment-avatar-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  font-size: 18px;
+  font-weight: 700;
+  font-family: 'Sarabun', sans-serif;
 }
 
 .novel-detail__comment-body {
@@ -162,6 +254,14 @@
   justify-content: space-between;
 
   margin-bottom: 8px;
+  gap: 10px;
+}
+
+.novel-detail__comment-user-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .novel-detail__comment-user {
@@ -169,6 +269,30 @@
   font-size: 14px;
   font-weight: 600;
   color: var(--reader-text, var(--ink));
+}
+
+.novel-detail__comment-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 1.5px 8px;
+  border-radius: 999px;
+  letter-spacing: 0.2px;
+  line-height: 1.4;
+  font-family: 'Sarabun', sans-serif;
+}
+
+.novel-detail__comment-badge--author {
+  background: #fdf2f8;
+  color: #db2777;
+  border: 1px solid #fbcfe8;
+}
+
+.novel-detail__comment-badge--you {
+  background: #eff6ff;
+  color: #2563eb;
+  border: 1px solid #bfdbfe;
 }
 
 .novel-detail__comment-date {

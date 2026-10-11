@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { ArrowLeft, ChevronDown, ChevronUp, Trash2, X, Map, Play, History } from "lucide-react";
-import LoadingScreen from "../../../components/LoadingScreen/LoadingScreen";
+import { NovelCardGridSkeleton } from "../../../components/Skeleton";
 import "./HistoryPage.css";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
@@ -125,7 +125,7 @@ const normalizeBook = (item) => {
       item.username ||
       "ไม่ทราบผู้แต่ง",
     categories: Array.isArray(item.categories) && item.categories.length > 0
-      ? item.categories.map(normalizeCategoryName).filter(Boolean)
+      ? Array.from(new Set(item.categories.map(normalizeCategoryName).filter(Boolean)))
       : ["ทั่วไป"],
     // ไม่มี fallback รูปจากเว็บนอก — ถ้า backend ไม่ส่ง cover มาก็ให้การ์ดไปโชว์ placeholder ของตัวเอง
     coverImage: item.cover_image || null,
@@ -519,8 +519,8 @@ const HistoryPage = () => {
           ))}
         </div>
 
-        {loading ? (
-          <LoadingScreen compact message="กำลังโหลดประวัติการอ่าน..." />
+        {loading && books.length === 0 ? (
+          <NovelCardGridSkeleton count={6} />
         ) : filteredBooks.length === 0 ? (
           <div className="history-page__empty">
             <div className="history-page__empty-icon">

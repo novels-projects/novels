@@ -10,7 +10,7 @@ import "quill/dist/quill.snow.css";
 import "./SceneEditorPage.css";
 import Toggle from "../../../components/Toggle/Toggle";
 import EndingSettings from "../../../components/EndingSettings/EndingSettings";
-import LoadingScreen from "../../../components/LoadingScreen/LoadingScreen";
+import { Skeleton, ButtonSpinner } from "../../../components/Skeleton";
 import { Search, Menu } from "lucide-react";
 import { getChoiceConnectionBlockReason, getChoiceConnectionMessage } from "../../../utils/choiceValidation";
 
@@ -2656,7 +2656,26 @@ const SceneEditorPage = ({
   }, [sceneId, isLoading]);
 
   if (isLoading) {
-    return <LoadingScreen />;
+    return (
+      <div className="se" style={{ minHeight: "100vh", display: "flex" }}>
+        <div style={{ width: "280px", borderRight: "1px solid #f0eef4", padding: "20px", display: "flex", flexDirection: "column", gap: "12px", background: "#fff" }}>
+          <Skeleton width="140px" height="24px" />
+          <Skeleton width="100%" height="40px" borderRadius="10px" />
+          <Skeleton width="100%" height="40px" borderRadius="10px" />
+          <Skeleton width="100%" height="40px" borderRadius="10px" />
+        </div>
+        <div style={{ flex: 1, padding: "32px", display: "flex", flexDirection: "column", gap: "20px", maxWidth: "900px", margin: "0 auto" }}>
+          <Skeleton width="50%" height="32px" />
+          <Skeleton width="100%" height="48px" borderRadius="12px" />
+          <div style={{ background: "#fff", borderRadius: "16px", padding: "32px", border: "1px solid #f0eef4", display: "flex", flexDirection: "column", gap: "16px" }}>
+            <Skeleton width="100%" height="16px" />
+            <Skeleton width="95%" height="16px" />
+            <Skeleton width="98%" height="16px" />
+            <Skeleton width="80%" height="16px" />
+          </div>
+        </div>
+      </div>
+    );
   }
 
   if (isEmptyNovel) {

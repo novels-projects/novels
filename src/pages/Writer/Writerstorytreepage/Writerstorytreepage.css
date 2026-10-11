@@ -521,15 +521,56 @@
   cursor: grabbing !important;
 }
 
-/* ในโหมดเลื่อนบอร์ด (Pan Mode) ปิด hover effect และไฮไลท์สีแดงที่เส้นทางเลือก */
+/* ในโหมดเชื่อมโยง (Connect), โหมดเพิ่มฉาก (Add-Node) และโหมดเลื่อนบอร์ด (Pan) 
+   ปิด hover effect และไฮไลท์สีแดงที่เส้นเชื่อมและกล่องข้อความทางเลือก */
 .wst-mode-pan .react-flow__edge,
 .wst-mode-pan .react-flow__edge-path,
+.wst-mode-pan .react-flow__edge-interaction,
 .wst-mode-pan .react-flow__edge-foreignobject,
 .wst-mode-pan g.react-flow__edge,
 .wst-mode-pan .react-flow__edge:hover,
-.wst-mode-pan .react-flow__edge-path:hover {
+.wst-mode-pan .react-flow__edge-path:hover,
+.wst-mode-pan .wst-edge-choice-wrapper,
+.wst-mode-pan .wst-edge-choice-badge,
+.wst-mode-connect .react-flow__edge,
+.wst-mode-connect .react-flow__edge-path,
+.wst-mode-connect .react-flow__edge-interaction,
+.wst-mode-connect .react-flow__edge-foreignobject,
+.wst-mode-connect g.react-flow__edge,
+.wst-mode-connect .react-flow__edge:hover,
+.wst-mode-connect .react-flow__edge-path:hover,
+.wst-mode-connect .wst-edge-choice-wrapper,
+.wst-mode-connect .wst-edge-choice-badge,
+.wst-mode-connect .wst-edge-choice-badge:hover,
+.wst-mode-add-node .react-flow__edge,
+.wst-mode-add-node .react-flow__edge-path,
+.wst-mode-add-node .react-flow__edge-interaction,
+.wst-mode-add-node .react-flow__edge-foreignobject,
+.wst-mode-add-node g.react-flow__edge,
+.wst-mode-add-node .react-flow__edge:hover,
+.wst-mode-add-node .react-flow__edge-path:hover,
+.wst-mode-add-node .wst-edge-choice-wrapper,
+.wst-mode-add-node .wst-edge-choice-badge,
+.wst-mode-add-node .wst-edge-choice-badge:hover {
   pointer-events: none !important;
+}
+
+.wst-mode-pan .react-flow__edge,
+.wst-mode-pan .react-flow__edge-path,
+.wst-mode-pan .wst-edge-choice-badge {
   cursor: grab !important;
+}
+
+.wst-mode-connect .react-flow__edge,
+.wst-mode-connect .react-flow__edge-path,
+.wst-mode-connect .wst-edge-choice-badge {
+  cursor: crosshair !important;
+}
+
+.wst-mode-add-node .react-flow__edge,
+.wst-mode-add-node .react-flow__edge-path,
+.wst-mode-add-node .wst-edge-choice-badge {
+  cursor: cell !important;
 }
 
 /* React Flow Handle custom style */
@@ -1296,12 +1337,18 @@
 
 .react-flow__edge-path {
   stroke-linejoin: round;
-  transition: stroke-width 0.12s ease, stroke 0.12s ease;
+  transition: stroke-width 0.15s ease, stroke 0.15s ease, stroke-opacity 0.15s ease;
 }
 
-.react-flow__edge-path:hover {
-  stroke: #ef4444 !important; /* ปรับไฮไลท์ให้เด่นขึ้นเวลาชี้ลบ */
+.react-flow__edge-path:hover,
+.react-flow__edge-path.react-flow__edge-path--hovered {
+  stroke: #ef4444 !important; /* ปรับไฮไลท์สีแดงสดใสเวลาเมาส์ชี้เส้นหรือชี้ข้อความทางเลือก */
   stroke-width: 4px !important;
+}
+
+.react-flow__edge-interaction {
+  pointer-events: stroke !important;
+  cursor: pointer !important;
 }
 
 .react-flow__edge-text {
@@ -1319,6 +1366,65 @@
   stroke: #e2e8f0 !important;
   stroke-width: 1px !important;
   pointer-events: none !important; /* ยอมให้เมาส์คลิกทะลุพื้นหลังข้อความ */
+}
+
+/* Choice Edge Label Badge (ข้อความทางเลือก) */
+.wst-edge-choice-wrapper {
+  cursor: pointer;
+  transition: opacity 0.2s ease, z-index 0.2s ease;
+}
+
+.wst-edge-choice-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transform-origin: center center;
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1),
+              border-color 0.2s ease,
+              border-width 0.2s ease,
+              box-shadow 0.2s ease,
+              color 0.2s ease,
+              background-color 0.2s ease;
+  user-select: none;
+}
+
+.wst-edge-choice-badge:hover,
+.wst-edge-choice-badge.wst-edge-choice-badge--hovered {
+  border: 2px solid #ef4444 !important;
+  border-color: #ef4444 !important;
+  color: #dc2626 !important;
+  transform: scale(1.1) !important;
+  box-shadow: 0 4px 14px rgba(239, 68, 68, 0.28), 0 0 0 1px rgba(239, 68, 68, 0.2) !important;
+  z-index: 3500 !important;
+}
+
+/* ปิด hover effect ทุกรูปแบบของกล่องทางเลือกและเส้นเชื่อมเมื่ออยู่ในโหมด connect, add-node, pan */
+.wst-mode-connect .wst-edge-choice-badge,
+.wst-mode-connect .wst-edge-choice-badge:hover,
+.wst-mode-connect .wst-edge-choice-badge.wst-edge-choice-badge--hovered,
+.wst-mode-add-node .wst-edge-choice-badge,
+.wst-mode-add-node .wst-edge-choice-badge:hover,
+.wst-mode-add-node .wst-edge-choice-badge.wst-edge-choice-badge--hovered,
+.wst-mode-pan .wst-edge-choice-badge,
+.wst-mode-pan .wst-edge-choice-badge:hover,
+.wst-mode-pan .wst-edge-choice-badge.wst-edge-choice-badge--hovered {
+  transform: scale(1) !important;
+  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.08) !important;
+  border: 1.5px solid #bfdbfe !important;
+  border-color: #bfdbfe !important;
+  color: #1e3a8a !important;
+  z-index: 100 !important;
+}
+
+.wst-mode-connect .react-flow__edge-path:hover,
+.wst-mode-connect .react-flow__edge-path.react-flow__edge-path--hovered,
+.wst-mode-add-node .react-flow__edge-path:hover,
+.wst-mode-add-node .react-flow__edge-path.react-flow__edge-path--hovered,
+.wst-mode-pan .react-flow__edge-path:hover,
+.wst-mode-pan .react-flow__edge-path.react-flow__edge-path--hovered {
+  stroke: inherit !important;
+  stroke-width: inherit !important;
 }
 /* ==========================================
    DAG Guard: ฟีดแบ็กภาพเวลาเชื่อม/ย้ายเส้นแล้วปลายทางไม่ถูกต้อง (Backward/Cycle)

@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
-import LoadingScreen from "../../../components/LoadingScreen/LoadingScreen";
+import { NovelCardGridSkeleton, ButtonSpinner } from "../../../components/Skeleton";
 import "./BookshelfPage.css";
 import {
     ArrowLeft,
@@ -236,7 +236,9 @@ const normalizeBook = (item) => {
 
             if (!Array.isArray(cats) || cats.length === 0) return ["ทั่วไป"];
 
-            return cats.map(normalizeCategoryName).filter(Boolean);
+            const cleanCats = cats.map(normalizeCategoryName).filter(Boolean);
+            const uniqueCats = Array.from(new Set(cleanCats));
+            return uniqueCats.length > 0 ? uniqueCats : ["ทั่วไป"];
         })(),
 
         coverImage: formatMinioUrl(
@@ -540,8 +542,8 @@ const BookshelfPage = () => {
                     ))}
                 </div>
 
-                {loading ? (
-                    <LoadingScreen compact message="กำลังโหลดชั้นหนังสือ..." />
+                {loading && books.length === 0 ? (
+                    <NovelCardGridSkeleton count={6} />
                 ) : (
                     <>
                         {filteredBooks.length === 0 ? (

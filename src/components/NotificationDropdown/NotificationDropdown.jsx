@@ -1,9 +1,38 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { Bell, ChevronRight, Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { Skeleton } from "../Skeleton";
 import "./NotificationDropdown.css";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
+
+const formatMinioUrl = (url) => {
+  if (!url || typeof url !== "string") return null;
+  const trimmed = url.trim();
+  if (!trimmed) return null;
+  let formatted = trimmed;
+  if (formatted.includes("http://minio:9000")) {
+    formatted = formatted.replace("http://minio:9000", "http://localhost:9000");
+  }
+  if (formatted.startsWith("/")) {
+    formatted = `http://localhost:9000${formatted}`;
+  }
+  return formatted;
+};
+
+const AVATAR_PALETTE = [
+  "#F472B6", "#A78BFA", "#60A5FA", "#34D399",
+  "#FBBF24", "#FB7185", "#38BDF8", "#C084FC"
+];
+
+const getAvatarColor = (name) => {
+  let hash = 0;
+  for (let i = 0; i < (name || "").length; i++) {
+    hash = (hash << 5) - hash + name.charCodeAt(i);
+    hash |= 0;
+  }
+  return AVATAR_PALETTE[Math.abs(hash) % AVATAR_PALETTE.length];
+};
 
 const NOTIFICATION_TYPE_LABEL = {
   system: "ระบบ",
@@ -13,19 +42,60 @@ const NOTIFICATION_TYPE_LABEL = {
   follower: "ผู้ติดตาม",
 };
 
-const normalizeNotification = (item = {}) => ({
-  id: item.id ?? item.notification_id,
-  type: item.type === "follow" ? "follower" : item.type || "system",
-  read: Boolean(item.is_read ?? item.read),
-  actorName: item.actor_name || item.actor?.name || "StoryVerse System",
-  actorColor: item.actor_color || item.actor?.avatarColor || "#E91E8C",
-  title: item.title || item.message || item.body || "มีการแจ้งเตือนใหม่",
-  body: item.title ? item.message || item.body || "" : "",
-  referenceId: item.reference_id ?? item.referenceId ?? null,
-  referenceType: item.reference_type ?? item.referenceType ?? "system",
-  createdAt: item.created_at ?? item.createdAt ?? new Date().toISOString(),
-  typeLabel: NOTIFICATION_TYPE_LABEL[item.type === "follow" ? "follower" : item.type || "system"] || "ระบบ",
-});
+const normalizeNotification = (item = {}) => {
+  const currentUser = (() => {
+    try {
+      return JSON.parse(localStorage.getItem("user") || "null");
+    } catch {
+      return null;
+    }
+  })();
+
+  const rawType = item.type || item.notification_type || "system";
+  const type = rawType === "follow" ? "follower" : rawType;
+  const isSystem = type === "system";
+
+  const actorName = isSystem
+    ? "StoryVerse ระบบ"
+    : (item.actor_name || item.actor?.name || "StoryVerse");
+
+  let actorAvatar = item.actor_avatar || item.actor?.avatar || null;
+  // หากเป็นคอมเมนต์/การกระทำของผู้ใช้ปัจจุบัน ดึงรูปโปรไฟล์ของ currentUser มาแสดง
+  if (!actorAvatar && !isSystem && currentUser) {
+    if (
+      (item.actor_id && Number(item.actor_id) === Number(currentUser.id || currentUser.user_id)) ||
+      (actorName && currentUser.username && actorName.toLowerCase() === currentUser.username.toLowerCase())
+    ) {
+      actorAvatar = currentUser.pic_profile || null;
+    }
+  }
+
+  // แยกชื่อเรื่องและข้อความคอมเมนต์
+  let title = item.title || "";
+  let body = item.body || item.message || "";
+  if (type === "comment" && item.message && item.message.includes("|")) {
+    const parts = item.message.split("|");
+    if (parts.length >= 2) {
+      body = parts.slice(1).join("|").trim();
+    }
+  }
+
+  return {
+    id: item.id ?? item.notification_id,
+    type,
+    isSystem,
+    read: Boolean(item.is_read ?? item.read),
+    actorId: item.actor_id ?? item.actor?.id ?? 0,
+    actorName,
+    actorAvatar: formatMinioUrl(actorAvatar),
+    title: title || (type === "comment" ? "นิยาย" : "มีการแจ้งเตือนใหม่"),
+    body,
+    referenceId: item.reference_id ?? item.referenceId ?? null,
+    referenceType: item.reference_type ?? item.referenceType ?? "system",
+    createdAt: item.created_at ?? item.createdAt ?? new Date().toISOString(),
+    typeLabel: NOTIFICATION_TYPE_LABEL[type] || "ระบบ",
+  };
+};
 
 const formatTime = (date) => {
   const diff = (Date.now() - new Date(date)) / 1000;
@@ -41,6 +111,7 @@ export default function NotificationDropdown({ unreadCount = 0 }) {
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [failedAvatars, setFailedAvatars] = useState(new Set());
 
   useEffect(() => {
     const handleOutsideClick = (event) => {
@@ -60,37 +131,48 @@ export default function NotificationDropdown({ unreadCount = 0 }) {
     };
   }, []);
 
+  const loadRecentNotifications = useCallback(async () => {
+    setLoading(true);
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${API_BASE_URL}/notifications?limit=5`, {
+        credentials: "include",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!response.ok) throw new Error(`Request failed: ${response.status}`);
+
+      const payload = await response.json();
+      const data = payload?.data ?? payload;
+      const list = Array.isArray(data)
+        ? data
+        : Array.isArray(data?.notifications)
+          ? data.notifications
+          : [];
+      setItems(list.map(normalizeNotification).slice(0, 5));
+    } catch (error) {
+      console.warn("โหลดแจ้งเตือนใน dropdown ไม่สำเร็จ", error);
+      setItems([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
-    if (!open) return;
+    if (open) {
+      loadRecentNotifications();
+    }
+  }, [open, loadRecentNotifications]);
 
-    const loadRecentNotifications = async () => {
-      setLoading(true);
-      try {
-        const token = localStorage.getItem("token");
-        const response = await fetch(`${API_BASE_URL}/notifications?limit=5`, {
-          credentials: "include",
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-        });
-        if (!response.ok) throw new Error(`Request failed: ${response.status}`);
-
-        const payload = await response.json();
-        const data = payload?.data ?? payload;
-        const list = Array.isArray(data)
-          ? data
-          : Array.isArray(data?.notifications)
-            ? data.notifications
-            : [];
-        setItems(list.map(normalizeNotification).slice(0, 5));
-      } catch (error) {
-        console.warn("โหลดแจ้งเตือนใน dropdown ไม่สำเร็จ", error);
-        setItems([]);
-      } finally {
-        setLoading(false);
+  // ซิงค์ข้อมูลเมื่อมีการอัปเดตแจ้งเตือนจากหน้าอื่น
+  useEffect(() => {
+    const handleUpdate = () => {
+      if (open) {
+        loadRecentNotifications();
       }
     };
-
-    loadRecentNotifications();
-  }, [open]);
+    window.addEventListener("notifications-updated", handleUpdate);
+    return () => window.removeEventListener("notifications-updated", handleUpdate);
+  }, [open, loadRecentNotifications]);
 
   const markReadAndNavigate = async (notification) => {
     if (!notification.read && notification.id) {
@@ -105,34 +187,42 @@ export default function NotificationDropdown({ unreadCount = 0 }) {
 
     setOpen(false);
 
-    const userObj = JSON.parse(localStorage.getItem("user") || "{}");
-    const userRole = (userObj.role || userObj.user_role || "").toLowerCase();
-    const isWriter = userRole === "writer" || userRole === "admin";
     const refId = notification.referenceId;
     const refType = notification.referenceType;
 
-    if (isWriter && refId && (refType === "novel" || refType === "chapter" || refType === "report" || refType === "ban" || refType === "system")) {
-      navigate(`/writer/${refId}/chapters`);
+    // ถ้าเป็นการแจ้งเตือนคอมเมนต์ นำทางไปที่หน้ารายละเอียดนิยายพร้อมเลื่อนไปที่ส่วนคอมเมนต์
+    if (notification.type === "comment" && refId) {
+      navigate(`/novel/${refId}#comments`);
       return;
     }
 
     if (refType === "novel" && refId) {
-      if (isWriter) {
-        navigate(`/writer/${refId}/chapters`);
-      } else {
-        navigate(`/novel/${refId}`);
-      }
-    } else if (refType === "chapter" && refId) {
-      if (isWriter) {
-        navigate(`/writer/${refId}/chapters`);
-      } else {
-        navigate(`/novel/${refId}`);
-      }
-    } else if (refType === "user" && refId) {
-      navigate(`/writer/${refId}/profile`);
-    } else if (refId && isWriter) {
-      navigate(`/writer/${refId}/chapters`);
+      navigate(`/novel/${refId}`);
+      return;
     }
+
+    if (refType === "chapter" && refId) {
+      navigate(`/novel/${refId}`);
+      return;
+    }
+
+    if (refType === "user" && refId) {
+      navigate(`/writer/${refId}/profile`);
+      return;
+    }
+
+    if (notification.type === "follower" && (refId || notification.actorId)) {
+      navigate(`/writer/${refId || notification.actorId}/profile`);
+      return;
+    }
+
+    if (refId) {
+      navigate(`/novel/${refId}`);
+    }
+  };
+
+  const handleAvatarError = (id) => {
+    setFailedAvatars((prev) => new Set(prev).add(id));
   };
 
   return (
@@ -164,10 +254,17 @@ export default function NotificationDropdown({ unreadCount = 0 }) {
           </div>
 
           <div className="notification-dropdown__list">
-            {loading ? (
-              <div className="notification-dropdown__state">
-                <Loader2 size={20} className="notification-dropdown__spinner" />
-                กำลังโหลด...
+            {loading && items.length === 0 ? (
+              <div style={{ padding: "12px 16px", display: "flex", flexDirection: "column", gap: "12px" }}>
+                {Array.from({ length: 3 }).map((_, idx) => (
+                  <div key={idx} style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+                    <Skeleton variant="circular" width="36px" height="36px" />
+                    <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "6px" }}>
+                      <Skeleton width="50%" height="13px" />
+                      <Skeleton width="80%" height="11px" />
+                    </div>
+                  </div>
+                ))}
               </div>
             ) : items.length === 0 ? (
               <div className="notification-dropdown__state">
@@ -175,32 +272,70 @@ export default function NotificationDropdown({ unreadCount = 0 }) {
                 ยังไม่มีการแจ้งเตือน
               </div>
             ) : (
-              items.map((notification) => (
-                <button
-                  type="button"
-                  role="menuitem"
-                  className={`notification-dropdown__item ${notification.read ? "" : "is-unread"}`}
-                  key={notification.id}
-                  onClick={() => markReadAndNavigate(notification)}
-                >
-                  <span
-                    className="notification-dropdown__avatar"
-                    style={{ backgroundColor: notification.actorColor }}
+              items.map((notification) => {
+                const hasCustomPhoto = notification.actorAvatar && !failedAvatars.has(notification.id);
+
+                return (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className={`notification-dropdown__item ${notification.read ? "" : "is-unread"}`}
+                    key={notification.id}
+                    onClick={() => markReadAndNavigate(notification)}
                   >
-                    {notification.actorName.charAt(0)}
-                  </span>
-                  <span className="notification-dropdown__copy">
-                    <span className="notification-dropdown__meta-row">
-                      <strong>{notification.actorName}</strong>
-                      <span className="notification-dropdown__tag">{notification.typeLabel}</span>
+                    {notification.isSystem ? (
+                      <span className="notification-dropdown__avatar notification-dropdown__avatar--system" title="StoryVerse">
+                        <img src="/logo192.png" alt="StoryVerse" className="notification-dropdown__logo-img" />
+                      </span>
+                    ) : hasCustomPhoto ? (
+                      <span className="notification-dropdown__avatar">
+                        <img
+                          src={notification.actorAvatar}
+                          alt={notification.actorName}
+                          className="notification-dropdown__avatar-img"
+                          onError={() => handleAvatarError(notification.id)}
+                        />
+                      </span>
+                    ) : (
+                      <span
+                        className="notification-dropdown__avatar"
+                        style={{ backgroundColor: getAvatarColor(notification.actorName) }}
+                      >
+                        {notification.actorName.charAt(0).toUpperCase()}
+                      </span>
+                    )}
+
+                    <span className="notification-dropdown__copy">
+                      <span className="notification-dropdown__meta-row">
+                        <strong title={notification.actorName}>{notification.actorName}</strong>
+                        <span className="notification-dropdown__tag">{notification.typeLabel}</span>
+                      </span>
+
+                      {notification.type === "comment" ? (
+                        <>
+                          <span className="notification-dropdown__title" title={`เรื่อง : ${notification.title}`}>
+                            เรื่อง : {notification.title}
+                          </span>
+                          {notification.body && (
+                            <small title={`แสดงความคิดเห็นว่า : ${notification.body}`}>
+                              แสดงความคิดเห็นว่า : {notification.body}
+                            </small>
+                          )}
+                        </>
+                      ) : (
+                        <>
+                          <span className="notification-dropdown__title">{notification.title}</span>
+                          {notification.body && <small>{notification.body}</small>}
+                        </>
+                      )}
+
+                      <time>{formatTime(notification.createdAt)}</time>
                     </span>
-                    <span className="notification-dropdown__title">{notification.title}</span>
-                    {notification.body && <small>{notification.body}</small>}
-                    <time>{formatTime(notification.createdAt)}</time>
-                  </span>
-                  {!notification.read && <span className="notification-dropdown__dot" aria-label="ยังไม่ได้อ่าน" />}
-                </button>
-              ))
+
+                    {!notification.read && <span className="notification-dropdown__dot" aria-label="ยังไม่ได้อ่าน" />}
+                  </button>
+                );
+              })
             )}
           </div>
 
@@ -219,3 +354,4 @@ export default function NotificationDropdown({ unreadCount = 0 }) {
     </div>
   );
 }
+

@@ -7,10 +7,12 @@ import {
   Routes,
   Route,
   useNavigate,
+  useNavigation,
   useParams,
   useLocation,
   Navigate,
 } from "react-router-dom";
+import { TopProgressBar } from "./components/Skeleton";
 
 import Navbar from "./components/Navbar/Navbar";
 import AdminNavbar from "./components/NavbarAdmin/AdminNavbar";
@@ -821,8 +823,21 @@ const WriterRegisterPageRoute = () => {
 };
 
 const AppRootLayout = () => {
+  const navigation = useNavigation();
+  const location = useLocation();
+  const [routeTransitioning, setRouteTransitioning] = useState(false);
+
+  useEffect(() => {
+    setRouteTransitioning(true);
+    const timer = setTimeout(() => setRouteTransitioning(false), 260);
+    return () => clearTimeout(timer);
+  }, [location.pathname, location.search]);
+
+  const isNavigating = navigation.state === "loading" || routeTransitioning;
+
   return (
     <>
+      <TopProgressBar active={isNavigating} />
       <NavbarWrapper />
       <Outlet />
     </>
@@ -917,7 +932,11 @@ function App() {
   }, []);
 
   if (!authChecked) {
-    return null;
+    return (
+      <div style={{ minHeight: "100vh", backgroundColor: "var(--background-pink, #FCF5F7)" }}>
+        <TopProgressBar active={true} />
+      </div>
+    );
   }
 
   return <RouterProvider router={router} />;

@@ -20,7 +20,7 @@ import {
 import FollowButton from "../../../components/FollowButton/FollowButton";
 import GenreTag from "../../../components/GenreTag/GenreTag";
 import AdminModeBanner from "../../../components/AdminModeBanner/AdminModeBanner";
-import LoadingScreen from "../../../components/LoadingScreen/LoadingScreen";
+import { NovelCardGridSkeleton, Skeleton, DataLoadError, ButtonSpinner } from "../../../components/Skeleton";
 import "./WriterProfile.css";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
@@ -385,7 +385,27 @@ export default function WriterProfile() {
   };
 
   if (loading) {
-    return <LoadingScreen message="กำลังโหลดข้อมูลโปรไฟล์นักเขียน..." />;
+    return (
+      <div className="profile-wrapper">
+        <div className="profile-container">
+          <div style={{ background: '#fff', borderRadius: '24px', padding: '32px', border: '1px solid #ffd6e7', display: 'flex', gap: '28px', alignItems: 'center', marginBottom: '24px' }}>
+            <Skeleton variant="circular" width="100px" height="100px" />
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <Skeleton width="40%" height="24px" />
+              <Skeleton width="60%" height="14px" />
+              <div style={{ display: 'flex', gap: '16px', marginTop: '6px' }}>
+                <Skeleton width="80px" height="24px" borderRadius="12px" />
+                <Skeleton width="80px" height="24px" borderRadius="12px" />
+              </div>
+            </div>
+          </div>
+          <div style={{ marginTop: '20px' }}>
+            <Skeleton width="180px" height="24px" style={{ marginBottom: '16px' }} />
+            <NovelCardGridSkeleton count={4} />
+          </div>
+        </div>
+      </div>
+    );
   }
 
   if (error || !writerInfo) {
@@ -697,7 +717,7 @@ export default function WriterProfile() {
 
                 const rawCats = novel.categories || novel.Categories || [];
                 const catList = Array.isArray(rawCats)
-                  ? rawCats.map(c => (typeof c === "object" ? c.name : c)).filter(Boolean)
+                  ? Array.from(new Set(rawCats.map(c => (typeof c === "object" ? c.name : c)).filter(Boolean)))
                   : [];
 
                 const views = novel.views || novel.view_count || novel.total_views || 0;

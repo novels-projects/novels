@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import axios from "axios";
 import { Pencil, Bookmark, Eye, Heart } from "lucide-react";
 import "./HomePage.css";
 import { getNovelStatusInfo } from "../../../utils/novelStatus";
-import LoadingScreen from "../../../components/LoadingScreen/LoadingScreen";
+import { NovelCardSkeleton, NovelCardGridSkeleton, DataLoadError, Skeleton } from "../../../components/Skeleton";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
 
@@ -33,6 +33,71 @@ const getTagClass = (cat) => {
   return "tag-romance";
 };
 
+const normalizeCategories = (rawCats, catMap = null) => {
+  if (!rawCats) return ["ทั่วไป"];
+
+  let list = [];
+  if (Array.isArray(rawCats)) {
+    list = rawCats;
+  } else if (typeof rawCats === "string") {
+    try {
+      const parsed = JSON.parse(rawCats);
+      list = Array.isArray(parsed) ? parsed : [rawCats];
+    } catch {
+      list = rawCats.split(",").map((s) => s.trim());
+    }
+  } else if (typeof rawCats === "object") {
+    list = [rawCats];
+  }
+
+  const cleanNames = list.map((cat) => {
+    if (!cat) return null;
+
+    // ถ้าเป็นตัวเลข หรือ string ตัวเลขเดี่ยวๆ เช่น 1 หรือ "1"
+    const numId = Number(cat);
+    if (!isNaN(numId) && (typeof cat === "number" || (typeof cat === "string" && cat.trim() !== "" && /^\d+$/.test(cat.trim())))) {
+      if (catMap && catMap.has(numId)) {
+        return catMap.get(numId);
+      }
+    }
+
+    // ถ้าเป็น string
+    if (typeof cat === "string") {
+      const trimmed = cat.trim();
+      if (!trimmed) return null;
+      if (catMap && catMap.has(trimmed)) return catMap.get(trimmed);
+      return trimmed;
+    }
+
+    // ถ้าเป็น object เช่น { category_id: 1, name: "โรแมนติก" }
+    if (typeof cat === "object") {
+      const name = cat.name || cat.Name || cat.title || cat.Title || cat.label || cat.category_name;
+      if (name && typeof name === "string" && name.trim()) {
+        return name.trim();
+      }
+      const id = cat.category_id || cat.id || cat.categoryId;
+      if (id && catMap && catMap.has(Number(id))) {
+        return catMap.get(Number(id));
+      }
+    }
+
+    return null;
+  }).filter(Boolean);
+
+  // ตัดค่าหมวดหมู่ที่ซ้ำกันออกด้วย Set (case-insensitive & trimmed)
+  const seen = new Set();
+  const uniqueNames = [];
+  for (const name of cleanNames) {
+    const key = name.toLowerCase().trim();
+    if (!seen.has(key)) {
+      seen.add(key);
+      uniqueNames.push(name.trim());
+    }
+  }
+
+  return uniqueNames.length > 0 ? uniqueNames : ["ทั่วไป"];
+};
+
 const HomePage = ({ onNavigate }) => {
   const [novels, setNovels] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -40,6 +105,7 @@ const HomePage = ({ onNavigate }) => {
   const [error, setError] = useState(null);
   const [continueReadingNovels, setContinueReadingNovels] = useState([]);
 
+  const categoryMapRef = useRef(new Map());
   const [activeGenre, setActiveGenre] = useState("");
   const [isFollowed, setIsFollowed] = useState(false);
   const [followLoading, setFollowLoading] = useState(false);
@@ -47,98 +113,108 @@ const HomePage = ({ onNavigate }) => {
   const [toast, setToast] = useState({ isOpen: false, message: "" });
   const navigate = useNavigate();
 
-  useEffect(() => {
-    const fetchNovels = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const [response, responseCats] = await Promise.all([
-          fetch(`${API_BASE_URL}/novels`),
-          fetch(`${API_BASE_URL}/categories`)
-        ]);
-        const payload = await response.json().catch(() => null);
-        const payloadCats = await responseCats.json().catch(() => null);
+  const fetchNovels = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const [response, responseCats] = await Promise.all([
+        fetch(`${API_BASE_URL}/novels`),
+        fetch(`${API_BASE_URL}/categories`)
+      ]);
+      const payload = await response.json().catch(() => null);
+      const payloadCats = await responseCats.json().catch(() => null);
 
-        if (!response.ok) {
-          throw new Error(payload?.error || payload?.message || "ดึงข้อมูลไม่สำเร็จ");
-        }
-
-        const catRaw = payloadCats?.data || payloadCats || [];
-        const formattedCats = Array.isArray(catRaw)
-          ? catRaw.map(c => ({ id: c.category_id || c.id, name: String(c.name || c.title || "").trim() }))
-          : [];
-        setCategories(formattedCats);
-
-        const raw = payload?.data?.novels ?? payload?.data ?? payload?.novels ?? payload;
-        const candidates = Array.isArray(raw) ? raw : (Array.isArray(raw?.novels) ? raw.novels : []);
-
-        const publishedNovels = candidates.filter((data) => {
-          const statusInfo = getNovelStatusInfo(data);
-          if (!statusInfo.rawStatus) return true;
-          return statusInfo.mode === "published" || statusInfo.mode === "completed-published";
-        });
-
-        const formatted = publishedNovels.map((data) => {
-          const statusInfo = getNovelStatusInfo(data);
-          const coverImg = formatMinioUrl(data.cover_image);
-          const hasCover = !!coverImg;
-
-          return {
-            id: data.novel_id || data.id,
-            title: data.title || "ไม่มีชื่อเรื่อง",
-            createdAt: data.created_at || data.createdAt || null, // 🟢 ดึงวันที่สร้างมาใช้เช็คความใหม่
-            categories: (() => {
-              const cats = data.categories ?? data.Categories ?? data.CategoryIDs ?? data.category_ids ?? [];
-              if (!Array.isArray(cats) || cats.length === 0) return ["ทั่วไป"];
-              return cats.map((cat) => {
-                if (!cat) return null;
-                if (typeof cat === "string") return cat;
-                if (typeof cat === "number") return String(cat);
-                return cat.name || cat.Name || cat.title || cat.label || null;
-              }).filter(Boolean);
-            })(),
-            coverImage: coverImg,
-            coverEmoji: data.cover_emoji || (hasCover ? "" : "🔮"),
-            bg: data.cover_bg || "#F5F3FF", // เลิกใช้ Math กะโหลกกะลา ใช้สีโทนสว่างเป็น Default
-            author: {
-              id: data.author_id || data.writer_id || data.user_id || data.author?.id || 0, // 🟢 เปลี่ยนจาก 3 เป็น 0 เพื่อไม่ให้ไปชนกับ User ที่มีอยู่จริง
-              displayName: data.pen_name || data.author_pen_name || data.author_name || data.username || data.author?.displayName || data.author?.pen_name || "ไม่ทราบผู้แต่ง",
-              avatarUrl: formatMinioUrl(
-                data.author_avatar ||
-                data.author_avatar_url ||
-                data.authorAvatar ||
-                data.avatar_url ||
-                data.avatarUrl ||
-                data.author?.avatar_url ||
-                data.author?.avatarUrl ||
-                data.author?.avatar ||
-                data.writer_avatar ||
-                data.user_avatar
-              ),
-              bio: data.author_bio || data.bio || data.author?.bio,
-              follower_count: data.author_follower_count || data.follower_count || data.author?.follower_count || 0
-            },
-            synopsis: data.captions || data.introduction || data.synopsis || "ไม่มีคำโปรย", // 🟢 ดึงคำโปรยให้ครบ
-            views: data.views || data.view_count || 0,
-            like_count: data.like_count || data.likes || 0,
-            bookshelf_count: data.bookshelf_count || data.bookmarks || 0,
-            status: statusInfo.mode || "published",
-            is_completed: statusInfo.isCompleted || false,
-            chapters_count: data.chapters_count || data.chapters?.length || 0,
-          };
-        });
-
-        setNovels(formatted);
-      } catch (err) {
-        console.error("API Error in HomePage:", err);
-        setError("ไม่สามารถเชื่อมต่อกับฐานข้อมูลได้");
-      } finally {
-        setLoading(false);
+      if (!response.ok) {
+        throw new Error(payload?.error || payload?.message || "ดึงข้อมูลไม่สำเร็จ");
       }
-    };
 
-    fetchNovels();
+      const catRaw = payloadCats?.data || payloadCats || [];
+      const formattedCats = Array.isArray(catRaw)
+        ? catRaw.map(c => ({ id: c.category_id || c.id, name: String(c.name || c.title || "").trim() }))
+        : [];
+      setCategories(formattedCats);
+
+      const catMap = new Map();
+      formattedCats.forEach(c => {
+        if (c.id && c.name) {
+          catMap.set(Number(c.id), c.name);
+          catMap.set(String(c.id), c.name);
+        }
+      });
+      categoryMapRef.current = catMap;
+
+      const raw = payload?.data?.novels ?? payload?.data ?? payload?.novels ?? payload;
+      const candidates = Array.isArray(raw) ? raw : (Array.isArray(raw?.novels) ? raw.novels : []);
+
+      const publishedNovels = candidates.filter((data) => {
+        const statusInfo = getNovelStatusInfo(data);
+        if (!statusInfo.rawStatus) return true;
+        return statusInfo.mode === "published" || statusInfo.mode === "completed-published";
+      });
+
+      const formatted = publishedNovels.map((data) => {
+        const statusInfo = getNovelStatusInfo(data);
+        const coverImg = formatMinioUrl(data.cover_image);
+        const hasCover = !!coverImg;
+
+        const rawCats = (Array.isArray(data.categories) && data.categories.length > 0)
+          ? data.categories
+          : (Array.isArray(data.Categories) && data.Categories.length > 0)
+            ? data.Categories
+            : (Array.isArray(data.category_ids) && data.category_ids.length > 0)
+              ? data.category_ids
+              : (Array.isArray(data.CategoryIDs) && data.CategoryIDs.length > 0)
+                ? data.CategoryIDs
+                : (data.categories || data.Categories || data.category_ids || data.CategoryIDs || data.category || data.genre || []);
+
+        return {
+          id: data.novel_id || data.id,
+          title: data.title || "ไม่มีชื่อเรื่อง",
+          createdAt: data.created_at || data.createdAt || null,
+          categories: normalizeCategories(rawCats, catMap),
+          coverImage: coverImg,
+          coverEmoji: data.cover_emoji || (hasCover ? "" : "🔮"),
+          bg: data.cover_bg || "#F5F3FF",
+          author: {
+            id: data.author_id || data.writer_id || data.user_id || data.author?.id || 0,
+            displayName: data.pen_name || data.author_pen_name || data.author_name || data.username || data.author?.displayName || data.author?.pen_name || "ไม่ทราบผู้แต่ง",
+            avatarUrl: formatMinioUrl(
+              data.author_avatar ||
+              data.author_avatar_url ||
+              data.authorAvatar ||
+              data.avatar_url ||
+              data.avatarUrl ||
+              data.author?.avatar_url ||
+              data.author?.avatarUrl ||
+              data.author?.avatar ||
+              data.writer_avatar ||
+              data.user_avatar
+            ),
+            bio: data.author_bio || data.bio || data.author?.bio,
+            follower_count: data.author_follower_count || data.follower_count || data.author?.follower_count || 0
+          },
+          synopsis: data.captions || data.introduction || data.synopsis || "ไม่มีคำโปรย",
+          views: data.views || data.view_count || 0,
+          like_count: data.like_count || data.likes || 0,
+          bookshelf_count: data.bookshelf_count || data.bookmarks || 0,
+          status: statusInfo.mode || "published",
+          is_completed: statusInfo.isCompleted || false,
+          chapters_count: data.chapters_count || data.chapters?.length || 0,
+        };
+      });
+
+      setNovels(formatted);
+    } catch (err) {
+      console.error("API Error in HomePage:", err);
+      setError("ไม่สามารถเชื่อมต่อกับฐานข้อมูลได้ กรุณาลองใหม่อีกครั้ง");
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchNovels();
+  }, [fetchNovels]);
 
   const showToast = (message) => {
     setToast({ isOpen: true, message });
@@ -260,13 +336,21 @@ const HomePage = ({ onNavigate }) => {
           const visited = novel.visited_count || 0;
           const progressPercent = Math.min(Math.round((visited / total) * 100), 100);
 
+          const rawHistoryCats = (Array.isArray(novel.categories) && novel.categories.length > 0)
+            ? novel.categories
+            : (Array.isArray(novel.Categories) && novel.Categories.length > 0)
+              ? novel.Categories
+              : (Array.isArray(novel.category_ids) && novel.category_ids.length > 0)
+                ? novel.category_ids
+                : (novel.categories || novel.Categories || novel.category_ids || []);
+
           return {
             id: novel.novel_id || novel.id,
             title: novel.title,
             coverImage: formatMinioUrl(novel.cover_image),
             coverEmoji: novel.cover_emoji || "🔮",
             bg: novel.cover_bg || "#FFF0F8",
-            categories: novel.categories?.map(c => c.name || c) || ["ทั่วไป"],
+            categories: normalizeCategories(rawHistoryCats, categoryMapRef.current),
             progress: progressPercent,
             lastReadLocation: novel.last_read_scene_name || novel.last_read_scene_title || "อ่านล่าสุด",
             is_completed: statusInfo.isCompleted,
@@ -354,7 +438,7 @@ const HomePage = ({ onNavigate }) => {
           </div>
 
           <div className="hero-right">
-            {heroFeaturedNovel && (
+            {heroFeaturedNovel ? (
               <div className="book-stack">
                 <div className="book-card-float book-behind2"></div>
                 <div className="book-card-float book-behind1"></div>
@@ -402,10 +486,28 @@ const HomePage = ({ onNavigate }) => {
                   </div>
                 </div>
               </div>
-            )}
+            ) : loading ? (
+              <div className="book-stack" style={{ opacity: 0.85 }}>
+                <div className="book-card-float book-behind2"></div>
+                <div className="book-card-float book-behind1"></div>
+                <div className="book-card-float book-main" style={{ background: '#f5f3ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Skeleton variant="rectangular" width="100%" height="100%" borderRadius="12px" />
+                </div>
+              </div>
+            ) : null}
           </div>
         </div>
       </section>
+
+      {error && novels.length === 0 && (
+        <div style={{ maxWidth: '1200px', margin: '20px auto', padding: '0 20px' }}>
+          <DataLoadError
+            title="ไม่สามารถโหลดข้อมูลนิยายได้"
+            message={error}
+            onRetry={fetchNovels}
+          />
+        </div>
+      )}
 
       {/* ═══ 2. TRENDING SECTION (Section A) ═══ */}
       <section className="home-section home-section--a">
@@ -420,8 +522,14 @@ const HomePage = ({ onNavigate }) => {
             </Link>
           </div>
 
-          {loading ? (
-            <LoadingScreen compact message="กำลังโหลดนิยายยอดนิยม..." />
+          {loading && trendingNovels.length === 0 ? (
+            <div className="trending-scroll" style={{ overflow: "hidden" }}>
+              {Array.from({ length: 4 }).map((_, idx) => (
+                <div key={idx} style={{ minWidth: "220px", maxWidth: "220px", flexShrink: 0 }}>
+                  <NovelCardSkeleton />
+                </div>
+              ))}
+            </div>
           ) : trendingNovels.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--muted)' }}>ไม่มีนิยายยอดนิยมในขณะนี้</div>
           ) : (
@@ -502,8 +610,12 @@ const HomePage = ({ onNavigate }) => {
             </Link>
           </div>
 
-          {loading ? (
-            <LoadingScreen compact message="กำลังโหลดนิยายใหม่..." />
+          {loading && newReleases.length === 0 ? (
+            <div className="new-grid">
+              {Array.from({ length: 6 }).map((_, idx) => (
+                <NovelCardSkeleton key={idx} />
+              ))}
+            </div>
           ) : newReleases.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--muted)' }}>ไม่มีนิยายใหม่ในขณะนี้</div>
           ) : (
@@ -608,8 +720,12 @@ const HomePage = ({ onNavigate }) => {
             })}
           </div>
 
-          {loading ? (
-            <LoadingScreen compact message="กำลังโหลดนิยายแนวนี้..." />
+          {loading && spotlightNovels.length === 0 ? (
+            <div className="dark-cards">
+              {Array.from({ length: 4 }).map((_, idx) => (
+                <NovelCardSkeleton key={idx} dark={true} />
+              ))}
+            </div>
           ) : (
             <div className="dark-cards">
               {spotlightNovels.map((novel) => (

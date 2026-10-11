@@ -18,7 +18,7 @@ import ReactFlow, {
 import axios from "axios";
 import "./Writerstorytreepage.css";
 import { ChevronRight } from "lucide-react";
-import LoadingScreen from "../../../components/LoadingScreen/LoadingScreen";
+import { TreeCanvasSkeleton, ButtonSpinner } from "../../../components/Skeleton";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
 
@@ -363,6 +363,39 @@ const CustomMultigraphEdge = ({
   label,
   data,
 }) => {
+  const [isHovered, setIsHovered] = useState(false);
+  const hoverTimeoutRef = useRef(null);
+
+  const interactionMode = data?.interactionMode;
+  const isHoverDisabled = interactionMode === "connect" || interactionMode === "add-node" || interactionMode === "pan";
+  const activeHover = isHovered && !isHoverDisabled;
+
+  const handleMouseEnter = useCallback(() => {
+    if (isHoverDisabled) return;
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+      hoverTimeoutRef.current = null;
+    }
+    setIsHovered(true);
+  }, [isHoverDisabled]);
+
+  const handleMouseLeave = useCallback(() => {
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+    }
+    hoverTimeoutRef.current = setTimeout(() => {
+      setIsHovered(false);
+    }, 60);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (hoverTimeoutRef.current) {
+        clearTimeout(hoverTimeoutRef.current);
+      }
+    };
+  }, []);
+
   const outIndex = data?.outIndex ?? 0;
   const outCount = data?.outCount ?? 1;
   const inIndex = data?.inIndex ?? 0;
@@ -503,50 +536,108 @@ const CustomMultigraphEdge = ({
     }
   }
 
+  const effectiveBadgeBorder = activeHover ? "2px solid #ef4444" : `1.5px solid ${borderStyleColor}`;
+  const effectiveBadgeColor = activeHover ? "#dc2626" : labelTextColor;
+  const effectiveBadgeScale = activeHover ? "scale(1.1)" : "scale(1)";
+  const effectiveBadgeShadow = activeHover
+    ? "0 4px 14px rgba(239, 68, 68, 0.28), 0 0 0 1px rgba(239, 68, 68, 0.2)"
+    : isHighlighted 
+      ? "0 4px 12px rgba(37, 99, 235, 0.16), 0 0 0 1.5px rgba(37, 99, 235, 0.25)" 
+      : "0 2px 6px rgba(37, 99, 235, 0.08)";
+
   return (
     <>
+      <defs>
+        <marker
+          id="wst-arrow-hover-red"
+          viewBox="0 0 10 10"
+          refX="5"
+          refY="5"
+          markerWidth="6"
+          markerHeight="6"
+          orient="auto-start-reverse"
+        >
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#ef4444" />
+        </marker>
+      </defs>
       <path
         id={id}
-        style={style}
-        className="react-flow__edge-path"
+        style={{
+          ...style,
+          stroke: activeHover ? "#ef4444" : style.stroke,
+          strokeWidth: activeHover ? 4 : style.strokeWidth,
+          strokeOpacity: activeHover ? 1 : style.strokeOpacity,
+        }}
+        className={`react-flow__edge-path ${activeHover ? "react-flow__edge-path--hovered" : ""}`}
         d={edgePath}
-        markerEnd={markerEnd}
+        markerEnd={activeHover ? "url(#wst-arrow-hover-red)" : markerEnd}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+      />
+      <path
+        d={edgePath}
+        fill="none"
+        stroke="transparent"
+        strokeWidth={24}
+        className="react-flow__edge-interaction"
+        style={{
+          cursor: isHoverDisabled ? "default" : "pointer",
+          pointerEvents: isHoverDisabled ? "none" : "stroke",
+        }}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
       />
       {label && (
         <EdgeLabelRenderer>
           <div
-            className="nodrag nopan"
+            className="nodrag nopan wst-edge-choice-wrapper"
             style={{
               position: "absolute",
               transform: `translate(-50%, -50%) translate(${labelCenterX}px, ${labelCenterY}px)`,
-              pointerEvents: labelOpacity < 0.5 ? "none" : "all",
-              zIndex: labelZIndex,
-              opacity: labelOpacity,
-              transition: "opacity 0.3s ease, z-index 0.3s ease",
+              pointerEvents: (isHoverDisabled || (labelOpacity < 0.5 && !activeHover)) ? "none" : "all",
+              zIndex: activeHover ? 3500 : labelZIndex,
+              opacity: activeHover ? 1 : labelOpacity,
+              transition: "opacity 0.2s ease, z-index 0.2s ease",
+            }}
+            onMouseEnter={handleMouseEnter}
+            onMouseLeave={handleMouseLeave}
+            onClick={(e) => {
+              if (isHoverDisabled) return;
+              if (data?.onEdgeClick) {
+                data.onEdgeClick(e, {
+                  id,
+                  source,
+                  target,
+                  label,
+                  data,
+                });
+              }
             }}
           >
             <div
+              className={`wst-edge-choice-badge ${activeHover ? "wst-edge-choice-badge--hovered" : ""}`}
               title={label}
               style={{
                 background: "#ffffff",
                 padding: "3px 8px",
-                border: `1.5px solid ${borderStyleColor}`,
+                border: effectiveBadgeBorder,
                 borderRadius: "6px",
                 fontSize: "11px",
                 fontWeight: "700",
-                color: labelTextColor,
+                color: effectiveBadgeColor,
                 textAlign: "center",
                 whiteSpace: "nowrap",
                 overflow: "hidden",
                 textOverflow: "ellipsis",
                 maxWidth: `${badgeWidth}px`,
-                boxShadow: isHighlighted 
-                  ? "0 4px 12px rgba(37, 99, 235, 0.16), 0 0 0 1.5px rgba(37, 99, 235, 0.25)" 
-                  : "0 2px 6px rgba(37, 99, 235, 0.08)",
+                boxShadow: effectiveBadgeShadow,
+                transform: effectiveBadgeScale,
+                transformOrigin: "center center",
                 fontFamily: '"Outfit", "Sarabun", sans-serif',
                 lineHeight: "1.3",
                 boxSizing: "border-box",
-                transition: "all 0.3s ease",
+                cursor: isHoverDisabled ? "default" : "pointer",
+                transition: "transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), border 0.2s ease, box-shadow 0.2s ease, color 0.2s ease",
               }}
             >
               {label}
@@ -1151,6 +1242,29 @@ let orphanCounter = 0;
     });
   }, [positionedNodes, novelId, scenePositionMap, selectedSceneId]);
 
+  const handleEdgeClick = useCallback((event, edge) => {
+    event?.stopPropagation?.();
+    
+    // หากอยู่ในโหมดเชื่อมโยง (Connect) หรือโหมดเลื่อน (Pan) ให้ข้ามการจัดการเส้นเชื่อม (ให้โหมดเลือก select สามารถกดได้ปกติ)
+    if (modeRef.current === "connect" || modeRef.current === "pan") {
+      return;
+    }
+
+    // โหมดลบ
+    if (modeRef.current === "delete") {
+      setSelectedEdge(edge);
+      setShowDeleteChoiceConfirm(true);
+      return;
+    }
+
+    // โหมดปกติ หรือโหมดอื่นๆ
+    setSelectedEdge(edge);
+    setEditEdgeLabel(edge.label || "");
+    setEditEdgeSource(String(edge.source));
+    setEditEdgeTarget(String(edge.target));
+    setShowEdgeModal(true);
+  }, []);
+
   const flowEdges = useMemo(() => {
     const hasSelection = !!selectedSceneId;
     return positionedEdges.map((e) => {
@@ -1190,6 +1304,8 @@ let orphanCounter = 0;
           ...e.data,
           isHighlighted: isConnectedToSelected,
           hasActiveSelection: hasSelection,
+          onEdgeClick: handleEdgeClick,
+          interactionMode,
         },
         animated: isConnectedToSelected ? true : !isSelected && !!e.animated,
         interactionWidth: 30, // พื้นที่รับคลิกเมาส์
@@ -1201,12 +1317,12 @@ let orphanCounter = 0;
           stroke: strokeColor,
           strokeWidth: strokeWidth,
           strokeOpacity: strokeOpacity,
-          cursor: "pointer",
+          cursor: (interactionMode === "connect" || interactionMode === "add-node" || interactionMode === "pan") ? "default" : "pointer",
           transition: "stroke-opacity 0.3s ease, stroke 0.3s ease, stroke-width 0.3s ease",
         },
       };
     });
-  }, [positionedEdges, selectedEdge, selectedSceneId]);
+  }, [positionedEdges, selectedEdge, selectedSceneId, handleEdgeClick, interactionMode]);
 
   // create editable react-flow state initialized from computed flowNodes/flowEdges
   const [rfNodes, setRfNodes, onNodesChangeRF] = useNodesState([]);
@@ -1797,28 +1913,7 @@ let orphanCounter = 0;
     }
   };
 
-  const handleEdgeClick = useCallback((event, edge) => {
-    event.stopPropagation();
-    
-    // หากอยู่ในโหมดเชื่อมโยง (Connect) หรือโหมดเลื่อน (Pan) ให้ข้ามการจัดการเส้นเชื่อม (ให้โหมดเลือก select สามารถกดได้ปกติ)
-    if (modeRef.current === "connect" || modeRef.current === "pan") {
-      return;
-    }
 
-    // โหมดลบ
-    if (modeRef.current === "delete") {
-      setSelectedEdge(edge);
-      setShowDeleteChoiceConfirm(true);
-      return;
-    }
-
-    // โหมดปกติ หรือโหมดอื่นๆ
-    setSelectedEdge(edge);
-    setEditEdgeLabel(edge.label || "");
-    setEditEdgeSource(String(edge.source));
-    setEditEdgeTarget(String(edge.target));
-    setShowEdgeModal(true);
-  }, []);
 
   // ==========================================
   // React Flow Reconnect Edge (ลากย้ายเส้น)
@@ -2819,7 +2914,11 @@ let orphanCounter = 0;
   };
 
   if (isLoading) {
-    return <LoadingScreen />;
+    return (
+      <div className="wst-page" style={{ padding: "20px" }}>
+        <TreeCanvasSkeleton title="กำลังจัดเตรียมโครงสร้างแผนผังเรื่องราว..." />
+      </div>
+    );
   }
 
   if (error) {

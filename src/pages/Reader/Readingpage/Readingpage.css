@@ -420,6 +420,64 @@
     color: #9a3412;
 }
 
+/* 🟢 Success Toast (สีเขียว สวยงาม นุ่มนวล สบายตา) */
+.rp-toast--success {
+    background: #f0fdf4 !important;
+    border: 1.5px solid #86efac !important;
+    color: #166534 !important;
+    box-shadow: 0 16px 36px rgba(22, 101, 52, 0.12), 0 4px 12px rgba(22, 101, 52, 0.06) !important;
+}
+
+.rp-toast--success .rp-toast__icon {
+    background: #dcfce7 !important;
+    color: #16a34a !important;
+    font-size: 18px !important;
+    font-weight: 800;
+}
+
+.rp-toast--success .rp-toast__title {
+    color: #15803d !important;
+}
+
+.rp-toast--success .rp-toast__message {
+    color: #166534 !important;
+    font-size: 14px !important;
+    font-weight: 600 !important;
+}
+
+.rp-toast--success .rp-toast__close {
+    color: #86efac !important;
+}
+
+.rp-toast--success .rp-toast__close:hover {
+    background: #dcfce7 !important;
+    color: #15803d !important;
+}
+
+/* 🔴 Error Toast */
+.rp-toast--error {
+    background: #fef2f2 !important;
+    border: 1.5px solid #fca5a5 !important;
+    color: #991b1b !important;
+    box-shadow: 0 16px 36px rgba(153, 27, 27, 0.12) !important;
+}
+
+.rp-toast--error .rp-toast__icon {
+    background: #fee2e2 !important;
+    color: #dc2626 !important;
+    font-size: 18px !important;
+}
+
+.rp-toast--error .rp-toast__message {
+    color: #991b1b !important;
+    font-weight: 600 !important;
+}
+
+.rp-toast--error .rp-toast__close:hover {
+    background: #fee2e2 !important;
+    color: #991b1b !important;
+}
+
 @keyframes rpToastIn {
     from {
         opacity: 0;

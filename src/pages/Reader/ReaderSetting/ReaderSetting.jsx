@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import Cropper from "react-easy-crop";
 import getCroppedImg from "../../../utils/cropImage.js";
 import "./ReaderSetting.css";
-import LoadingScreen from "../../../components/LoadingScreen/LoadingScreen";
+import { Skeleton, ButtonSpinner, DataLoadError } from "../../../components/Skeleton";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
 
@@ -1070,18 +1070,39 @@ export default function ReaderSetting() {
   const strengthInfo = getPwStrength();
 
   if (loading) {
-    return <LoadingScreen message="กำลังโหลดข้อมูลการตั้งค่าบัญชี..." />;
+    return (
+      <div className="wst-page-container">
+        <div style={{ maxWidth: '800px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Skeleton width="180px" height="28px" />
+          </div>
+          <div style={{ background: '#fff', borderRadius: '20px', padding: '32px', border: '1px solid #f0eef4', display: 'flex', gap: '24px', alignItems: 'center' }}>
+            <Skeleton variant="circular" width="90px" height="90px" />
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <Skeleton width="40%" height="20px" />
+              <Skeleton width="60%" height="14px" />
+            </div>
+          </div>
+          <div style={{ background: '#fff', borderRadius: '20px', padding: '32px', border: '1px solid #f0eef4', display: 'flex', flexDirection: 'column', gap: '18px' }}>
+            <Skeleton width="30%" height="20px" />
+            <Skeleton width="100%" height="42px" borderRadius="10px" />
+            <Skeleton width="100%" height="42px" borderRadius="10px" />
+          </div>
+        </div>
+      </div>
+    );
   }
 
   if (error) {
     return (
       <div className="wst-page-container">
-        <div className="wst-error-card">
-          <p className="wst-error-text">❌ {error}</p>
-          <button className="btn btn-pink" onClick={fetchData}>
-            ลองใหม่อีกครั้ง
-          </button>
-        </div>
+        <DataLoadError
+          title="เกิดข้อผิดพลาดในการโหลดข้อมูลการตั้งค่า"
+          message={error}
+          onRetry={fetchData}
+          onBack={() => navigate("/")}
+          backText="กลับหน้าหลัก"
+        />
       </div>
     );
   }

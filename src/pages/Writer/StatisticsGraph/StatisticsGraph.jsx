@@ -18,7 +18,7 @@ import { ArrowLeft, ChevronUp, ChevronDown, Info, Palette, Flame, GitFork, Eye, 
 import axios from "axios";
 import "reactflow/dist/style.css";
 import "./StatisticsGraph.css";
-import LoadingScreen from "../../../components/LoadingScreen/LoadingScreen";
+import { StatisticsGraphSkeleton, Skeleton, ButtonSpinner } from "../../../components/Skeleton";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
 
@@ -1588,7 +1588,11 @@ function StatisticsGraph() {
   }, [overallAnalytics]);
 
   if (isLoading || (!isDataLoaded && !error)) {
-    return <LoadingScreen message="กำลังโหลดสถิติกราฟนิยาย..." />;
+    return (
+      <div className="wsg-page">
+        <StatisticsGraphSkeleton />
+      </div>
+    );
   }
 
   if (error) {
@@ -1982,8 +1986,11 @@ function StatisticsGraph() {
             <div className="wsg-sidebar-content">
               {activeTab === "scene" ? (
                 isSceneLoading ? (
-                  <div className="wsg-loading-overlay">
-                    <LoadingScreen message="กำลังโหลดสถิติฉาก..." compact />
+                  <div className="wsg-loading-overlay" style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "14px", width: "100%" }}>
+                    <Skeleton width="60%" height="22px" />
+                    <Skeleton width="100%" height="70px" borderRadius="12px" />
+                    <Skeleton width="100%" height="70px" borderRadius="12px" />
+                    <Skeleton width="80%" height="16px" />
                   </div>
                 ) : sceneError ? (
                   <div className="wsg-loading-overlay">
@@ -2141,8 +2148,11 @@ function StatisticsGraph() {
                 )
               ) : (
                 isChoiceLoading ? (
-                  <div className="wsg-loading-overlay">
-                    <LoadingScreen message="กำลังโหลดสถิติทางเลือก..." compact />
+                  <div className="wsg-loading-overlay" style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "14px", width: "100%" }}>
+                    <Skeleton width="60%" height="22px" />
+                    <Skeleton width="100%" height="70px" borderRadius="12px" />
+                    <Skeleton width="100%" height="70px" borderRadius="12px" />
+                    <Skeleton width="80%" height="16px" />
                   </div>
                 ) : choiceError ? (
                   <div className="wsg-loading-overlay">

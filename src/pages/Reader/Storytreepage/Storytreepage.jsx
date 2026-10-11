@@ -20,7 +20,7 @@ import "reactflow/dist/style.css";
 import "./Storytreepage.css";
 
 import EndingCollection from "../../../components/EndingCollection/EndingCollection";
-import LoadingScreen from "../../../components/LoadingScreen/LoadingScreen";
+import { TreeCanvasSkeleton, ButtonSpinner } from "../../../components/Skeleton";
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
 
@@ -820,7 +820,7 @@ const StoryTreeInner = ({ activeNovelId, effectiveUserId, onNavigate }) => {
   if (loading) {
     return (
       <StoryTreeShell>
-        <LoadingScreen compact message="กำลังเตรียมข้อมูลแผนผังการอ่าน..." />
+        <TreeCanvasSkeleton title="กำลังจัดเตรียมแผนผังเรื่องราวและเส้นทางคำเลือก..." />
       </StoryTreeShell>
     );
   }

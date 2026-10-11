@@ -6,10 +6,11 @@ import { useParams, useNavigate, useBlocker } from "react-router-dom";
 import "./ChapterManagerPage.css";
 import { getNovelStatusInfo, registerBannedNovel, isNovelBannedInRegistry, cleanBanReason, extractBanDetails, getBannedRegistry } from "../../../utils/novelStatus";
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
-import LoadingScreen from "../../../components/LoadingScreen/LoadingScreen";
+import { ChapterManagerSkeleton, ButtonSpinner, DataLoadError } from "../../../components/Skeleton";
 import UnsavedChangesModal from "../../../components/UnsavedChangesModal/UnsavedChangesModal";
 import { getChoiceConnectionBlockReason, getChoiceConnectionMessage } from "../../../utils/choiceValidation";
 import { ShieldAlert, X, AlertCircle, Send, ChevronDown, ChevronRight, Check, Eye, GitFork, Layers, FileText, Clock, Search, AlertTriangle } from "lucide-react";
+import { showTopToast } from "../../../utils/toast";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
 const IMAGE_BASE_URL = import.meta.env.VITE_IMAGE_BASE_URL || "http://localhost:9000";
@@ -761,8 +762,61 @@ const NovelBanner = ({ novel, chapters, onEdit, onToggleStatus, isUpdatingNovelS
       </div>
 
       {!isPublishedNovel && !isCompletedNovel && (
-        <div className="cm-banner__draft-note w-full mt-0" style={{ width: '100%', maxWidth: '100%', margin: '0', display: 'flex', alignItems: 'center' }}>
-          ✨ นิยายยังเป็นฉบับร่าง — ผู้เขียนและผู้ดูแลเท่านั้นที่เห็นเรื่องนี้ และทุกตอนจะยังไม่แสดงให้ผู้อ่านเห็น
+        <div
+          className="cm-banner__draft-note w-full mt-0"
+          style={{
+            width: '100%',
+            maxWidth: '100%',
+            margin: '0',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '12px',
+            flexWrap: 'wrap'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span>✨</span>
+            <span>นิยายยังเป็นฉบับร่าง — ผู้เขียนและผู้ดูแลเท่านั้นที่เห็นเรื่องนี้ และทุกตอนจะยังไม่แสดงให้ผู้อ่านเห็น</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              if (statusInfo.isBanned) {
+                alert(BAN_ACTION_BLOCKED_MSG);
+                return;
+              }
+              onToggleStatus("published");
+            }}
+            disabled={isUpdatingNovelStatus || statusInfo.isBanned}
+            style={{
+              backgroundColor: '#16a34a',
+              color: '#ffffff',
+              border: 'none',
+              padding: '6px 16px',
+              borderRadius: '9999px',
+              fontSize: '12.5px',
+              fontWeight: '700',
+              fontFamily: "'Sarabun', sans-serif",
+              cursor: (isUpdatingNovelStatus || statusInfo.isBanned) ? 'not-allowed' : 'pointer',
+              boxShadow: '0 2px 6px rgba(22, 163, 74, 0.2)',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              transition: 'all 0.2s ease',
+              whiteSpace: 'nowrap',
+              flexShrink: 0,
+            }}
+            onMouseOver={(e) => {
+              if (!isUpdatingNovelStatus && !statusInfo.isBanned) e.currentTarget.style.backgroundColor = '#15803d';
+            }}
+            onMouseOut={(e) => {
+              if (!isUpdatingNovelStatus && !statusInfo.isBanned) e.currentTarget.style.backgroundColor = '#16a34a';
+            }}
+          >
+            <Check size={14} strokeWidth={2.5} />
+            <span>{isUpdatingNovelStatus ? "กำลังเผยแพร่..." : "เผยแพร่นิยาย"}</span>
+          </button>
         </div>
       )}
     </div>
@@ -2212,6 +2266,12 @@ const ChapterPanel = ({
 
       await Promise.all(sceneUpdates);
       await fetchScenes();
+      if (nextStatus === "published") {
+        showTopToast("เผยแพร่ตอนสำเร็จ", {
+          description: chapterTitle ? `ตอน "${chapterTitle}" เผยแพร่เรียบร้อยแล้ว` : "ตอนเปิดให้ผู้อ่านเข้าชมเรียบร้อยแล้ว",
+          type: "success",
+        });
+      }
     } catch (err) {
       console.error(err);
       alert(err.message || "เปลี่ยนสถานะตอนไม่สำเร็จ");
@@ -2285,6 +2345,12 @@ const ChapterPanel = ({
 
       await Promise.all(sceneUpdates);
       await fetchScenes();
+      if (targetStatus === "published") {
+        showTopToast("เผยแพร่ตอนสำเร็จ", {
+          description: chapterTitle ? `ตอน "${chapterTitle}" เผยแพร่เรียบร้อยแล้ว` : "ตอนเปิดให้ผู้อ่านเข้าชมเรียบร้อยแล้ว",
+          type: "success",
+        });
+      }
     } catch (err) {
       console.error(err);
       alert(err.message || "เปลี่ยนสถานะตอนไม่สำเร็จ");
@@ -3206,6 +3272,18 @@ const ChapterManagerPage = ({ onNavigate, novelId }) => {
 
       if (!res.ok) throw new Error("อัปเดตสถานะนิยายไม่สำเร็จ");
       await fetchNovelAndChapters(true);
+      if (isTargetPublished) {
+        const novelTitle = novel?.title || novel?.Title || "";
+        showTopToast("นิยายเผยแพร่สำเร็จ", {
+          description: novelTitle ? `นิยายเรื่อง "${novelTitle}" เผยแพร่สู่สาธารณะเรียบร้อยแล้ว` : "นิยายเปิดให้ผู้อ่านเข้าชมเรียบร้อยแล้ว",
+          type: "success",
+        });
+      } else {
+        showTopToast("เปลี่ยนสถานะเป็นฉบับร่างเรียบร้อยแล้ว", {
+          description: "นิยายจะไม่แสดงให้นักอ่านเห็น",
+          type: "info",
+        });
+      }
     } catch (err) {
       console.error(err);
       alert("อัปเดตสถานะนิยายไม่สำเร็จ กรุณาลองใหม่");
@@ -3396,7 +3474,11 @@ const ChapterManagerPage = ({ onNavigate, novelId }) => {
     return hasMatchingScene;
   });
   if (loading) {
-    return <LoadingScreen message="กำลังโหลดข้อมูลหน้าจัดการตอน..." />;
+    return (
+      <div className="cm-layout" style={{ padding: "28px" }}>
+        <ChapterManagerSkeleton />
+      </div>
+    );
   }
 
   return (

@@ -635,7 +635,7 @@ const WriterRegisterPage = ({ onComplete, onBack }) => {
             if (!form.mainContact.trim()) e.mainContact = "กรุณากรอกช่องทางติดต่อหลัก";
         }
         if (s === 4) {
-            if (!form.confirmed) e.confirmed = "กรุณากดรับรองว่าข้อมูลทั้งหมดเป็นความจริง";
+            if (!form.confirmed) e.confirmed = "กรุณายืนยันว่าข้อมูลข้างต้นเป็นความจริงก่อนส่งใบสมัคร";
         }
         return e;
     };
@@ -918,14 +918,14 @@ const WriterRegisterPage = ({ onComplete, onBack }) => {
                                 ช่องทางติดต่อหลัก <span className="wr-asterisk">*</span>
                             </label>
                             <p className="wr-field__hint">
-                                เช่น เบอร์โทรศัพท์, อีเมล, ลิงก์ Facebook / IG / Line หลักที่สะดวกในการติดต่อ
+                                แนบลิงก์เพจหรือโซเชียลมีเดียหลัก 
                             </p>
                             <div className={`wr-input-wrap ${errors.mainContact ? "wr-input-wrap--error" : ""}`}>
                                 <input
                                     id="mainContact"
                                     className="wr-input"
                                     type="text"
-                                    placeholder="เช่น 081-234-5678, facebook.com/mywriterpage หรือ line: @mywriter"
+                                    placeholder="เช่น https://facebook.com/yourpage หรือ https://x.com/yourwriter"
                                     value={form.mainContact}
                                     onChange={(e) => setField("mainContact", e.target.value)}
                                 />
@@ -936,13 +936,13 @@ const WriterRegisterPage = ({ onComplete, onBack }) => {
                         <div className="wr-field" style={{ marginTop: 20 }}>
                             <label className="wr-label" htmlFor="otherLinks">ช่องทางอื่นๆ (ถ้ามี)</label>
                             <p className="wr-field__hint">
-                                แนบลิงก์ผลงานเก่าๆ บล็อก เว็บไซต์ หรือช่องทางการติดตามเพิ่มเติม
+                                โซเชียลมีเดียหรือลิงก์ผลงานอื่นๆ 
                             </p>
                             <div className="wr-input-wrap">
                                 <textarea
                                     id="otherLinks"
                                     className="wr-textarea wr-textarea--sm"
-                                    placeholder="เช่น ลิงก์ผลงานนิยายเรื่องก่อนหน้า, ทวิตเตอร์, YouTube หรือพอร์ตโฟลิโอ"
+                                    placeholder="เช่น X (Twitter), TikTok, บล็อกส่วนตัว หรือลิงก์รวมผลงาน"
                                     rows={4}
                                     value={form.otherLinks}
                                     onChange={(e) => setField("otherLinks", e.target.value)}
@@ -980,7 +980,7 @@ const WriterRegisterPage = ({ onComplete, onBack }) => {
                                 />
                                 <span className={`wr-checkbox__box ${form.confirmed ? "wr-checkbox__box--checked" : ""}`} />
                                 <span className="wr-checkbox__label">
-                                    ฉันยอมรับข้อมูลที่ให้ไว้เป็นความจริง <span className="wr-asterisk">*</span>
+                                    ฉันขอยืนยันว่าข้อมูลข้างต้นเป็นความจริง <span className="wr-asterisk">*</span>
                                 </span>
                             </label>
                             {errors.confirmed && (

@@ -7,7 +7,7 @@ import "./EditNovelPage.css";
 import MultiSelect from "../../../components/MultiSelect/MultiSelect";
 import CoverUpload from "../../../components/CoverUpload/CoverUpload";
 import Toggle from "../../../components/Toggle/Toggle";
-import LoadingScreen from "../../../components/LoadingScreen/LoadingScreen";
+import { Skeleton, ButtonSpinner } from "../../../components/Skeleton";
 import { useNavigate, useParams, useBlocker } from "react-router-dom";
 import UnsavedChangesModal from "../../../components/UnsavedChangesModal/UnsavedChangesModal";
 import { getNovelStatusInfo, registerBannedNovel, isNovelBannedInRegistry } from "../../../utils/novelStatus";
@@ -487,7 +487,22 @@ const EditNovelPage = ({ onNavigate }) => {
     const taglineLen = form.tagline ? form.tagline.length : 0;
 
     if (isLoading) {
-        return <LoadingScreen message="กำลังโหลดข้อมูลนิยาย..." />;
+        return (
+            <div className="cnp">
+                <div className="cnp__header">
+                    <Skeleton width="220px" height="32px" />
+                    <Skeleton width="340px" height="16px" style={{ marginTop: '8px' }} />
+                </div>
+                <div className="cnp__form-wrap">
+                    <div className="cnp__card" style={{ display: 'flex', flexDirection: 'column', gap: '20px', padding: '32px' }}>
+                        <Skeleton width="40%" height="20px" />
+                        <Skeleton width="100%" height="44px" borderRadius="12px" />
+                        <Skeleton width="30%" height="20px" />
+                        <Skeleton width="100%" height="100px" borderRadius="12px" />
+                    </div>
+                </div>
+            </div>
+        );
     }
 
     return (
