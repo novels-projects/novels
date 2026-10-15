@@ -1291,7 +1291,7 @@ const ChoiceRow = ({ choice, choiceIndex, sceneOptions = [], currentChapterId, f
               </select>
               {subScene && (
                 <div
-                  role="status"
+                  role={normalizedConnectionBlockReason ? "alert" : "status"}
                   className={`cm-choice-validation ${normalizedConnectionBlockReason ? "is-invalid" : "is-valid"}`}
                 >
                   {normalizedConnectionBlockReason
@@ -1340,7 +1340,7 @@ const ChoiceRow = ({ choice, choiceIndex, sceneOptions = [], currentChapterId, f
             <button
               className="cm-btn cm-btn--sm"
               onClick={handleSaveChoice}
-              disabled={isSaving || showSuccess || Boolean(normalizedConnectionBlockReason)}
+              disabled={isSaving || showSuccess}
               style={{ 
                 padding: '8px 16px', 
                 fontSize: '13px', 

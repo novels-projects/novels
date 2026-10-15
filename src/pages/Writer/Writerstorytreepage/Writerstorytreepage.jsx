@@ -729,6 +729,8 @@ const StoryTreeInner = ({ novelId, onNavigate }) => {
   const [connectTarget, setConnectTarget] = useState(null); // ฉากปลายทาง
   const [isModalOpen, setIsModalOpen] = useState(false);     // ควบคุม Popup Modal
   const [choiceText, setChoiceText] = useState("");          // ข้อความตัวเลือก
+  const [connectError, setConnectError] = useState("");
+  const [isSavingConnection, setIsSavingConnection] = useState(false);
   const [toast, setToast] = useState(null);                  // Toast แจ้งเตือน
 
   // States สำหรับการเพิ่มฉากโดยระบุตอนที่เลือก
@@ -1587,6 +1589,8 @@ let orphanCounter = 0;
     setConnectTarget(null);
     setHoverTargetInfo(null);
     setIsModalOpen(false);
+    setConnectError("");
+    setIsSavingConnection(false);
     setRfNodes((nds) => nds.filter((n) => n.id !== "cursor-node"));
     setRfEdges((eds) => eds.filter((e) => e.id !== "cursor-edge"));
   }, [setRfNodes, setRfEdges]);
@@ -2718,6 +2722,7 @@ let orphanCounter = 0;
         
         setConnectTarget(node);
         setChoiceText("");
+        setConnectError("");
         setIsModalOpen(true);
       }
       return;
@@ -2731,8 +2736,18 @@ let orphanCounter = 0;
   }, [connectSource, getConnectionBlockReason, getBlockReasonMessage, screenToFlowPosition, setRfNodes, setRfEdges, showToast, setSceneToDelete, setShowDeleteModal, clearConnectionState]);
 
   const handleConfirmConnect = async () => {
-    if (!choiceText.trim() || !connectSource || !connectTarget) return;
+    if (isSavingConnection) return;
+    if (!choiceText.trim()) {
+      setConnectError("กรุณากรอกข้อความทางเลือกก่อนเชื่อมโหนด");
+      return;
+    }
+    if (!connectSource || !connectTarget) {
+      setConnectError("ไม่พบฉากต้นทางหรือปลายทาง กรุณาปิดหน้าต่างแล้วเลือกฉากใหม่");
+      return;
+    }
 
+    setConnectError("");
+    setIsSavingConnection(true);
     try {
       const srcSceneId = connectSource.id;
       const dstSceneId = connectTarget.id;
@@ -2741,7 +2756,13 @@ let orphanCounter = 0;
       const dstIdInt = parseInt(dstSceneId, 10);
       
       if (isNaN(srcIdInt) || isNaN(dstIdInt)) {
-        showToast("กรุณากดแก้ไขและบันทึกข้อมูลของฉากใหม่ก่อนสร้างเส้นทางเชื่อมโยง", "warn");
+        setConnectError("กรุณาแก้ไขและบันทึกข้อมูลของฉากใหม่ก่อนสร้างเส้นทางเชื่อมโยง");
+        return;
+      }
+
+      const blockReason = getConnectionBlockReason(srcSceneId, dstSceneId);
+      if (blockReason) {
+        setConnectError(getBlockReasonMessage(blockReason));
         return;
       }
 
@@ -2754,7 +2775,7 @@ let orphanCounter = 0;
           getChoiceLabel(e).trim().toLowerCase() === trimmedChoiceText
       );
       if (isDuplicateChoiceLabel) {
-        showToast("มีตัวเลือกชื่อนี้ไปยังฉากเดียวกันอยู่แล้ว กรุณาตั้งชื่อตัวเลือกให้แตกต่างออกไป", "warn");
+        setConnectError("มีตัวเลือกชื่อนี้ไปยังฉากเดียวกันอยู่แล้ว กรุณาตั้งชื่อตัวเลือกให้แตกต่างออกไป");
         return;
       }
       
@@ -2812,8 +2833,10 @@ let orphanCounter = 0;
         console.error("Fallback verification failed:", fallbackErr);
       }
 
-      clearConnectionState();
       fetchStoryTreeAndChapters();
+      setConnectError("เชื่อมทางเลือกไม่สำเร็จ กรุณาตรวจสอบข้อมูลแล้วลองอีกครั้ง");
+    } finally {
+      setIsSavingConnection(false);
     }
   };
 
@@ -2986,23 +3009,28 @@ let orphanCounter = 0;
                 className="wst-field-input"
                 type="text"
                 value={choiceText}
-                onChange={(e) => setChoiceText(e.target.value)}
+                onChange={(e) => {
+                  setChoiceText(e.target.value);
+                  setConnectError("");
+                }}
                 placeholder="เช่น เดินไปทางลำธาร, สำรวจรอยเท้าประหลาด..."
                 maxLength={80}
                 autoFocus
               />
               <p className="wst-field-hint">ข้อความสั้น กระชับ บอกว่าตัวละครจะทำอะไร (ไม่เกิน 80 ตัวอักษร)</p>
+              {connectError && <div className="wst-connection-error" role="alert">{connectError}</div>}
             </div>
 
             <div className="wst-modal-footer">
-              <button className="wst-modal-btn-cancel" onClick={handleCloseModal}>ยกเลิก</button>
+              <button className="wst-modal-btn-cancel" onClick={handleCloseModal} disabled={isSavingConnection}>ยกเลิก</button>
               <button 
                 className="wst-modal-btn-confirm" 
                 onClick={handleConfirmConnect}
-                disabled={!choiceText.trim()}
+                disabled={isSavingConnection}
+                aria-busy={isSavingConnection}
               >
                 <i className="ti ti-git-merge"></i>
-                เชื่อมโหนด
+                {isSavingConnection ? "กำลังเชื่อม..." : "เชื่อมโหนด"}
               </button>
             </div>
           </div>
