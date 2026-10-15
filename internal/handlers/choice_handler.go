@@ -34,6 +34,19 @@ func writeChoiceServiceError(w http.ResponseWriter, err error) {
 	}
 }
 
+// =========================================================================================
+// [อาจารย์ถาม: "เมื่อนักเขียนลากสาย Choice บนหน้าเว็บ (React Flow) API ทำงานอย่างไร?"]
+//
+// Endpoint: POST /choices
+// หน้าที่: รับคำขอสร้างตัวเลือกเชื่อมฉาก (from_scene -> to_scene)
+//
+// ลำดับขั้นตอนการทำงานใน Handler:
+// 1. ตรวจสอบ HTTP Method ต้องเป็น POST เท่านั้น
+// 2. แกะข้อมูล JSON Body เป็น CreateChoiceRequest struct
+// 3. เรียก req.Validate() ตรวจสอบความถูกต้องเบื้องต้น (เช่น ข้อความ Label ว่างไหม, ID > 0 ไหม)
+// 4. ตรวจสอบสิทธิ์ความเป็นเจ้าของ (Ownership): ยืนยันว่านักเขียนเป็นเจ้าของนิยายเรื่องนี้จริง
+// 5. ส่งข้อมูลต่อไปให้ sceneService.CreateChoice เพื่อตรวจสอบกราฟ DAG (ดักลูป) และบันทึกลง Database
+// =========================================================================================
 func CreateChoiceHandler(sceneService service.SceneService, chapterService service.ChapterService, novelService service.NovelService, writerService service.WriterService, auditService service.AuditService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {

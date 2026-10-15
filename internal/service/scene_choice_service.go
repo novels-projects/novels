@@ -37,23 +37,41 @@ func validateChoiceLabelLength(label string) error {
 	return nil
 }
 
+// =========================================================================================
+// [อาจารย์ถาม: "ดัก Loop ไม่ให้เนื้อเรื่องวนลูปยังไง / เช็ค DAG ด้วยวิธีอะไร?"]
+//
+// ฟังก์ชัน: wouldCreateCycle
+// หลักการ: ใช้ขั้นตอนวิธี Depth-First Search (DFS) ในการตรวจจับวงรอบ (Cycle Detection)
+//
+// ทำงานอย่างไร:
+// 1. จำลองว่าถ้าเราลากเส้นเชื่อมใหม่ (fromSceneID -> toSceneID) ลงไปในกราฟเรื่อง
+// 2. ถ้าเส้นนี้ทำให้เกิดลูป แสดงว่า "จะต้องมีทางเดินจาก toSceneID เดินหน้าต่อไปเรื่อยๆ จนวนกลับมาถึง fromSceneID ได้"
+// 3. ดังนั้น ระบบจะเริ่ม DFS โดยเอา toSceneID ใส่ Stack แล้วเดินตามลูกศร (Adjacency List) ไปข้างหน้า
+// 4. ถ้าเจอโหนดไหนที่ ID ตรงกับ fromSceneID -> แปลว่า "เกิดวงรอบ (Loop)" ทันที! -> คืนค่า true
+// 5. ถ้าเดินจนทั่ว (Visited ครบทุกโหนดที่เป็นไปได้) แล้วไม่เจอ fromSceneID -> ปลอดภัย -> คืนค่า false
+// =========================================================================================
 func (s *sceneService) wouldCreateCycle(fromSceneID, toSceneID int, edges []models.SceneEdge) bool {
+	// ป้องกัน Edge ที่ไม่ถูกต้อง หรือลากเข้าตัวเอง (Self-loop)
 	if fromSceneID == 0 || toSceneID == 0 || fromSceneID == toSceneID {
 		return false
 	}
 
+	// สร้าง Adjacency List: ตัวเชื่อมบอกว่าโหนดไหนชี้ไปโหนดไหนบ้าง เช่น { 1: [2, 3], 2: [4] }
 	adjacency := make(map[int][]int)
 	for _, edge := range edges {
 		adjacency[edge.FromID] = append(adjacency[edge.FromID], edge.ToID)
 	}
 
+	// เริ่ม DFS จากจุดปลายทาง (toSceneID) เพื่อดูว่าจะเดินวนกลับมาหาต้นทาง (fromSceneID) ได้ไหม
 	visited := make(map[int]bool)
 	stack := []int{toSceneID}
 
 	for len(stack) > 0 {
+		// ดึงโหนดบนสุดของ Stack ออกมาตรวจสอบ (LIFO)
 		current := stack[len(stack)-1]
 		stack = stack[:len(stack)-1]
 
+		// ถ้าเดินมาจนเจอ fromSceneID แสดงว่ามีเส้นทางวนกลับมาที่เดิม = เกิด Loop!
 		if current == fromSceneID {
 			return true
 		}
@@ -62,6 +80,7 @@ func (s *sceneService) wouldCreateCycle(fromSceneID, toSceneID int, edges []mode
 		}
 		visited[current] = true
 
+		// แตกกิ่งก้าน (โหนดลูกที่ current ชี้ไป) ใส่ Stack เพื่อค้นหาต่อ
 		for _, next := range adjacency[current] {
 			if !visited[next] {
 				stack = append(stack, next)
@@ -69,9 +88,13 @@ func (s *sceneService) wouldCreateCycle(fromSceneID, toSceneID int, edges []mode
 		}
 	}
 
+	// เดินจนครบทุกเส้นทางแล้ว ไม่เจอทางวนกลับมา = ปลอดภัย เป็น DAG แน่นอน
 	return false
 }
 
+// CreateChoice ทำหน้าที่สร้างตัวเลือกใหม่เชื่อมระหว่าง 2 ฉาก (from_scene -> to_scene)
+// มีการครอบด้วย WithNovelGraphMutation (Database Lock / Transaction) เพื่อป้องกันปัญหานักเขียน
+// 2 คนกดบันทึกทางเลือกพร้อมกันแล้วเกิด Race Condition
 func (s *sceneService) CreateChoice(choice models.Choice) (int, error) {
 	choice.Label = strings.TrimSpace(choice.Label)
 	if err := validateChoiceLabelLength(choice.Label); err != nil {
@@ -95,12 +118,13 @@ func (s *sceneService) createChoiceInMutation(repo repository.ChoiceMutationRepo
 	if err := validateChoiceLabelLength(choice.Label); err != nil {
 		return 0, err
 	}
+	// 1. ตรวจสอบ Endpoint ของทั้ง 2 ฉาก (ฉากมีอยู่จริงไหม, ข้ามเรื่องไหม, ฉากจบไหม)
 	fromScene, _, err := s.validateChoiceEndpoints(repo, choice.FromSceneID, choice.ToSceneID)
 	if err != nil {
 		return 0, err
 	}
 
-	// เช็คการย้อนกลับ (Reverse Choice)
+	// 2. เช็คการย้อนกลับ (Reverse Choice): ห้ามมีเส้นทางสวนทางกัน A->B แล้วสร้าง B->A ตรงๆ
 	reverseExists, err := repo.CheckChoiceExists(choice.ToSceneID, choice.FromSceneID, "")
 	if err != nil {
 		return 0, fmt.Errorf("check reverse choice: %w", err)
@@ -109,7 +133,7 @@ func (s *sceneService) createChoiceInMutation(repo repository.ChoiceMutationRepo
 		return 0, ErrChoiceReverse
 	}
 
-	// 3. เช็คข้อมูลซ้ำ (Label ซ้ำในเส้นทางเดิม)
+	// 3. เช็คข้อมูลซ้ำ (Label ซ้ำในเส้นทางเดิม A -> B ที่มีข้อความเดียวกันเป๊ะ)
 	exists, err := repo.CheckChoiceExists(choice.FromSceneID, choice.ToSceneID, choice.Label)
 	if err != nil {
 		return 0, fmt.Errorf("check duplicate choice: %w", err)
@@ -118,6 +142,7 @@ func (s *sceneService) createChoiceInMutation(repo repository.ChoiceMutationRepo
 		return 0, ErrChoiceDuplicate
 	}
 
+	// 4. ดึง Edges ทั้งหมดในนิยายเรื่องนี้มาตรวจสอบว่าสร้าง Loop หรือไม่ด้วย DFS
 	edges, err := repo.GetEdgesByNovelID(fromScene.NovelID)
 	if err != nil {
 		return 0, fmt.Errorf("get edges for cycle validation: %w", err)
@@ -126,9 +151,21 @@ func (s *sceneService) createChoiceInMutation(repo repository.ChoiceMutationRepo
 		return 0, ErrChoiceCycle
 	}
 
+	// ผ่านทุกกฎครบถ้วน จึงอนุญาตให้ Insert ลงใน Database
 	return repo.CreateChoice(choice)
 }
 
+// =========================================================================================
+// [อาจารย์ถาม: "มีกฎการเชื่อมเส้นเรื่อง (Choice) อะไรบ้างที่ระบบตรวจสอบ?"]
+//
+// ฟังก์ชัน: validateChoiceEndpoints
+// ตรวจสอบความถูกต้องของโหนดต้นทางและปลายทาง:
+// 1. from_scene และ to_scene ต้องมีอยู่ในระบบจริง
+// 2. ทั้ง 2 ฉากต้องอยู่ในนิยายเรื่องเดียวกัน (ห้ามข้าม NovelID)
+// 3. ฉากต้นทางกับปลายทางต้องไม่ใช่ฉากเดียวกัน (ห้าม Self-loop)
+// 4. ฉากต้นทางต้องไม่ใช่ "ฉากจบ (Ending)" -> เพราะฉากจบคือสิ้นสุดเรื่องแล้ว ห้ามมีตัวเลือกต่อ
+// 5. ฉากปลายทางต้องไม่ใช่ "ฉากเริ่มต้น (Start Scene)" -> เพราะฉากเริ่มเรื่องมีไว้ให้เริ่ม ไม่ให้ย้อนกลับมาหา
+// =========================================================================================
 func (s *sceneService) validateChoiceEndpoints(repo repository.ChoiceMutationRepository, fromSceneID, toSceneID int) (*models.Scene, *models.Scene, error) {
 	fromScene, err := repo.GetSceneByID(fromSceneID)
 	if err != nil {

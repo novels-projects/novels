@@ -72,13 +72,31 @@ func writeAuthError(w http.ResponseWriter, statusCode int, code, message string)
 	_ = json.NewEncoder(w).Encode(dto.ErrorResponse{Error: dto.ErrorDetail{Code: code, Message: message}})
 }
 
+// =========================================================================================
+// [อาจารย์ถาม: "ระบบตรวจสอบการเข้าสู่ระบบ (Authentication) ทำงานอย่างไร / ใช้เทคโนโลยีอะไร?"]
+//
+// Middleware: RequireAuth
+// หน้าที่: บังคับว่าต้องมี JWT Token ที่ถูกต้องเท่านั้นถึงจะผ่านเข้าไปเรียก Handler ได้
+//
+// ขั้นตอนการทำงาน:
+// 1. ดึง Token จาก HTTP Header "Authorization: Bearer <token>" (หรือจาก Query Param ถ้าเป็น SSE)
+// 2. ถ้าไม่พบ Token -> ส่ง HTTP 401 Unauthorized กลับไปทันที
+// 3. นำ Token มาถอดรหัสและตรวจสอบลายเซ็นดิจิทัล (jwt.Parse)
+//   - ตรวจว่า Algorithm ที่ใช้คือ "HS256" (HMAC-SHA256) ป้องกันช่องโหว่ Alg None Attack
+//   - ตรวจว่าลายเซ็นตรงกับ jwtSecret ของระบบหรือไม่ และโทเคนหมดอายุหรือยัง (exp claim)
+//  4. ถ้าผ่าน -> ดึงข้อมูล Payload (Claims) ได้แก่ "user_id" และ "role" ฝังลงใน r.Context()
+//     เพื่อให้ Handler ในชั้นถัดไปสามารถดึง User ID ไปใช้ได้อย่างปลอดภัยโดยไม่ต้อง Verify ซ้ำ
+//
+// =========================================================================================
 func RequireAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// อนุญาตให้ OPTIONS method วิ่งผ่านได้เสมอ (เพื่อรองรับ CORS Preflight ของ Browser)
 		if r.Method == http.MethodOptions {
 			next.ServeHTTP(w, r)
 			return
 		}
 
+		// 1. สกัดดึง Bearer Token ออกมาจาก Authorization Header
 		authHeader := r.Header.Get("Authorization")
 		tokenString := extractBearerToken(authHeader)
 		if tokenString == "" {
@@ -90,6 +108,7 @@ func RequireAuth(next http.Handler) http.Handler {
 			return
 		}
 
+		// 2. ตรวจสอบความถูกต้องของ Token ด้วย Secret Key ของระบบ และบังคับใช้ HS256
 		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 			if token.Method != jwt.SigningMethodHS256 {
 				return nil, fmt.Errorf("unexpected signing method")
@@ -97,18 +116,21 @@ func RequireAuth(next http.Handler) http.Handler {
 			return jwtSecret, nil
 		})
 
+		// ถ้า Token เสียหาย ถูกปลอมแปลง หรือหมดอายุแล้ว
 		if err != nil || !token.Valid {
 			recordUnauthorized(r, "invalid_or_expired_token", "")
 			writeAuthError(w, http.StatusUnauthorized, "UNAUTHORIZED", "บัตรผ่านไม่ถูกต้อง หรือหมดอายุแล้ว")
 			return
 		}
 
+		// 3. นำ user_id และ role ที่ได้จาก Token ฝังลงใน Request Context
 		if claims, ok := token.Claims.(jwt.MapClaims); ok {
 			ctx := context.WithValue(r.Context(), UserIDKey, claims["user_id"])
 			ctx = context.WithValue(ctx, RoleKey, claims["role"])
 			r = r.WithContext(ctx)
 		}
 
+		// ปลอดภัยแล้ว ส่งคำขอให้ Handler ถัดไปทำงานต่อ
 		next.ServeHTTP(w, r)
 	})
 }
@@ -147,6 +169,18 @@ func OptionalAuth(next http.Handler) http.Handler {
 	})
 }
 
+// =========================================================================================
+// [อาจารย์ถาม: "ตรวจสิทธิ์ Role เช่น แอดมิน หรือ นักเขียน ตรงไหน / ใครห้ามทำอะไรบ้าง?"]
+//
+// Middleware: RequireRole
+// หน้าที่: ตรวจสอบสิทธิ์ (Authorization) ว่าผู้ใช้มี Role ตรงกับที่กำหนดไว้หรือไม่ (เช่น "admin")
+//
+// ขั้นตอนการทำงาน:
+// 1. เรียก RequireAuth ก่อนเสมอเพื่อยืนยันว่าผู้ใช้ล็อกอินจริง
+// 2. ดึงค่า Role ออกมาจาก Context
+// 3. ถ้าไม่มี Role หรือ Role ไม่ตรงกับ requiredRole -> ส่ง HTTP 403 Forbidden ปฏิเสธทันที
+// 4. มีการเรียก recordUnauthorized เพื่อบันทึก Audit Log เฝ้าระวังความปลอดภัย
+// =========================================================================================
 func RequireRole(requiredRole string, next http.Handler) http.Handler {
 	return RequireAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		role, ok := GetRoleFromContext(r.Context())
