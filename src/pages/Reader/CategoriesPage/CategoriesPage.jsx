@@ -109,9 +109,10 @@ const CategoriesPage = () => {
     setLoading(true);
     setError(null);
     try {
+      // 🔗 เชื่อมต่อ GET /api/v1/categories และ GET /api/v1/novels: เพื่อดึงรายการหมวดหมู่และนิยายทั้งหมดมาจัดกลุ่มแสดงตามหมวดหมู่ในหน้า Categories
       const [catRes, novelRes] = await Promise.all([
-        axios.get(`${API_BASE_URL}/categories`),
-        axios.get(`${API_BASE_URL}/novels`),
+        axios.get(`${API_BASE_URL}/api/v1/categories`),
+        axios.get(`${API_BASE_URL}/api/v1/novels`),
       ]);
 
       const catData = catRes.data?.data || catRes.data || [];

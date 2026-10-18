@@ -50,13 +50,23 @@ const Manageusers = () => {
   };
   const currentUserId = getCurrentUserId();
 
-  // 🎯 ดึงข้อมูลรายชื่อผู้ใช้งานจาก API จริง (/api/admin/users)
+  // 🎯 ดึงข้อมูลรายชื่อผู้ใช้งานจาก API จริง (/api/v1/admin/users)
+  // 🔗 เชื่อมต่อ GET /api/v1/admin/users: ดึงรายชื่อผู้ใช้งานทั้งหมดในระบบเพื่อนำมาแสดงและจัดการในตารางผู้ใช้งานของ Admin
   const loadData = async () => {
     setIsLoading(true);
     setError(null);
     try {
       const headers = getAuthHeaders();
-      const res = await axios.get(`${API_BASE_URL}/api/admin/users?limit=1000`, { headers });
+      let res;
+      try {
+        res = await axios.get(`${API_BASE_URL}/api/v1/admin/users?limit=1000`, { headers });
+      } catch (err) {
+        if (err.response?.status === 404) {
+          res = await axios.get(`${API_BASE_URL}/api/admin/users?limit=1000`, { headers });
+        } else {
+          throw err;
+        }
+      }
       const list = res.data?.users || res.data?.data || res.data;
       setUsers(Array.isArray(list) ? list : []);
     } catch (err) {
@@ -137,7 +147,32 @@ const Manageusers = () => {
   const [isUpdating, setIsUpdating] = useState(false);
 
   // 4. จัดการอัปเดตผู้ใช้ (Edit) — เรียก backend จริง 2 endpoint แยกกัน
-  //    - username: PATCH /api/admin/users/{id}/username
+  // ฟังก์ชันช่วยเหลือสำหรับเรียก PATCH /api/v1/admin/users พร้อม fallback อัตโนมัติ
+  const patchAdminUser = async (endpoint, body, headers) => {
+    try {
+      return await axios.patch(`${API_BASE_URL}/api/v1/admin/users/${endpoint}`, body, { headers });
+    } catch (err) {
+      if (err.response?.status === 400 || err.response?.status === 404) {
+        return await axios.patch(`${API_BASE_URL}/api/admin/users/${endpoint}`, body, { headers });
+      }
+      throw err;
+    }
+  };
+
+  // ฟังก์ชันช่วยเหลือสำหรับเรียก DELETE /api/v1/admin/users พร้อม fallback อัตโนมัติ
+  const deleteAdminUser = async (userId, headers) => {
+    try {
+      return await axios.delete(`${API_BASE_URL}/api/v1/admin/users/${userId}`, { headers });
+    } catch (err) {
+      if (err.response?.status === 400 || err.response?.status === 404) {
+        return await axios.delete(`${API_BASE_URL}/api/admin/users/${userId}`, { headers });
+      }
+      throw err;
+    }
+  };
+
+  // 4. จัดการอัปเดตข้อมูลผู้ใช้ (Update/Edit) — รองรับ 3 เส้นทาง
+  //    - username: PATCH /api/v1/admin/users/{id}/username
   //    - demote: ใช้เฉพาะกรณี writer -> reader เท่านั้น (ทิศทางเดียว ห้ามตั้งเป็น writer/admin จากหน้านี้)
   //    - status: ใช้เปลี่ยน active <-> suspended เท่านั้น
   const handleUpdateUser = async () => {
@@ -155,26 +190,26 @@ const Manageusers = () => {
       const headers = getAuthHeaders();
 
       if (trimmedUsername !== user.username) {
-        await axios.patch(
-          `${API_BASE_URL}/api/admin/users/${user.id}/username`,
-          { username: trimmedUsername },
-          { headers }
-        );
+        // 🔗 เชื่อมต่อ PATCH /api/v1/admin/users/:id/username: อัปเดตชื่อผู้ใช้งาน (Admin แก้ไข username)
+        await patchAdminUser(`${user.id}/username`, { username: trimmedUsername }, headers);
       }
 
       if (user.role === "writer" && role === "reader") {
-        await axios.patch(`${API_BASE_URL}/api/admin/users/${user.id}/demote`, {}, { headers });
+        // 🔗 เชื่อมต่อ PATCH /api/v1/admin/users/:id/demote: ปรับลดบทบาทผู้ใช้จาก writer กลับเป็น reader
+        await patchAdminUser(`${user.id}/demote`, {}, headers);
       }
 
       if (user.role === "reader" && role === "writer" && user.had_writer_history && user.status === "active") {
-        await axios.patch(`${API_BASE_URL}/api/admin/users/${user.id}/restore-writer`, {}, { headers });
+        // 🔗 เชื่อมต่อ PATCH /api/v1/admin/users/:id/restore-writer: กู้คืนสิทธิ์นักเขียนให้ผู้ใช้ที่เคยเป็นนักเขียนมาก่อน
+        await patchAdminUser(`${user.id}/restore-writer`, {}, headers);
       }
 
       if (status !== user.status) {
-        await axios.patch(
-          `${API_BASE_URL}/api/admin/users/${user.id}/status`,
+        // 🔗 เชื่อมต่อ PATCH /api/v1/admin/users/:id/status: เปลี่ยนสถานะบัญชีผู้ใช้ (active / suspended)
+        await patchAdminUser(
+          `${user.id}/status`,
           { status, reason: status === "suspended" ? reason : undefined },
-          { headers }
+          headers
         );
       }
 
@@ -209,7 +244,8 @@ const Manageusers = () => {
 
     try {
       const headers = getAuthHeaders();
-      await axios.delete(`${API_BASE_URL}/api/admin/users/${user.id}`, { headers });
+      // 🔗 เชื่อมต่อ DELETE /api/v1/admin/users/:id: ลบบัญชีผู้ใช้งานออกจากระบบ (Admin ลบผู้ใช้)
+      await deleteAdminUser(user.id, headers);
       setDeleteConfirmModal({ isOpen: false, user: null });
       await loadData();
     } catch (err) {

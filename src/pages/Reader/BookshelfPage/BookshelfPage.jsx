@@ -77,8 +77,9 @@ const formatMinioUrl = (url) => {
     return url.replace("http://minio:9000", "http://localhost:9000");
 };
 
+// 🔗 เชื่อมต่อ GET /api/v1/bookshelves?user_id=:id: เพื่อดึงรายการนิยายในชั้นหนังสือของผู้อ่าน
 const getBookshelfApiUrl = (userId) => {
-    const base = `${API_BASE_URL}/bookshelves`;
+    const base = `${API_BASE_URL}/api/v1/bookshelves`;
     return userId ? `${base}?user_id=${userId}` : base;
 };
 
@@ -491,7 +492,8 @@ const BookshelfPage = () => {
             if (token) headers.Authorization = `Bearer ${token}`;
 
             const bookId = deleteTarget.id;
-            await axios.delete(`${API_BASE_URL}/bookshelves`, {
+            // 🔗 เชื่อมต่อ DELETE /api/v1/bookshelves: เพื่อนำนิยายออกจากชั้นหนังสือของผู้ใช้
+            await axios.delete(`${API_BASE_URL}/api/v1/bookshelves`, {
                 headers,
                 data: { novel_id: bookId },
             });
@@ -665,7 +667,9 @@ const BookshelfPage = () => {
                                                                 <Clock size={12} className="bookshelf-card__time-icon" />
                                                                 <span>{formatLastReadInfo(book)}</span>
                                                             </div>
-                                                        ) : null}
+                                                        ) : (
+                                                            <div className="bookshelf-card__time-meta bookshelf-card__time-meta--empty" aria-hidden="true" />
+                                                        )}
 
                                                         <div className="bookshelf-card__stats">
                                                             <div className="bookshelf-card__stat" title="ยอดวิว">

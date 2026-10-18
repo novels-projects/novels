@@ -4,6 +4,7 @@ import { Link, useNavigate, useLocation } from "react-router-dom";
 import { Bell, Menu, X, LogOut, User } from "lucide-react";
 import "./Navbarwriter.css";
 import { getNovelStatusInfo } from "../../utils/novelStatus";
+import { apiFetch } from "../../utils/apiFetch";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
 
@@ -85,9 +86,10 @@ const Navbarwriter = () => {
     useEffect(() => {
         const fetchSearchOverlayData = async () => {
             try {
+                // 🔗 เชื่อมต่อ GET /api/v1/novels และ GET /api/v1/categories: เพื่อดึงรายชื่อนิยายและหมวดหมู่สำหรับแสดงในหน้าต่างค้นหา (Search Overlay)
                 const [novelRes, catRes] = await Promise.all([
-                    fetch(`${API_BASE_URL}/novels`),
-                    fetch(`${API_BASE_URL}/categories`)
+                    apiFetch(`${API_BASE_URL}/api/v1/novels`),
+                    apiFetch(`${API_BASE_URL}/api/v1/categories`)
                 ]);
                 if (novelRes.ok) {
                     const novelData = await novelRes.json();
@@ -115,7 +117,8 @@ const Navbarwriter = () => {
         const t = token || localStorage.getItem("token");
         if (!t) { setUnreadCount(0); return; }
         try {
-            const res = await fetch(`${API_BASE_URL}/notifications/unread-count`, {
+            // 🔗 เชื่อมต่อ GET /api/v1/notifications/unread-count: เพื่อดึงจำนวนการแจ้งเตือนที่ยังไม่ได้อ่านมาแสดงบน Badge ของกระดิ่ง
+            const res = await apiFetch(`${API_BASE_URL}/api/v1/notifications/unread-count`, {
                 headers: { Authorization: `Bearer ${t}` },
                 credentials: "include",
             });
@@ -182,8 +185,9 @@ const Navbarwriter = () => {
         let eventSource = null;
         if (token) {
             try {
+                // 🔗 เชื่อมต่อ SSE GET /api/v1/notifications/stream: เพื่อเปิดการเชื่อมต่อ Stream รับแจ้งเตือนแบบเรียลไทม์
                 eventSource = new EventSource(
-                    `${API_BASE_URL}/notifications/stream?token=${encodeURIComponent(token)}`
+                    `${API_BASE_URL}/api/v1/notifications/stream?token=${encodeURIComponent(token)}`
                 );
                 eventSource.onmessage = refreshNotifications;
             } catch (e) {
@@ -275,7 +279,8 @@ const Navbarwriter = () => {
         let isCancelled = false;
         const token = localStorage.getItem("token");
         const headers = token ? { Authorization: `Bearer ${token}` } : {};
-        fetch(`${API_BASE_URL}/novels/${urlNovelId}`, { headers })
+        // 🔗 เชื่อมต่อ GET /api/v1/novels/:id: เพื่อดึงข้อมูลชื่อเรื่องและภาพปกของนิยายที่กำลังเปิดอยู่มาแสดงบน Workspace Navbar
+        apiFetch(`${API_BASE_URL}/api/v1/novels/${urlNovelId}`, { headers })
             .then((res) => (res.ok ? res.json() : null))
             .then((data) => {
                 if (isCancelled || !data) return;
@@ -315,7 +320,8 @@ const Navbarwriter = () => {
     const fetchUserData = async (token) => {
         setIsLoadingUser(true);
         try {
-            const response = await fetch(`${API_BASE_URL}/api/users`, {
+            // 🔗 เชื่อมต่อ GET /api/v1/users/me: เพื่อดึงข้อมูลโปรไฟล์ของผู้ใช้ปัจจุบัน (Username, Email, รูปโปรไฟล์, Role)
+            const response = await apiFetch(`${API_BASE_URL}/api/v1/users/me`, {
                 headers: { Authorization: `Bearer ${token}` },
             });
             if (!response.ok) return;
@@ -340,7 +346,8 @@ const Navbarwriter = () => {
 
     const fetchNovels = async (token) => {
         try {
-            const response = await fetch(`${API_BASE_URL}/api/me/novels`, {
+            // 🔗 เชื่อมต่อ GET /api/v1/writers/me/novels: เพื่อดึงรายการนิยายทั้งหมดของนักเขียน สำหรับแสดงในเมนูสลับนิยายบนแถบ Navbar
+            const response = await apiFetch(`${API_BASE_URL}/api/v1/writers/me/novels`, {
                 headers: { Authorization: `Bearer ${token}` },
             });
             if (!response.ok) throw new Error("โหลดนิยายไม่สำเร็จ");
@@ -426,7 +433,8 @@ const Navbarwriter = () => {
                 const token = localStorage.getItem("token");
                 const headers = { Authorization: `Bearer ${token}` };
 
-                const chapterRes = await fetch(`${API_BASE_URL}/novels/${novelId}/chapters`, { headers });
+                // 🔗 เชื่อมต่อ GET /api/v1/novels/:id/chapters: เพื่อดึงรายชื่อตอนทั้งหมด และหาฉากแรกสำหรับเปิดหน้าเขียนเนื้อหา
+                const chapterRes = await apiFetch(`${API_BASE_URL}/api/v1/novels/${novelId}/chapters`, { headers });
                 const chapterData = await chapterRes.json();
                 const chapters = chapterData?.data?.chapters || chapterData?.chapters || chapterData?.data || [];
 
@@ -440,7 +448,8 @@ const Navbarwriter = () => {
                     const chId = ch.id || ch.chapter_id || ch.ChapterID;
                     if (!chId) continue;
 
-                    const sceneRes = await fetch(`${API_BASE_URL}/chapters/${chId}/scenes`, { headers });
+                    // 🔗 เชื่อมต่อ GET /api/v1/chapters/:id/scenes: เพื่อดึงฉากในตอนแรกมาเปิดเขียน
+                    const sceneRes = await apiFetch(`${API_BASE_URL}/api/v1/chapters/${chId}/scenes`, { headers });
                     const sceneData = await sceneRes.json();
                     const scenes = sceneData?.data?.scenes || sceneData?.scenes || sceneData?.data || [];
 
@@ -483,7 +492,8 @@ const Navbarwriter = () => {
         const headers = { Authorization: `Bearer ${token}` };
 
         try {
-            const chapterRes = await fetch(`${API_BASE_URL}/novels/${novelId}/chapters`, { headers });
+            // 🔗 เชื่อมต่อ GET /api/v1/novels/:id/chapters: เพื่อดึงรายชื่อตอนทั้งหมดเมื่อสลับเรื่องนิยาย
+            const chapterRes = await apiFetch(`${API_BASE_URL}/api/v1/novels/${novelId}/chapters`, { headers });
             const chapterData = await chapterRes.json();
             const chapters = chapterData?.data?.chapters || chapterData?.chapters || chapterData?.data || [];
 
@@ -495,7 +505,8 @@ const Navbarwriter = () => {
             const firstChapter = chapters[0];
             const firstChapterId = firstChapter.id || firstChapter.chapter_id || firstChapter.ChapterID;
 
-            const sceneRes = await fetch(`${API_BASE_URL}/chapters/${firstChapterId}/scenes`, { headers });
+            // 🔗 เชื่อมต่อ GET /api/v1/chapters/:id/scenes: เพื่อดึงฉากแรกของเรื่องที่เพิ่งเลือก
+            const sceneRes = await apiFetch(`${API_BASE_URL}/api/v1/chapters/${firstChapterId}/scenes`, { headers });
             const sceneData = await sceneRes.json();
             const scenes = sceneData?.data?.scenes || sceneData?.scenes || sceneData?.data || [];
 
@@ -552,7 +563,8 @@ const Navbarwriter = () => {
         try {
             const token = localStorage.getItem("token");
             if (token) {
-                await fetch(`${API_BASE_URL}/api/logout`, {
+                // 🔗 เชื่อมต่อ POST /api/v1/auth/logout: เพื่อส่งคำสั่งออกจากระบบและเคลียร์ Session ของนักเขียนบนเซิร์ฟเวอร์
+                await apiFetch(`${API_BASE_URL}/api/v1/auth/logout`, {
                     method: 'POST',
                     headers: {
                         'Authorization': `Bearer ${token}`,

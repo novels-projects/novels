@@ -99,7 +99,8 @@ const Navbar = () => {
         const token = localStorage.getItem("token");
         if (!token) return;
         try {
-            const res = await fetch(`${API_BASE_URL}/api/me/novels`, {
+            // 🔗 เชื่อมต่อ GET /api/v1/writers/me/novels: เพื่อดึงรายการนิยายทั้งหมดของนักเขียน สำหรับแสดงในเมนูสลับนิยายบนแถบ Navbar
+            const res = await fetch(`${API_BASE_URL}/api/v1/writers/me/novels`, {
                 headers: { Authorization: `Bearer ${token}` },
             });
             if (!res.ok) throw new Error("โหลดนิยายไม่สำเร็จ");
@@ -173,7 +174,8 @@ const Navbar = () => {
         let isCancelled = false;
         const token = localStorage.getItem("token");
         const headers = token ? { Authorization: `Bearer ${token}` } : {};
-        fetch(`${API_BASE_URL}/novels/${urlNovelId}`, { headers })
+        // 🔗 เชื่อมต่อ GET /api/v1/novels/:id: เพื่อดึงข้อมูลชื่อเรื่องและภาพปกของนิยายที่กำลังเปิดอยู่มาแสดงบน Workspace Navbar
+        fetch(`${API_BASE_URL}/api/v1/novels/${urlNovelId}`, { headers })
             .then((res) => (res.ok ? res.json() : null))
             .then((data) => {
                 if (isCancelled || !data) return;
@@ -246,7 +248,8 @@ const Navbar = () => {
                 const token = localStorage.getItem("token");
                 const headers = { Authorization: `Bearer ${token}` };
 
-                const chapterRes = await fetch(`${API_BASE_URL}/novels/${novelId}/chapters`, { headers });
+                // 🔗 เชื่อมต่อ GET /api/v1/novels/:id/chapters: เพื่อดึงรายชื่อตอนทั้งหมด และหาฉากแรกสำหรับเปิดหน้าเขียนเนื้อหา
+                const chapterRes = await fetch(`${API_BASE_URL}/api/v1/novels/${novelId}/chapters`, { headers });
                 if (!chapterRes.ok) {
                     navigate(`/writer/${novelId}/chapters`);
                     return;
@@ -264,7 +267,8 @@ const Navbar = () => {
                     const chId = ch.id || ch.chapter_id || ch.ChapterID;
                     if (!chId) continue;
 
-                    const sceneRes = await fetch(`${API_BASE_URL}/chapters/${chId}/scenes`, { headers });
+                    // 🔗 เชื่อมต่อ GET /api/v1/chapters/:id/scenes: เพื่อดึงฉากในตอนแรกมาเปิดเขียน
+                    const sceneRes = await fetch(`${API_BASE_URL}/api/v1/chapters/${chId}/scenes`, { headers });
                     if (!sceneRes.ok) continue;
 
                     const sceneData = await sceneRes.json();

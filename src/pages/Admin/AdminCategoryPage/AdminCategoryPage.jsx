@@ -16,6 +16,7 @@ import {
     Tag
 } from "lucide-react";
 import "./AdminCategoryPage.css";
+import { apiFetch } from "../../../utils/apiFetch";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
 
@@ -78,9 +79,11 @@ export default function AdminCategoryPage() {
         setLoading(true);
         setError("");
         try {
+            // 🔗 เชื่อมต่อ GET /categories หรือ /api/v1/categories: ดึงรายการหมวดหมู่ทั้งหมดในระบบ
+            // 🔗 เชื่อมต่อ GET /novels หรือ /api/v1/novels: ดึงรายการนิยายทั้งหมดเพื่อนับจำนวนการใช้งานหมวดหมู่
             const [catRes, novelRes] = await Promise.all([
-                fetch(`${API_BASE_URL}/categories`),
-                fetch(`${API_BASE_URL}/novels`).catch(err => {
+                apiFetch(`${API_BASE_URL}/categories`),
+                apiFetch(`${API_BASE_URL}/novels`).catch(err => {
                     console.warn("Fetch novels failed:", err);
                     return null;
                 })
@@ -102,6 +105,8 @@ export default function AdminCategoryPage() {
                 const count = novelList.filter(novel => novelBelongsToCategory(novel, cat)).length;
                 return {
                     ...cat,
+                    category_id: cat.category_id ?? cat.CategoryID ?? cat.id,
+                    name: cat.name ?? cat.Name ?? "",
                     novelCount: count
                 };
             });
@@ -152,21 +157,23 @@ export default function AdminCategoryPage() {
 
         setMutationLoading(true);
         setMutationError("");
-        const token = localStorage.getItem("token");
+        const token = localStorage.getItem("token") || localStorage.getItem("authToken") || sessionStorage.getItem("token");
 
         try {
             const isEdit = modalMode === "edit";
+            const catId = selectedCategory?.category_id ?? selectedCategory?.CategoryID ?? selectedCategory?.id;
+            // 🔗 เชื่อมต่อ POST /api/admin/categories หรือ PATCH /api/admin/categories/:id: สร้างหรือแก้ไขหมวดหมู่นิยาย
             const url = isEdit 
-                ? `${API_BASE_URL}/api/admin/categories/${selectedCategory.category_id}`
+                ? `${API_BASE_URL}/api/admin/categories/${catId}`
                 : `${API_BASE_URL}/api/admin/categories`;
             
             const method = isEdit ? "PATCH" : "POST";
 
-            const res = await fetch(url, {
+            const res = await apiFetch(url, {
                 method,
                 headers: {
                     "Content-Type": "application/json",
-                    Authorization: `Bearer ${token}`
+                    ...(token ? { Authorization: `Bearer ${token}` } : {})
                 },
                 body: JSON.stringify({ name: trimmedName })
             });
@@ -178,16 +185,18 @@ export default function AdminCategoryPage() {
             }
 
             if (!res.ok) {
+                const errData = await res.json().catch(() => null);
+                const errMsg = errData?.error || errData?.message || errData?.details;
                 if (res.status === 409) {
                     throw new Error("มีหมวดหมู่นี้อยู่แล้วในระบบ");
                 }
                 if (res.status === 400) {
-                    throw new Error("ชื่อหมวดหมู่ไม่ถูกต้อง");
+                    throw new Error(errMsg || "ชื่อหมวดหมู่ไม่ถูกต้อง");
                 }
                 if (res.status === 404) {
                     throw new Error("ไม่พบหมวดหมู่นี้");
                 }
-                throw new Error("บันทึกหมวดหมู่ล้มเหลว");
+                throw new Error(errMsg || "บันทึกหมวดหมู่ล้มเหลว");
             }
 
             triggerSuccess(isEdit ? "แก้ไขหมวดหมู่สำเร็จ" : "เพิ่มหมวดหมู่สำเร็จ");
@@ -214,13 +223,15 @@ export default function AdminCategoryPage() {
 
         setDeleteLoading(true);
         setDeleteError("");
-        const token = localStorage.getItem("token");
+        const token = localStorage.getItem("token") || localStorage.getItem("authToken") || sessionStorage.getItem("token");
 
         try {
-            const res = await fetch(`${API_BASE_URL}/api/admin/categories/${categoryToDelete.category_id}`, {
+            const catId = categoryToDelete?.category_id ?? categoryToDelete?.CategoryID ?? categoryToDelete?.id;
+            // 🔗 เชื่อมต่อ DELETE /api/admin/categories/:id: ลบหมวดหมู่นิยายออกจากระบบ
+            const res = await apiFetch(`${API_BASE_URL}/api/admin/categories/${catId}`, {
                 method: "DELETE",
                 headers: {
-                    Authorization: `Bearer ${token}`
+                    ...(token ? { Authorization: `Bearer ${token}` } : {})
                 }
             });
 
@@ -231,13 +242,15 @@ export default function AdminCategoryPage() {
             }
 
             if (!res.ok) {
+                const errData = await res.json().catch(() => null);
+                const errMsg = errData?.error || errData?.message || errData?.details;
                 if (res.status === 409) {
                     throw new Error("ไม่สามารถลบหมวดหมู่นี้ได้ เนื่องจากยังมีการใช้งานอยู่");
                 }
                 if (res.status === 404) {
                     throw new Error("ไม่พบหมวดหมู่นี้ในระบบ");
                 }
-                throw new Error("เกิดข้อผิดพลาดในการลบหมวดหมู่");
+                throw new Error(errMsg || "เกิดข้อผิดพลาดในการลบหมวดหมู่");
             }
 
             triggerSuccess("ลบหมวดหมู่เรียบร้อยแล้ว");

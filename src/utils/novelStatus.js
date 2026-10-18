@@ -90,8 +90,12 @@ export function unregisterBannedNovel(novelId) {
   if (!novelId) return;
   try {
     const reg = getBannedRegistry();
-    delete reg[String(novelId)];
-    localStorage.setItem(BANNED_REGISTRY_KEY, JSON.stringify(reg));
+    const key = String(novelId);
+    if (reg[key]) {
+      delete reg[key];
+      localStorage.setItem(BANNED_REGISTRY_KEY, JSON.stringify(reg));
+      window.dispatchEvent(new CustomEvent("novel-unbanned", { detail: { novelId: key } }));
+    }
   } catch (e) {
     console.warn("unregisterBannedNovel error", e);
   }
@@ -150,16 +154,38 @@ function labelFor(mode) {
 export function getNovelStatusInfo(input = {}) {
   // input may contain: status, is_published, is_completed, isPublished, isCompleted, is_banned, id, novel_id, novelId, ID, NovelID
   const novelId = input.id || input.novel_id || input.novelId || input.ID || input.NovelID;
-  const inRegistry = isNovelBannedInRegistry(novelId);
-  const registryData = inRegistry ? getBannedRegistry()[String(novelId)] : null;
-
   const statusRaw = String(input.status || input.Status || "").toLowerCase().trim();
   const isBannedFlag = Boolean(input.is_banned ?? input.IsBanned ?? input.isBanned ?? input.banned);
-  const isBanned = statusRaw === "suspended" || statusRaw === "banned" || statusRaw === "ban" || statusRaw === "ระงับ" || isBannedFlag || inRegistry;
+  const isExplicitlySuspended = statusRaw === "suspended" || statusRaw === "banned" || statusRaw === "ban" || statusRaw === "ระงับ" || isBannedFlag;
 
-  // Auto-register in persistent registry if backend reported banned/suspended
-  if ((statusRaw === "suspended" || statusRaw === "banned" || statusRaw === "ban" || isBannedFlag) && novelId) {
-    registerBannedNovel(novelId, input);
+  const hasStatusProp = input.status !== undefined || input.Status !== undefined || input.is_banned !== undefined || input.IsBanned !== undefined || input.isBanned !== undefined;
+
+  let inRegistry = false;
+  if (novelId) {
+    inRegistry = isNovelBannedInRegistry(novelId);
+  }
+
+  let isBanned = false;
+  let registryData = null;
+
+  if (isExplicitlySuspended) {
+    isBanned = true;
+    if (novelId) {
+      registerBannedNovel(novelId, input);
+      registryData = getBannedRegistry()[String(novelId)] || null;
+    }
+  } else if (hasStatusProp && statusRaw !== "") {
+    // ข้อมูลจริงจาก Backend ระบุสถานะชัดเจนว่าไม่ถูกระงับ (เช่น 'draft', 'published', 'completed')
+    // แปลว่านิยายได้รับการปลดแบนแล้ว หรือไม่เคยถูกแบน -> เคลียร์ออกจาก registry ทันที
+    isBanned = false;
+    if (novelId && inRegistry) {
+      unregisterBannedNovel(novelId);
+    }
+    registryData = null;
+  } else if (inRegistry) {
+    // กรณี input ไม่มีข้อมูลสถานะจาก Backend เลย (เช่น { id: 123 }) ให้ fallback ไปเช็ค registry
+    isBanned = true;
+    registryData = getBannedRegistry()[String(novelId)] || null;
   }
 
   const flagPublished = (typeof input.is_published === "boolean") ? input.is_published : (typeof input.isPublished === "boolean" ? input.isPublished : null);

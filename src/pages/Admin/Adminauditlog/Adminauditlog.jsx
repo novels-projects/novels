@@ -483,7 +483,8 @@ export default function Adminauditlog() {
       if (dateFromFilter) params.set("date_from", new Date(dateFromFilter).toISOString());
       if (dateToFilter) params.set("date_to", new Date(dateToFilter).toISOString());
 
-      const res = await fetch(`${API_BASE_URL}/api/admin/audit-logs?${params.toString()}`, {
+      // 🔗 เชื่อมต่อ GET /api/v1/admin/audit-logs: ดึงข้อมูลบันทึกประวัติการทำงาน (Audit Log) ทั้งหมดตามเงื่อนไขตัวกรอง
+      const res = await fetch(`${API_BASE_URL}/api/v1/admin/audit-logs?${params.toString()}`, {
         headers: { Authorization: `Bearer ${token}` },
       }).catch(() => null);
 
@@ -590,7 +591,8 @@ export default function Adminauditlog() {
         params.set("date_to", isoTo);
       }
 
-      const res = await fetch(`${API_BASE_URL}/api/admin/audit-logs?${params.toString()}`, {
+      // 🔗 เชื่อมต่อ GET /api/v1/admin/audit-logs: ดึงข้อมูลประวัติการกระทำของระบบมาแสดงบนตาราง
+      const res = await fetch(`${API_BASE_URL}/api/v1/admin/audit-logs?${params.toString()}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
@@ -655,7 +657,8 @@ export default function Adminauditlog() {
     const token = localStorage.getItem("token");
     if (!token) return;
     try {
-      const res = await fetch(`${API_BASE_URL}/api/admin/audit-logs/metadata`, {
+      // 🔗 เชื่อมต่อ GET /api/v1/admin/audit-logs/metadata: ดึงข้อมูลรายการ Metadata สำหรับตัวเลือกตัวกรอง
+      const res = await fetch(`${API_BASE_URL}/api/v1/admin/audit-logs/metadata`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
@@ -701,7 +704,8 @@ export default function Adminauditlog() {
       if (dateFromFilter) params.set("date_from", new Date(dateFromFilter).toISOString());
       if (dateToFilter) params.set("date_to", new Date(dateToFilter).toISOString());
 
-      const res = await fetch(`${API_BASE_URL}/api/admin/audit-logs?${params.toString()}`, {
+      // 🔗 เชื่อมต่อ GET /api/v1/admin/audit-logs: ดึงข้อมูลทั้งหมดตามตัวกรองเพื่อส่งออกเป็นไฟล์
+      const res = await fetch(`${API_BASE_URL}/api/v1/admin/audit-logs?${params.toString()}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) throw new Error("ไม่สามารถดึงข้อมูลเพื่อส่งออกได้");
@@ -907,7 +911,8 @@ export default function Adminauditlog() {
       return;
     }
     try {
-      const res = await fetch(`${API_BASE_URL}/api/admin/audit-logs/${id}`, {
+      // 🔗 เชื่อมต่อ GET /api/v1/admin/audit-logs/:id: ดึงรายละเอียดเชิงลึกของรายการบันทึกประวัติการทำงาน
+      const res = await fetch(`${API_BASE_URL}/api/v1/admin/audit-logs/${id}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },

@@ -186,7 +186,7 @@
 
 .bookshelf-page__grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 20px;
 }
 
@@ -205,6 +205,8 @@
   gap: 16px;
   transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
   box-sizing: border-box;
+  min-width: 0;
+  width: 100%;
 }
 
 .bookshelf-card:hover {
@@ -219,6 +221,7 @@
   gap: 16px;
   align-items: flex-start;
   min-width: 0;
+  width: 100%;
 }
 
 /* Cover & Overlays */
@@ -329,12 +332,15 @@
 
 /* Right Info Column */
 .bookshelf-card__info-col {
-  flex: 1;
+  flex: 1 1 0;
   min-width: 0;
+  width: 0;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
+  height: 152px;
   min-height: 152px;
+  overflow: hidden;
 }
 
 .bookshelf-card__info-top {
@@ -342,6 +348,7 @@
   flex-direction: column;
   gap: 4px;
   min-width: 0;
+  width: 100%;
 }
 
 .bookshelf-card__title {
@@ -355,6 +362,9 @@
   text-overflow: ellipsis;
   line-height: 1.3;
   transition: color 0.15s ease;
+  padding-right: 32px;
+  display: block;
+  max-width: 100%;
 }
 
 .bookshelf-card__title:hover {
@@ -372,6 +382,13 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.bookshelf-card__author span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .bookshelf-card__author-icon {
@@ -382,9 +399,13 @@
 /* Category Tags */
 .bookshelf-card__categories {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  align-items: center;
   gap: 5px;
   margin-top: 1px;
+  height: 22px;
+  overflow: hidden;
+  max-width: 100%;
 }
 
 .bookshelf-card__tag {
@@ -397,6 +418,10 @@
   border: 1px solid #fbcfe8;
   line-height: 1.3;
   white-space: nowrap;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-shrink: 0;
 }
 
 .bookshelf-card__extra-categories {
@@ -406,6 +431,7 @@
   border-radius: 999px;
   background: var(--pink-pale);
   color: var(--pink-deep);
+  flex-shrink: 0;
 }
 
 /* Description 2-lines Snippet */
@@ -420,7 +446,10 @@
   line-clamp: 2;
   overflow: hidden;
   text-overflow: ellipsis;
-  min-height: 35px;
+  height: 35px;
+  max-height: 35px;
+  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 .bookshelf-card__info-bottom {
@@ -429,6 +458,7 @@
   gap: 4px;
   margin-top: auto;
   min-width: 0;
+  width: 100%;
 }
 
 /* Last read / Time meta */
@@ -443,6 +473,11 @@
   overflow: hidden;
   text-overflow: ellipsis;
   line-height: 1.2;
+  min-height: 18px;
+}
+
+.bookshelf-card__time-meta--empty {
+  visibility: hidden;
 }
 
 .bookshelf-card__time-icon {
@@ -459,6 +494,8 @@
   color: var(--muted);
   font-weight: 500;
   line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
 }
 
 .bookshelf-card__stat {
@@ -541,7 +578,7 @@
 
 @media (max-width: 900px) {
   .bookshelf-page__grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
     gap: 16px;
   }
 }
@@ -587,6 +624,11 @@
     width: 95px;
     height: 130px;
     border-radius: 10px;
+  }
+
+  .bookshelf-card__info-col {
+    height: 130px;
+    min-height: 130px;
   }
 
   .bookshelf-card__title {

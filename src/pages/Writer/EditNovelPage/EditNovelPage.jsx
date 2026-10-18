@@ -10,8 +10,9 @@ import Toggle from "../../../components/Toggle/Toggle";
 import { Skeleton, ButtonSpinner } from "../../../components/Skeleton";
 import { useNavigate, useParams, useBlocker } from "react-router-dom";
 import UnsavedChangesModal from "../../../components/UnsavedChangesModal/UnsavedChangesModal";
-import { getNovelStatusInfo, registerBannedNovel, isNovelBannedInRegistry } from "../../../utils/novelStatus";
+import { getNovelStatusInfo, registerBannedNovel, unregisterBannedNovel, isNovelBannedInRegistry } from "../../../utils/novelStatus";
 import { showTopToast } from "../../../utils/toast";
+import { apiFetch } from "../../../utils/apiFetch";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
 
@@ -161,7 +162,8 @@ const EditNovelPage = ({ onNavigate }) => {
         const loadCategories = async () => {
             setCategoriesLoading(true);
             try {
-                const response = await fetch(`${API_BASE_URL}/categories`);
+                // 🔗 เชื่อมต่อ GET /api/v1/categories: เพื่อดึงรายการหมวดหมู่ทั้งหมดมาแสดงในแบบฟอร์มแก้ไขข้อมูลนิยาย
+                const response = await apiFetch(`${API_BASE_URL}/api/v1/categories`);
                 if (!response.ok) throw new Error("failed to fetch categories");
                 const result = await response.json();
                 const categoriesData = Array.isArray(result)
@@ -216,7 +218,8 @@ const EditNovelPage = ({ onNavigate }) => {
                 try {
                     console.log("EditNovelPage: attempting fetch for id", idCandidate);
                     console.debug("EditNovelPage: attempting novel fetch", { idCandidate });
-                    const response = await fetch(`${API_BASE_URL}/novels/${idCandidate}`, {
+                    // 🔗 เชื่อมต่อ GET /api/v1/novels/:id: เพื่อดึงข้อมูลรายละเอียดนิยายปัจจุบันมาแสดงในแบบฟอร์มแก้ไข
+                    const response = await apiFetch(`${API_BASE_URL}/api/v1/novels/${idCandidate}`, {
                         headers: token ? { Authorization: `Bearer ${token}` } : {},
                     });
                     console.log("EditNovelPage: fetch response status", { idCandidate, status: response.status });
@@ -361,7 +364,8 @@ const EditNovelPage = ({ onNavigate }) => {
                 const imageFormData = new FormData();
                 imageFormData.append("image", form.coverFile, "cover_novel.jpg");
 
-                const uploadRes = await fetch(`${API_BASE_URL}/upload/image`, {
+                // 🔗 เชื่อมต่อ POST /api/v1/media/upload: เพื่ออัปโหลดไฟล์ภาพปกใหม่ขึ้น MinIO Storage
+                const uploadRes = await apiFetch(`${API_BASE_URL}/api/v1/media/upload`, {
                     method: "POST",
                     headers: {
                         "Authorization": `Bearer ${token}`,
@@ -394,7 +398,7 @@ const EditNovelPage = ({ onNavigate }) => {
             });
 
             // 🔒 หากนิยายโดนระงับ (Banned / Suspended) ให้คงค่าสถานะแบนเดิมไว้เสมอ ไม่ล้างเป็น draft/published
-            const isBanned = isBannedNovel || isNovelBannedInRegistry(novelId);
+            const isBanned = isBannedNovel;
             const finalStatus = isBanned
                 ? (bannedRawStatus || "suspended")
                 : calculatedStatus;
@@ -414,10 +418,13 @@ const EditNovelPage = ({ onNavigate }) => {
 
             if (isBanned) {
                 registerBannedNovel(novelId, novelPayload);
+            } else {
+                unregisterBannedNovel(novelId);
             }
 
             console.debug("EditNovelPage: PUT payload", novelPayload);
-            const response = await fetch(`${API_BASE_URL}/novels/${novelId}`, {
+            // 🔗 เชื่อมต่อ PUT /api/v1/novels/:id: เพื่อบันทึกข้อมูลนิยายที่แก้ไขแล้วลงสู่ฐานข้อมูล
+            const response = await apiFetch(`${API_BASE_URL}/api/v1/novels/${novelId}`, {
                 method: "PUT",
                 headers: {
                     "Content-Type": "application/json",

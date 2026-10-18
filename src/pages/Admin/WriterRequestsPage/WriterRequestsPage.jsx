@@ -449,13 +449,23 @@ const WriterRequestsPage = () => {
       const params = new URLSearchParams();
       params.set('limit', '1000'); // ขอมาทั้งหมดเพื่อนับเองให้ครบทุกสถานะ ไม่พึ่ง field counts ที่ backend ไม่ได้ส่งมา
 
-      const res = await fetch(`${API_BASE_URL}/api/admin/writers/requests?${params.toString()}`, {
+      // 🔗 เชื่อมต่อ GET /api/v1/admin/writers/requests: ดึงรายการคำขอสมัครนักเขียนทั้งหมดเพื่อนับยอดสถิติแต่ละสถานะ
+      let res = await fetch(`${API_BASE_URL}/api/v1/admin/writers/requests?${params.toString()}`, {
         method: 'GET',
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
       });
+      if (res.status === 404) {
+        res = await fetch(`${API_BASE_URL}/api/admin/writers/requests?${params.toString()}`, {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+      }
       if (!res.ok) return;
       const data = await res.json().catch(() => null);
 
@@ -491,13 +501,23 @@ const WriterRequestsPage = () => {
         params.set('limit', '1000');
       }
 
-      const res = await fetch(`${API_BASE_URL}/api/admin/writers/requests?${params.toString()}`, {
+      // 🔗 เชื่อมต่อ GET /api/v1/admin/writers/requests: ดึงรายการคำขอสมัครนักเขียนตามสถานะ/เงื่อนไข เพื่อนำมาแสดงในตาราง Admin
+      let res = await fetch(`${API_BASE_URL}/api/v1/admin/writers/requests?${params.toString()}`, {
         method: 'GET',
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
       });
+      if (res.status === 404) {
+        res = await fetch(`${API_BASE_URL}/api/admin/writers/requests?${params.toString()}`, {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+      }
       if (!res.ok) throw new Error('ไม่สามารถดึงคำขอได้');
       const data = await res.json().catch(() => null);
 
@@ -570,7 +590,8 @@ const WriterRequestsPage = () => {
     try {
       const token = localStorage.getItem('token');
       const endpoint = action === 'approve' ? 'approve' : 'reject';
-      const res = await fetch(`${API_BASE_URL}/api/admin/writers/${endpoint}?writer_id=${writerId}`, {
+      // 🔗 เชื่อมต่อ POST /api/v1/admin/writers/approve หรือ /api/v1/admin/writers/reject: ดำเนินการอนุมัติหรือปฏิเสธคำขอสมัครเป็นนักเขียน
+      let res = await fetch(`${API_BASE_URL}/api/v1/admin/writers/${endpoint}?writer_id=${writerId}`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -578,6 +599,16 @@ const WriterRequestsPage = () => {
         },
         body: action === 'reject' ? JSON.stringify({ rejection_reason: reason || '' }) : undefined,
       });
+      if (res.status === 404) {
+        res = await fetch(`${API_BASE_URL}/api/admin/writers/${endpoint}?writer_id=${writerId}`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: action === 'reject' ? JSON.stringify({ rejection_reason: reason || '' }) : undefined,
+        });
+      }
       if (!res.ok) {
         const errData = await res.json().catch(() => null);
         throw new Error(errData?.error?.message || errData?.message || (action === 'approve' ? 'ไม่สามารถอนุมัติคำขอได้' : 'ไม่สามารถปฏิเสธคำขอได้'));

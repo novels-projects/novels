@@ -530,7 +530,8 @@ const WriterRegisterPage = ({ onComplete, onBack }) => {
             }
 
             try {
-                const data = await authFetch("/api/writers/me");
+                // 🔗 เชื่อมต่อ GET /api/v1/writers/me: เพื่อตรวจสอบสถานะคำขอสมัครเป็นนักเขียนของผู้ใช้ปัจจุบัน (none, pending, approved, rejected)
+                const data = await authFetch("/api/v1/writers/me");
                 setWriterAppStatus(data.status || "none");
                 setWriterAppRejectionReason(data.rejection_reason || null);
 
@@ -560,7 +561,7 @@ const WriterRegisterPage = ({ onComplete, onBack }) => {
         fetchWriterApplication();
     }, []);
 
-    // ดึงประเภทนิยายจริงจาก backend — GET /categories คืน {status, message, data:[{category_id, name}]}
+    // ดึงประเภทนิยายจริงจาก backend — GET /api/v1/categories คืน {status, message, data:[{category_id, name}]}
     useEffect(() => {
         let cancelled = false;
 
@@ -568,7 +569,8 @@ const WriterRegisterPage = ({ onComplete, onBack }) => {
             setGenresLoading(true);
             setGenresError(null);
             try {
-                const data = await authFetch("/categories");
+                // 🔗 เชื่อมต่อ GET /api/v1/categories: เพื่อดึงรายการหมวดหมู่/ประเภทนิยายสำหรับเลือกแนวที่สนใจตอนสมัครนักเขียน
+                const data = await authFetch("/api/v1/categories");
                 const list = Array.isArray(data) ? data : data.data || data.categories || [];
                 if (!cancelled) {
                     setGenreOptions(list.map((c) => ({ id: c.category_id, name: c.name })));
@@ -733,7 +735,8 @@ const WriterRegisterPage = ({ onComplete, onBack }) => {
                 formData.append("avatar", form.avatarFile, fileName);
             }
 
-            const response = await fetch(`${API_BASE_URL}/api/writers/apply`, {
+            // 🔗 เชื่อมต่อ POST /api/v1/writers/apply: เพื่อส่งใบสมัครขอเป็นนักเขียนพร้อมข้อมูลประวัติและรูปโปรไฟล์ให้แอดมินพิจารณา
+            const response = await fetch(`${API_BASE_URL}/api/v1/writers/apply`, {
                 method: "POST",
                 headers: {
                     "Authorization": `Bearer ${token}`

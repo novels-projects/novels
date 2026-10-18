@@ -4,6 +4,7 @@ import Cropper from "react-easy-crop";
 import getCroppedImg from "../../../utils/cropImage.js";
 import "./ReaderSetting.css";
 import { Skeleton, ButtonSpinner, DataLoadError } from "../../../components/Skeleton";
+import { saveUserAvatar } from "../../../utils/avatarService";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
 
@@ -274,8 +275,8 @@ export default function ReaderSetting() {
     const headers = { Authorization: `Bearer ${token}` };
 
     try {
-      // 1. GET /api/users - โหลดข้อมูลผู้ใช้ปัจจุบัน
-      const userRes = await fetch(`${API_BASE_URL}/api/users`, { headers });
+      // 🔗 เชื่อมต่อ GET /api/v1/users/me: โหลดข้อมูลโปรไฟล์ของผู้ใช้งานปัจจุบันที่ล็อกอินอยู่
+      const userRes = await fetch(`${API_BASE_URL}/api/v1/users/me`, { headers });
       if (!userRes.ok) {
         throw new Error("ไม่สามารถดึงข้อมูลบัญชีผู้ใช้งานได้");
       }
@@ -303,7 +304,8 @@ export default function ReaderSetting() {
       // ดึงรายชื่อผู้ใช้และอีเมลที่ถูกใช้งานแล้วเพิ่มเติมแบบไดนามิก
       // a) ดึงจากรายชื่อนักเขียนในนิยายทั้งหมดที่มีในระบบ
       try {
-        const novelsRes = await fetch(`${API_BASE_URL}/novels`);
+        // 🔗 เชื่อมต่อ GET /api/v1/novels: ดึงรายชื่อนิยายทั้งหมดมาตรวจสอบ username นักเขียนที่ถูกใช้งานแล้ว
+        const novelsRes = await fetch(`${API_BASE_URL}/api/v1/novels`);
         if (novelsRes.ok) {
           const novelsData = await novelsRes.json();
           const list = novelsData?.data || novelsData || [];
@@ -316,9 +318,9 @@ export default function ReaderSetting() {
         console.warn("ไม่สามารถโหลดรายชื่อนักเขียนเพิ่มเติมจากนิยายได้:", e);
       }
 
-      // 2. GET /api/me/notification-settings - โหลดค่าความพึงพอใจการแจ้งเตือน
+      // 🔗 เชื่อมต่อ GET /api/v1/users/me/notification-settings: โหลดการตั้งค่าเปิด/ปิดการแจ้งเตือนของผู้ใช้
       try {
-        const notifRes = await fetch(`${API_BASE_URL}/api/me/notification-settings`, { headers });
+        const notifRes = await fetch(`${API_BASE_URL}/api/v1/users/me/notification-settings`, { headers });
         if (notifRes.ok) {
           const notifData = await notifRes.json();
           const settings = notifData?.data || notifData || {};
@@ -607,12 +609,12 @@ export default function ReaderSetting() {
     try {
       let currentAvatarUrl = avatarUrl;
 
-      // 1. อัปโหลดรูปภาพใหม่ (หากมีการคลิกเลือกรูปภาพโปรไฟล์เข้ามาใหม่)
+      // 🔗 เชื่อมต่อ PATCH /api/v1/users/me/profile-picture: อัปโหลดรูปภาพโปรไฟล์ใหม่ของผู้ใช้
       if (selectedAvatarFile) {
         const formData = new FormData();
         formData.append("profileImage", selectedAvatarFile, "avatar.jpg");
 
-        const avatarRes = await fetch(`${API_BASE_URL}/api/me/profile-picture`, {
+        const avatarRes = await fetch(`${API_BASE_URL}/api/v1/users/me/profile-picture`, {
           method: "PATCH",
           headers: { Authorization: `Bearer ${token}` },
           body: formData
@@ -638,9 +640,9 @@ export default function ReaderSetting() {
         "Content-Type": "application/json",
       };
 
-      // 2. PATCH /api/me/username - เปลี่ยนชื่อผู้ใช้
+      // 🔗 เชื่อมต่อ PATCH /api/v1/users/me/username: อัปเดตเปลี่ยนชื่อผู้ใช้ (Username) ใหม่
       if (isUsernameChanged) {
-        const userUpdateRes = await fetch(`${API_BASE_URL}/api/me/username`, {
+        const userUpdateRes = await fetch(`${API_BASE_URL}/api/v1/users/me/username`, {
           method: "PATCH",
           headers,
           body: JSON.stringify({ username }),
@@ -664,9 +666,9 @@ export default function ReaderSetting() {
         }
       }
 
-      // 3. PATCH /api/me/email - เปลี่ยนอีเมล
+      // 🔗 เชื่อมต่อ PATCH /api/v1/users/me/email: อัปเดตเปลี่ยนอีเมล (Email) ใหม่
       if (isEmailChanged) {
-        const emailUpdateRes = await fetch(`${API_BASE_URL}/api/me/email`, {
+        const emailUpdateRes = await fetch(`${API_BASE_URL}/api/v1/users/me/email`, {
           method: "PATCH",
           headers,
           body: JSON.stringify({ email }),
@@ -701,6 +703,7 @@ export default function ReaderSetting() {
           u.avatar_url = currentAvatarUrl;
         }
         localStorage.setItem("user", JSON.stringify(u));
+        saveUserAvatar(u);
         window.dispatchEvent(new Event("storage"));
         window.dispatchEvent(new Event("auth-change"));
       }
@@ -754,7 +757,8 @@ export default function ReaderSetting() {
     setIsSavingPassword(true);
 
     try {
-      const res = await fetch(`${API_BASE_URL}/api/me/password`, {
+      // 🔗 เชื่อมต่อ PATCH /api/v1/users/me/password: อัปเดตเปลี่ยนรหัสผ่านใหม่ของผู้ใช้
+      const res = await fetch(`${API_BASE_URL}/api/v1/users/me/password`, {
         method: "PATCH",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -790,7 +794,7 @@ export default function ReaderSetting() {
   };
 
   // ------------------------------------------
-  // Save Notification settings (PATCH /api/me/notification-settings)
+  // Save Notification settings (PATCH /api/v1/users/me/notification-settings)
   // ------------------------------------------
   const handleSaveNotifications = async () => {
     const token = localStorage.getItem("token");
@@ -799,7 +803,8 @@ export default function ReaderSetting() {
     setIsSavingNotifications(true);
 
     try {
-      const res = await fetch(`${API_BASE_URL}/api/me/notification-settings`, {
+      // 🔗 เชื่อมต่อ PATCH /api/v1/users/me/notification-settings: บันทึกการตั้งค่าการแจ้งเตือนของผู้ใช้
+      const res = await fetch(`${API_BASE_URL}/api/v1/users/me/notification-settings`, {
         method: "PATCH",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -861,7 +866,8 @@ export default function ReaderSetting() {
           const formData = new FormData();
           formData.append("profileImage", selectedAvatarFile, "avatar.jpg");
 
-          const avatarRes = await fetch(`${API_BASE_URL}/api/me/profile-picture`, {
+          // 🔗 เชื่อมต่อ PATCH /api/v1/users/me/profile-picture: บันทึกอัปโหลดรูปภาพโปรไฟล์ใหม่
+          const avatarRes = await fetch(`${API_BASE_URL}/api/v1/users/me/profile-picture`, {
             method: "PATCH",
             headers: { Authorization: `Bearer ${token}` },
             body: formData
@@ -882,7 +888,8 @@ export default function ReaderSetting() {
         };
 
         if (isUsernameChanged) {
-          const userUpdateRes = await fetch(`${API_BASE_URL}/api/me/username`, {
+          // 🔗 เชื่อมต่อ PATCH /api/v1/users/me/username: บันทึกการแก้ไขชื่อผู้ใช้
+          const userUpdateRes = await fetch(`${API_BASE_URL}/api/v1/users/me/username`, {
             method: "PATCH",
             headers,
             body: JSON.stringify({ username }),
@@ -905,7 +912,8 @@ export default function ReaderSetting() {
         }
 
         if (isEmailChanged) {
-          const emailUpdateRes = await fetch(`${API_BASE_URL}/api/me/email`, {
+          // 🔗 เชื่อมต่อ PATCH /api/v1/users/me/email: บันทึกการแก้ไขอีเมล
+          const emailUpdateRes = await fetch(`${API_BASE_URL}/api/v1/users/me/email`, {
             method: "PATCH",
             headers,
             body: JSON.stringify({ email }),
@@ -937,6 +945,7 @@ export default function ReaderSetting() {
             u.avatar_url = currentAvatarUrl;
           }
           localStorage.setItem("user", JSON.stringify(u));
+          saveUserAvatar(u);
           window.dispatchEvent(new Event("storage"));
           window.dispatchEvent(new Event("auth-change"));
         }
@@ -952,7 +961,8 @@ export default function ReaderSetting() {
 
       // 2. บันทึกข้อมูลการเปลี่ยนรหัสผ่าน (หากมี)
       if (isPasswordChanged) {
-        const passwordRes = await fetch(`${API_BASE_URL}/api/me/password`, {
+        // 🔗 เชื่อมต่อ PATCH /api/v1/users/me/password: บันทึกการเปลี่ยนรหัสผ่านใหม่
+        const passwordRes = await fetch(`${API_BASE_URL}/api/v1/users/me/password`, {
           method: "PATCH",
           headers: {
             Authorization: `Bearer ${token}`,
@@ -979,7 +989,8 @@ export default function ReaderSetting() {
 
       // 3. บันทึกการตั้งค่าการแจ้งเตือน
       if (isNotifSettingChanged) {
-        await fetch(`${API_BASE_URL}/api/me/notification-settings`, {
+        // 🔗 เชื่อมต่อ PATCH /api/v1/users/me/notification-settings: บันทึกการตั้งค่าการแจ้งเตือน
+        await fetch(`${API_BASE_URL}/api/v1/users/me/notification-settings`, {
           method: "PATCH",
           headers: {
             Authorization: `Bearer ${token}`,
@@ -1012,7 +1023,7 @@ export default function ReaderSetting() {
   };
 
   // ------------------------------------------
-  // Confirm Delete Account (DELETE /api/me)
+  // Confirm Delete Account (DELETE /api/v1/users/me)
   // ------------------------------------------
   const handleConfirmDeleteAccount = async () => {
     if (!deletePassword) {
@@ -1026,7 +1037,8 @@ export default function ReaderSetting() {
     setIsDeletingAccount(true);
     
     try {
-      const res = await fetch(`${API_BASE_URL}/api/me`, {
+      // 🔗 เชื่อมต่อ DELETE /api/v1/users/me: ลบบัญชีผู้ใช้งานปัจจุบันออกจากระบบถาวร
+      const res = await fetch(`${API_BASE_URL}/api/v1/users/me`, {
         method: "DELETE",
         headers: {
           Authorization: `Bearer ${token}`,

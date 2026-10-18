@@ -17,6 +17,7 @@ import { useNavigate, useBlocker } from "react-router-dom";
 import UnsavedChangesModal from "../../../components/UnsavedChangesModal/UnsavedChangesModal";
 import { getNovelStatusInfo } from "../../../utils/novelStatus";
 import { showTopToast } from "../../../utils/toast";
+import { apiFetch } from "../../../utils/apiFetch";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
 
@@ -166,7 +167,8 @@ const CreateNovelPage = () => {
             setCategoriesLoading(true);
             setCategoriesError(null);
             try {
-                const response = await fetch(`${API_BASE_URL}/categories`);
+                // 🔗 เชื่อมต่อ GET /api/v1/categories: เพื่อดึงรายการหมวดหมู่นิยายทั้งหมดมาแสดงในตัวเลือกหมวดหมู่ให้ผู้เขียนเลือก
+                const response = await apiFetch(`${API_BASE_URL}/api/v1/categories`);
                 if (!response.ok) {
                     throw new Error("failed to fetch categories");
                 }
@@ -250,8 +252,8 @@ const CreateNovelPage = () => {
                 const imageFormData = new FormData();
                 imageFormData.append("image", form.coverFile ,"cover_novel.jpg"); 
 
-                // 🎯 แก้ไขจุดที่ 1: เปลี่ยนเส้นทาง Endpoint ไปที่ /upload/image
-                const uploadRes = await fetch(`${API_BASE_URL}/upload/image`, {
+                // 🔗 เชื่อมต่อ POST /api/v1/media/upload: เพื่ออัปโหลดไฟล์ภาพหน้าปกนิยายไปยังเซิร์ฟเวอร์ และนำ URL ของภาพมาเก็บไว้
+                const uploadRes = await apiFetch(`${API_BASE_URL}/api/v1/media/upload`, {
                     method: "POST",
                     headers: { "Authorization": `Bearer ${token}` },
                     body: imageFormData
@@ -261,7 +263,7 @@ const CreateNovelPage = () => {
                     const uploadData = await uploadRes.json();
                     console.log("✅ ข้อมูลที่ได้จาก API Upload:", uploadData); 
                     
-                    // 🎯 แก้ไขจุดที่ 2: เจาะจงดึงลิงก์รูปแบบยาวจาก full_url ลงสู่ตัวแปรส่งเข้าฐานข้อมูล
+                    // 🎯 ดึงลิงก์รูปแบบยาวจาก full_url ลงสู่ตัวแปรส่งเข้าฐานข้อมูล
                     coverImageUrl = uploadData.data?.full_url || ""; 
                     console.log("🖼️ ลิงก์รูปภาพที่จะใช้บันทึกลงฐานข้อมูล:", coverImageUrl);
                 } else {
@@ -296,7 +298,8 @@ const CreateNovelPage = () => {
                 is_completed: form.isCompleted,
             };
 
-            const response = await fetch(`${API_BASE_URL}/novels`, {
+            // 🔗 เชื่อมต่อ POST /api/v1/novels: เพื่อสร้างนิยายเรื่องใหม่พร้อมบันทึกข้อมูลตั้งต้นลงฐานข้อมูล
+            const response = await apiFetch(`${API_BASE_URL}/api/v1/novels`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",

@@ -72,8 +72,8 @@ export default function ReaderReportButton({
     };
 
     try {
-      // 🟢 3. ยิง API POST /api/reports
-      const res = await fetch(`${API_BASE_URL}/api/reports`, {
+      // 🔗 เชื่อมต่อ POST /api/v1/reports: เพื่อส่งรายงานปัญหา/รายงานเนื้อหานิยายที่ไม่เหมาะสมไปยังแอดมิน
+      const res = await fetch(`${API_BASE_URL}/api/v1/reports`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

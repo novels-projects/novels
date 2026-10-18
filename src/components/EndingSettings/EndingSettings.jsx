@@ -233,7 +233,7 @@ export default function EndingSettings({
                         WebkitBoxOrient: "vertical",
                         overflow: "hidden"
                       }}>
-                        {endingDescription.trim() || "คุณตัดสินใจสละชีวิตทางโลกเพื่อกลายเป็นผู้พิทักษ์ความลับตลอดกาล..."}
+                        {endingDescription.trim() || ""}
                       </p>
                     )}
                   </div>

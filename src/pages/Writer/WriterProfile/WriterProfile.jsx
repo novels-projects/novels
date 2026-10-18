@@ -21,6 +21,7 @@ import FollowButton from "../../../components/FollowButton/FollowButton";
 import GenreTag from "../../../components/GenreTag/GenreTag";
 import AdminModeBanner from "../../../components/AdminModeBanner/AdminModeBanner";
 import { NovelCardGridSkeleton, Skeleton, DataLoadError, ButtonSpinner } from "../../../components/Skeleton";
+import { apiFetch } from "../../../utils/apiFetch";
 import "./WriterProfile.css";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
@@ -147,7 +148,8 @@ export default function WriterProfile() {
 
         if (token) {
           try {
-            const meRes = await fetch(`${API_BASE_URL}/api/writers/me`, { headers });
+            // 🔗 เชื่อมต่อ GET /api/v1/writers/me: เพื่อตรวจสอบ ID นักเขียนของผู้ใช้ปัจจุบันที่กำลังล็อกอินอยู่
+            const meRes = await apiFetch(`${API_BASE_URL}/api/v1/writers/me`, { headers });
             if (meRes.ok) {
               const meData = await meRes.json();
               myWriterId = meData.writer_id || meData.data?.writer_id || null;
@@ -169,7 +171,11 @@ export default function WriterProfile() {
           return;
         }
 
-        const writerRes = await fetch(`${API_BASE_URL}/writer/${targetWriterId}`, { headers });
+        // 🔗 เชื่อมต่อ GET /api/v1/writers/:id หรือ /writer/:id: เพื่อดึงข้อมูลโปรไฟล์นักเขียน นามปากกา คำแนะนำตัว และสถิติผู้ติดตาม
+        let writerRes = await apiFetch(`${API_BASE_URL}/api/v1/writers/${targetWriterId}`, { headers });
+        if (!writerRes.ok) {
+          writerRes = await apiFetch(`${API_BASE_URL}/writer/${targetWriterId}`, { headers });
+        }
         let writerData = null;
         if (writerRes.ok) {
           const resJson = await writerRes.json();
@@ -224,7 +230,8 @@ export default function WriterProfile() {
 
         let novelsArr = [];
         try {
-          const novelsRes = await fetch(`${API_BASE_URL}/novels`, { headers });
+          // 🔗 เชื่อมต่อ GET /api/v1/novels: เพื่อดึงรายการนิยายทั้งหมดมาคัดกรองเฉพาะผลงานของนักเขียนคนนี้
+          const novelsRes = await apiFetch(`${API_BASE_URL}/api/v1/novels`, { headers });
           if (novelsRes.ok) {
             const nJson = await novelsRes.json();
             const rawList = nJson.novels || nJson.data?.novels || nJson.data || (Array.isArray(nJson) ? nJson : []);
@@ -240,10 +247,11 @@ export default function WriterProfile() {
         // 1. ตรวจสอบสถานะการติดตามจากข้อมูล writerData (เฉพาะเมื่อมี token เท่านั้น)
         let followingState = Boolean(token && (writerData.is_following || writerData.isFollowing));
 
-        // 2. ตรวจสอบสถานะการติดตามจาก /api/users/following-writers (ตรงกับหน้านักเขียนที่ติดตามและหน้ารายละเอียดนิยาย)
+        // 2. ตรวจสอบสถานะการติดตามจาก /api/v1/users/me/following-writers
         if (!followingState && token && !computedIsOwner) {
           try {
-            const followRes = await fetch(`${API_BASE_URL}/api/users/following-writers`, { headers });
+            // 🔗 เชื่อมต่อ GET /api/v1/users/me/following-writers: เพื่อตรวจสอบว่าผู้ใช้กำลังติดตามนักเขียนท่านนี้อยู่หรือไม่
+            const followRes = await apiFetch(`${API_BASE_URL}/api/v1/users/me/following-writers`, { headers });
             if (followRes.ok) {
               const fJson = await followRes.json().catch(() => null);
               const fBody = fJson?.data ?? fJson ?? {};
@@ -252,8 +260,8 @@ export default function WriterProfile() {
                 followingState = true;
               }
             } else if (followRes.status === 404 || followRes.status === 500) {
-              // Fallback ไปยัง /api/me/following-writers เผื่อกรณี backend มี endpoint นี้
-              const fallbackRes = await fetch(`${API_BASE_URL}/api/me/following-writers`, { headers });
+              // Fallback ไปยัง /api/users/following-writers เผื่อกรณี legacy
+              const fallbackRes = await apiFetch(`${API_BASE_URL}/api/users/following-writers`, { headers });
               if (fallbackRes.ok) {
                 const fbJson = await fallbackRes.json().catch(() => null);
                 const fbBody = fbJson?.data ?? fbJson ?? {};
@@ -879,7 +887,8 @@ function EditProfileModal({ writerInfo, onClose, onSuccess }) {
 
   // โหลดรายการหมวดหมู่ทั้งหมดจาก Backend
   useEffect(() => {
-    fetch(`${API_BASE_URL}/categories`)
+    // 🔗 เชื่อมต่อ GET /api/v1/categories: เพื่อดึงรายการหมวดหมู่ทั้งหมดสำหรับให้นักเขียนเลือกในหน้าแก้ไขโปรไฟล์
+    apiFetch(`${API_BASE_URL}/api/v1/categories`)
       .then(res => (res.ok ? res.json() : []))
       .then(data => {
         const list = Array.isArray(data) ? data : (data.categories || data.data || []);
@@ -904,7 +913,8 @@ function EditProfileModal({ writerInfo, onClose, onSuccess }) {
 
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch(`${API_BASE_URL}/upload/image`, {
+      // 🔗 เชื่อมต่อ POST /api/v1/media/upload: เพื่ออัปโหลดไฟล์รูปภาพโปรไฟล์ (Avatar) ขึ้น MinIO Storage
+      const res = await apiFetch(`${API_BASE_URL}/api/v1/media/upload`, {
         method: "POST",
         headers: token ? { Authorization: `Bearer ${token}` } : {},
         body: formData,
@@ -974,7 +984,8 @@ function EditProfileModal({ writerInfo, onClose, onSuccess }) {
 
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch(`${API_BASE_URL}/api/writers/me/profile`, {
+      // 🔗 เชื่อมต่อ PUT /api/v1/writers/me/profile: เพื่อบันทึกข้อมูลโปรไฟล์นักเขียน นามปากกา ประวัติ และข้อมูลติดต่อ
+      const res = await apiFetch(`${API_BASE_URL}/api/v1/writers/me/profile`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",

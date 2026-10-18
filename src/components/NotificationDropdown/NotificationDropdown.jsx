@@ -2,23 +2,11 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { Bell, ChevronRight, Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Skeleton } from "../Skeleton";
+import { formatMinioUrl, getAvatar, resolveAvatarAsync } from "../../utils/avatarService";
+import { apiFetch } from "../../utils/apiFetch";
 import "./NotificationDropdown.css";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
-
-const formatMinioUrl = (url) => {
-  if (!url || typeof url !== "string") return null;
-  const trimmed = url.trim();
-  if (!trimmed) return null;
-  let formatted = trimmed;
-  if (formatted.includes("http://minio:9000")) {
-    formatted = formatted.replace("http://minio:9000", "http://localhost:9000");
-  }
-  if (formatted.startsWith("/")) {
-    formatted = `http://localhost:9000${formatted}`;
-  }
-  return formatted;
-};
 
 const AVATAR_PALETTE = [
   "#F472B6", "#A78BFA", "#60A5FA", "#34D399",
@@ -68,6 +56,15 @@ const normalizeNotification = (item = {}) => {
     ) {
       actorAvatar = currentUser.pic_profile || null;
     }
+  }
+
+  // ดึงจาก Avatar Registry (ครอบคลุมทั้งนักเขียน, ผู้ใช้อื่น, และ Seed Data)
+  if (!actorAvatar && !isSystem) {
+    actorAvatar = getAvatar({
+      userId: item.actor_id ?? item.actor?.id,
+      username: actorName,
+      novelId: (item.reference_type === "novel" || type === "novel_update") ? (item.reference_id ?? item.referenceId) : null,
+    });
   }
 
   // แยกชื่อเรื่องและข้อความคอมเมนต์
@@ -135,7 +132,8 @@ export default function NotificationDropdown({ unreadCount = 0 }) {
     setLoading(true);
     try {
       const token = localStorage.getItem("token");
-      const response = await fetch(`${API_BASE_URL}/notifications?limit=5`, {
+      // 🔗 เชื่อมต่อ GET /api/v1/notifications?limit=5: เพื่อดึงรายการแจ้งเตือนล่าสุด 5 รายการมาแสดงในเมนู Dropdown
+      const response = await apiFetch(`${API_BASE_URL}/api/v1/notifications?limit=5`, {
         credentials: "include",
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
@@ -148,7 +146,25 @@ export default function NotificationDropdown({ unreadCount = 0 }) {
         : Array.isArray(data?.notifications)
           ? data.notifications
           : [];
-      setItems(list.map(normalizeNotification).slice(0, 5));
+      const normalizedList = list.map(normalizeNotification).slice(0, 5);
+      setItems(normalizedList);
+
+      // วนลูปโหลดรูปภาพสำหรับแจ้งเตือนที่ยังไม่มีรูป
+      normalizedList.forEach(async (notif) => {
+        if (!notif.actorAvatar && !notif.isSystem) {
+          const novelId = (notif.referenceType === "novel" || notif.type === "novel_update") ? notif.referenceId : null;
+          const av = await resolveAvatarAsync({
+            userId: notif.actorId,
+            username: notif.actorName,
+            novelId,
+          });
+          if (av) {
+            setItems((prev) =>
+              prev.map((i) => (i.id === notif.id ? { ...i, actorAvatar: av } : i))
+            );
+          }
+        }
+      });
     } catch (error) {
       console.warn("โหลดแจ้งเตือนใน dropdown ไม่สำเร็จ", error);
       setItems([]);
@@ -163,7 +179,7 @@ export default function NotificationDropdown({ unreadCount = 0 }) {
     }
   }, [open, loadRecentNotifications]);
 
-  // ซิงค์ข้อมูลเมื่อมีการอัปเดตแจ้งเตือนจากหน้าอื่น
+  // ซิงค์ข้อมูลเมื่อมีการอัปเดตแจ้งเตือนจากหน้าอื่น หรือมีการอัปเดตรูปโปรไฟล์ในระบบ
   useEffect(() => {
     const handleUpdate = () => {
       if (open) {
@@ -171,13 +187,18 @@ export default function NotificationDropdown({ unreadCount = 0 }) {
       }
     };
     window.addEventListener("notifications-updated", handleUpdate);
-    return () => window.removeEventListener("notifications-updated", handleUpdate);
+    window.addEventListener("storyverse_avatar_updated", handleUpdate);
+    return () => {
+      window.removeEventListener("notifications-updated", handleUpdate);
+      window.removeEventListener("storyverse_avatar_updated", handleUpdate);
+    };
   }, [open, loadRecentNotifications]);
 
   const markReadAndNavigate = async (notification) => {
     if (!notification.read && notification.id) {
       const token = localStorage.getItem("token");
-      await fetch(`${API_BASE_URL}/notifications/${notification.id}/read`, {
+      // 🔗 เชื่อมต่อ PATCH /api/v1/notifications/:id/read: เพื่อทำเครื่องหมายการแจ้งเตือนนี้ว่าอ่านแล้ว เมื่อผู้ใช้กดคลิก
+      await fetch(`${API_BASE_URL}/api/v1/notifications/${notification.id}/read`, {
         method: "PATCH",
         credentials: "include",
         headers: token ? { Authorization: `Bearer ${token}` } : {},

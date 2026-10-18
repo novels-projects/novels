@@ -13,6 +13,7 @@ import EndingSettings from "../../../components/EndingSettings/EndingSettings";
 import { Skeleton, ButtonSpinner } from "../../../components/Skeleton";
 import { Search, Menu } from "lucide-react";
 import { getChoiceConnectionBlockReason, getChoiceConnectionMessage } from "../../../utils/choiceValidation";
+import { apiFetch } from "../../../utils/apiFetch";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
 
@@ -316,7 +317,8 @@ const ChoiceCard = ({
       // และไม่ทำให้ target ถูกเลือกเป็น start แทนโดยอัตโนมัติ
       if (String(currentSceneId) === "new") {
         const sourceTitle = sourceSceneTitle?.trim() || `ฉากใหม่ ${Date.now()}`;
-        const sourceResponse = await fetch(`${API_BASE_URL}/scenes`, {
+        // 🔗 เชื่อมต่อ POST /scenes: เพื่อสร้างฉากต้นทาง (Source Scene) ลงฐานข้อมูล
+        const sourceResponse = await apiFetch(`${API_BASE_URL}/scenes`, {
           method: "POST",
           headers,
           body: JSON.stringify({
@@ -339,7 +341,8 @@ const ChoiceCard = ({
         if (!sourceSceneId) throw new Error("ระบบไม่ได้รับรหัสฉากต้นทาง");
         createdSceneId = sourceSceneId;
 
-        const targetResponse = await fetch(`${API_BASE_URL}/scenes`, {
+        // 🔗 เชื่อมต่อ POST /scenes: เพื่อสร้างฉากปลายทาง (Target Scene) ที่ทางเลือกจะเชื่อมโยงไป
+        const targetResponse = await apiFetch(`${API_BASE_URL}/scenes`, {
           method: "POST",
           headers,
           body: JSON.stringify(payload),
@@ -354,7 +357,8 @@ const ChoiceCard = ({
         if (!targetSceneId) throw new Error("ระบบไม่ได้รับรหัสฉากปลายทาง");
         createdTargetSceneId = targetSceneId;
 
-        const updateResponse = await fetch(`${API_BASE_URL}/scenes/${sourceSceneId}`, {
+        // 🔗 เชื่อมต่อ PUT /scenes/:id: เพื่ออัปเดตฉากต้นทางให้มีทางเลือกเชื่อมไปยังฉากปลายทาง
+        const updateResponse = await apiFetch(`${API_BASE_URL}/scenes/${sourceSceneId}`, {
           method: "PUT",
           headers,
           body: JSON.stringify({
@@ -390,7 +394,8 @@ const ChoiceCard = ({
         return;
       }
 
-      const res = await fetch(`${API_BASE_URL}/scenes`, {
+      // 🔗 เชื่อมต่อ POST /scenes: เพื่อสร้างฉากใหม่จากทางเลือก
+      const res = await apiFetch(`${API_BASE_URL}/scenes`, {
         method: "POST",
         headers,
         body: JSON.stringify(payload)
@@ -1583,6 +1588,9 @@ const SceneEditorPage = ({
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isPublishing, setIsPublishing] = useState(false);
+  const [justSaved, setJustSaved] = useState(false);
+  const [justPublished, setJustPublished] = useState(false);
   const [isUnsaved, setIsUnsaved] = useState(false);
   const [pendingAction, setPendingAction] = useState(null);
   useEffect(() => {
@@ -1722,7 +1730,8 @@ const SceneEditorPage = ({
         const headers = {};
         if (token) headers["Authorization"] = `Bearer ${token}`;
 
-        const uploadRes = await fetch(`${API_BASE_URL}/upload/image`, {
+        // 🔗 เชื่อมต่อ POST /api/v1/media/upload: เพื่ออัปโหลดรูปภาพแทรกในเนื้อหาฉาก (Rich Text Editor)
+        const uploadRes = await apiFetch(`${API_BASE_URL}/api/v1/media/upload`, {
           method: "POST",
           body: formData,
           headers,
@@ -1787,8 +1796,8 @@ const SceneEditorPage = ({
       const headers = {};
       if (token) headers["Authorization"] = `Bearer ${token}`;
 
-      // ดึงข้อมูลรายชื่อตอนทั้งหมดก่อนเพื่อประมวลผล
-      const chaptersRes = await fetch(`${API_BASE_URL}/novels/${novelId}/chapters`, {
+      // 🔗 เชื่อมต่อ GET /novels/:id/chapters: เพื่อดึงข้อมูลรายชื่อตอนทั้งหมดของนิยายเรื่องนี้ สำหรับเลือกเชื่อมโยงฉาก
+      const chaptersRes = await apiFetch(`${API_BASE_URL}/novels/${novelId}/chapters`, {
         headers,
       });
       let chaptersData = [];
@@ -1805,7 +1814,8 @@ const SceneEditorPage = ({
 
       // ดึงข้อมูลนิยายเพื่อแสดงชื่อเรื่องที่ header เมื่อสร้างฉากใหม่
       try {
-        const novelRes = await fetch(`${API_BASE_URL}/novels/${novelId}`, { headers });
+        // 🔗 เชื่อมต่อ GET /novels/:id: เพื่อดึงข้อมูลรายละเอียดและชื่อเรื่องของนิยาย
+        const novelRes = await apiFetch(`${API_BASE_URL}/novels/${novelId}`, { headers });
         if (novelRes.ok) {
           const novelResult = await novelRes.json().catch(() => null);
           const novelData = novelResult?.novel || novelResult?.data?.novel || novelResult?.data || novelResult || {};
@@ -1822,7 +1832,8 @@ const SceneEditorPage = ({
       }
 
       if (!isNewScene) {
-        const sceneRes = await fetch(`${API_BASE_URL}/scenes/${sceneId}`, {
+        // 🔗 เชื่อมต่อ GET /scenes/:id: เพื่อดึงข้อมูลรายละเอียดเนื้อหาฉากและทางเลือกเดิมมาแสดงใน Editor
+        const sceneRes = await apiFetch(`${API_BASE_URL}/scenes/${sceneId}`, {
           headers,
         });
         if (!sceneRes.ok) throw new Error("ไม่สามารถดึงข้อมูลรายละเอียดฉากได้");
@@ -2107,10 +2118,11 @@ const SceneEditorPage = ({
       const headers = { "Content-Type": "application/json" };
       if (token) headers["Authorization"] = `Bearer ${token}`;
 
+      // 🔗 เชื่อมต่อ POST /scenes (สร้างฉากใหม่) หรือ PUT /scenes/:id (อัปเดตฉากและทางเลือกเดิม): เพื่อบันทึกข้อมูลเนื้อหาฉากและทางเลือกทั้งหมด
       const requestUrl = isNewScene ? `${API_BASE_URL}/scenes` : `${API_BASE_URL}/scenes/${sceneId}`;
       const method = isNewScene ? "POST" : "PUT";
 
-      const response = await fetch(requestUrl, {
+      const response = await apiFetch(requestUrl, {
         method,
         headers,
         body: JSON.stringify(payload),
@@ -2132,6 +2144,8 @@ const SceneEditorPage = ({
 
         if (savedSceneId) {
           setIsSaving(false);
+          setJustSaved(true);
+          setTimeout(() => setJustSaved(false), 2500);
           if (showToast) {
             try { sessionStorage.setItem("toastMessage", "บันทึกฉากเรียบร้อยแล้ว"); } catch (e) { /* ignore */ }
           }
@@ -2165,6 +2179,8 @@ const SceneEditorPage = ({
         setToastMessage("บันทึกฉากเรียบร้อยแล้ว");
         setTimeout(() => setToastMessage(null), 2500);
       }
+      setJustSaved(true);
+      setTimeout(() => setJustSaved(false), 2500);
       return true;
     } catch (err) {
       console.error("Save scene error:", err);
@@ -2181,6 +2197,7 @@ const SceneEditorPage = ({
       return;
     }
 
+    setIsPublishing(true);
     setIsSaving(true);
     setErrorMsg(null);
     try {
@@ -2196,37 +2213,50 @@ const SceneEditorPage = ({
       const headers = { "Content-Type": "application/json" };
       if (token) headers["Authorization"] = `Bearer ${token}`;
 
-      const chRes = await fetch(`${API_BASE_URL}/chapters/${targetChapterId}`, { headers });
-      if (chRes.ok) {
-        const chResult = await chRes.json();
-        const chData = chResult?.data || chResult;
+      let targetChapter = Array.isArray(chapters)
+        ? chapters.find((c) => String(c.id ?? c.chapter_id ?? c.ChapterID ?? c.chapterId) === String(targetChapterId))
+        : null;
 
-        const payload = {
-          novel_id: parseInt(novelId, 10),
-          episode: chData.episode || 1,
-          title: chData.title || "ตอนไม่มีชื่อ",
-          status: "published" // อัปเดตตอนเป็นสถานะเผยแพร่
-        };
+      if (!targetChapter) {
+        try {
+          const chListRes = await apiFetch(`${API_BASE_URL}/novels/${novelId}/chapters`, { headers });
+          if (chListRes.ok) {
+            const listData = await chListRes.json();
+            const chs = listData?.data?.chapters || listData?.chapters || listData?.data || listData || [];
+            targetChapter = chs.find((c) => String(c.id ?? c.chapter_id ?? c.ChapterID ?? c.chapterId) === String(targetChapterId));
+          }
+        } catch (_) {}
+      }
 
-        const putRes = await fetch(`${API_BASE_URL}/chapters/${targetChapterId}`, {
-          method: "PUT",
-          headers,
-          body: JSON.stringify(payload)
-        });
+      const payload = {
+        novel_id: parseInt(novelId, 10),
+        episode: targetChapter?.episode ?? targetChapter?.order_index ?? 1,
+        title: targetChapter?.title ?? targetChapter?.name ?? chapterTitle ?? "ตอนไม่มีชื่อ",
+        status: "published" // อัปเดตตอนเป็นสถานะเผยแพร่
+      };
 
-        if (!putRes.ok) {
-          console.warn("ไม่สามารถเปลี่ยนสถานะของตอนเป็นเผยแพร่ได้");
-        }
+      // 🔗 เชื่อมต่อ PUT /chapters/:id: เพื่อเปลี่ยนสถานะตอนให้เป็นเผยแพร่ (published) เพื่อให้ผู้อ่านเข้าถึงได้
+      const putRes = await apiFetch(`${API_BASE_URL}/chapters/${targetChapterId}`, {
+        method: "PUT",
+        headers,
+        body: JSON.stringify(payload)
+      });
+
+      if (!putRes.ok) {
+        console.warn("ไม่สามารถเปลี่ยนสถานะของตอนเป็นเผยแพร่ได้");
       }
 
       setToastMessage("เผยแพร่ตอนและฉากย่อยเรียบร้อยแล้ว");
       setTimeout(() => setToastMessage(null), 2500);
+      setJustPublished(true);
+      setTimeout(() => setJustPublished(false), 2500);
       await fetchSceneData();
     } catch (err) {
       console.error("Publish error:", err);
       setErrorMsg(err.message || "เกิดข้อผิดพลาดในการเผยแพร่");
       setIsPublished(false); // Rollback UI if failed
     } finally {
+      setIsPublishing(false);
       setIsSaving(false);
     }
   };
@@ -2310,7 +2340,8 @@ const SceneEditorPage = ({
 
   const deleteCreatedScene = async (createdSceneId) => {
     if (!createdSceneId) return;
-    const response = await fetch(`${API_BASE_URL}/scenes/${createdSceneId}`, {
+    // 🔗 เชื่อมต่อ DELETE /scenes/:id: เพื่อลบฉากย่อยที่สร้างค้างไว้เมื่อผู้เขียนยกเลิกการสร้าง
+    const response = await apiFetch(`${API_BASE_URL}/scenes/${createdSceneId}`, {
       method: "DELETE",
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     });
@@ -2376,7 +2407,8 @@ const SceneEditorPage = ({
         status: "draft",
       };
 
-      const res = await fetch(`${API_BASE_URL}/scenes`, {
+      // 🔗 เชื่อมต่อ POST /scenes: เพื่อสร้างฉากย่อยใหม่ในตอนที่เลือก
+      const res = await apiFetch(`${API_BASE_URL}/scenes`, {
         method: "POST",
         headers,
         body: JSON.stringify(payload),
@@ -2446,7 +2478,8 @@ const SceneEditorPage = ({
 
       const nextEpisode = (Array.isArray(chapters) ? chapters.length : 0) + 1;
 
-      const response = await fetch(`${API_BASE_URL}/chapters`, {
+      // 🔗 เชื่อมต่อ POST /chapters: เพื่อสร้างตอนใหม่ในนิยาย
+      const response = await apiFetch(`${API_BASE_URL}/chapters`, {
         method: "POST",
         headers,
         body: JSON.stringify({
@@ -2840,15 +2873,44 @@ const SceneEditorPage = ({
         </div>
 
         <div className="se-header__right">
-          {isSaving && <span className="se-header__saving">กำลังบันทึก...</span>}
-          {!isSaving && savedText && <span className="se-header__saved">✓ {savedText}</span>}
+          {isSaving && !isPublishing && <span className="se-header__saving">{isNewScene ? "กำลังสร้าง..." : "กำลังบันทึก..."}</span>}
+          {isPublishing && <span className="se-header__saving" style={{ color: '#16a34a' }}>กำลังเผยแพร่...</span>}
+          {!isSaving && !isPublishing && savedText && <span className="se-header__saved">✓ {savedText}</span>}
 
           <button
             className="se-header__btn se-header__btn--save"
             onClick={() => handleSave(null, false, null, null, true)}
-            disabled={isSaving}
+            disabled={isSaving || isPublishing}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px',
+              minWidth: isNewScene ? '96px' : '82px',
+              transition: 'all 0.2s ease',
+              backgroundColor: justSaved ? '#16a34a' : undefined,
+              borderColor: justSaved ? '#16a34a' : undefined,
+              color: justSaved ? '#ffffff' : undefined,
+            }}
           >
-            {isNewScene ? "สร้างฉาก" : "บันทึก"}
+            {isSaving && !isPublishing ? (
+              <>
+                <div style={{
+                  width: '12px',
+                  height: '12px',
+                  border: '2px solid rgba(255, 255, 255, 0.35)',
+                  borderTopColor: '#ffffff',
+                  borderRadius: '50%',
+                  animation: 'se-spin 0.8s linear infinite',
+                  flexShrink: 0
+                }} />
+                <span>{isNewScene ? "กำลังสร้าง..." : "กำลังบันทึก..."}</span>
+              </>
+            ) : justSaved ? (
+              <span>{isNewScene ? "✓ สร้างสำเร็จ" : "✓ บันทึกแล้ว"}</span>
+            ) : (
+              <span>{isNewScene ? "สร้างฉาก" : "บันทึก"}</span>
+            )}
           </button>
 
           <button
@@ -2860,9 +2922,37 @@ const SceneEditorPage = ({
               }
               setShowPublishConfirm(true);
             }}
-            disabled={isSaving}
+            disabled={isSaving || isPublishing}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px',
+              minWidth: '92px',
+              transition: 'all 0.2s ease',
+              backgroundColor: justPublished ? '#15803d' : undefined,
+              borderColor: justPublished ? '#15803d' : undefined,
+              color: justPublished ? '#ffffff' : undefined,
+            }}
           >
-            เผยแพร่เลย
+            {isPublishing ? (
+              <>
+                <div style={{
+                  width: '12px',
+                  height: '12px',
+                  border: '2px solid rgba(255, 255, 255, 0.35)',
+                  borderTopColor: '#ffffff',
+                  borderRadius: '50%',
+                  animation: 'se-spin 0.8s linear infinite',
+                  flexShrink: 0
+                }} />
+                <span>กำลังเผยแพร่...</span>
+              </>
+            ) : justPublished ? (
+              <span>✓ เผยแพร่แล้ว</span>
+            ) : (
+              <span>เผยแพร่เลย</span>
+            )}
           </button>
         </div>
       </header>
@@ -3166,7 +3256,7 @@ const SceneEditorPage = ({
                 value={newChapterTitle}
                 onChange={(e) => { setNewChapterTitle(e.target.value); setCreateChapterError(""); }}
                 onKeyPress={(e) => e.key === "Enter" && handleConfirmAddChapter()}
-                placeholder="เช่น ตอนที่ 1 : การเริ่มต้นเดินทาง"
+                placeholder="เช่น การเริ่มต้นเดินทาง"
                 style={{
                   width: "100%",
                   padding: "10px 12px",
@@ -3276,7 +3366,7 @@ const SceneEditorPage = ({
                 value={newSceneTitle}
                 onChange={(e) => { setNewSceneTitle(e.target.value); setCreateSceneError(""); }}
                 onKeyPress={(e) => e.key === "Enter" && handleConfirmAddScene()}
-                placeholder="เช่น การพบกับชายปริศนา"
+                placeholder="เช่น ค้นพบสมบัติในป่าลึก"
                 style={{
                   width: "100%",
                   padding: "10px 12px",

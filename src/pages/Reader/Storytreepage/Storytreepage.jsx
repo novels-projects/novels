@@ -306,7 +306,11 @@ const StoryTreeInner = ({ activeNovelId, effectiveUserId, onNavigate }) => {
       const query = (effectiveUserId > 0 && !isAdmin) ? `?user_id=${effectiveUserId}` : "";
 
       try {
-        const novelRes = await fetch(`${BASE_URL}/novels/${activeNovelId}${query}`, { headers });
+        // 🔗 เชื่อมต่อ GET /api/v1/novels/:id: ดึงข้อมูลรายละเอียดนิยายและรายการฉากจบเพื่อแสดงบนหน้าผังต้นไม้
+        let novelRes = await fetch(`${BASE_URL}/api/v1/novels/${activeNovelId}${query}`, { headers });
+        if (!novelRes.ok) {
+          novelRes = await fetch(`${BASE_URL}/novels/${activeNovelId}${query}`, { headers });
+        }
         if (novelRes.ok) {
           const novelJson = await novelRes.json();
           const payloadData = novelJson?.data || novelJson || {};
@@ -320,7 +324,11 @@ const StoryTreeInner = ({ activeNovelId, effectiveUserId, onNavigate }) => {
         console.warn("ดึงข้อมูลนิยายหลักไม่สำเร็จ:", e);
       }
 
-      const response = await fetch(`${BASE_URL}/novels/${activeNovelId}/story-tree${query}`, { headers });
+      // 🔗 เชื่อมต่อ GET /api/v1/novels/:id/story-tree: ดึงข้อมูลผังเรื่องราว (Story Tree Nodes & Edges) ทั้งหมด
+      let response = await fetch(`${BASE_URL}/api/v1/novels/${activeNovelId}/story-tree${query}`, { headers });
+      if (!response.ok) {
+        response = await fetch(`${BASE_URL}/novels/${activeNovelId}/story-tree${query}`, { headers });
+      }
       if (!response.ok) {
         throw new Error("ไม่สามารถเรียกดูแผนผังนิยายกิ่งไม้จากฐานข้อมูลได้");
       }
@@ -710,13 +718,23 @@ const StoryTreeInner = ({ activeNovelId, effectiveUserId, onNavigate }) => {
     setRestartError(null);
 
     try {
-      const response = await fetch(`${BASE_URL}/novels/${activeNovelId}/restart`, {
+      // 🔗 เชื่อมต่อ POST /api/v1/novels/:id/restart: รีเซ็ตความคืบหน้าเพื่อเริ่มต้นอ่านใหม่ตั้งแต่ฉากแรก
+      let response = await fetch(`${BASE_URL}/api/v1/novels/${activeNovelId}/restart`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
       });
+      if (!response.ok) {
+        response = await fetch(`${BASE_URL}/novels/${activeNovelId}/restart`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        });
+      }
       const payload = await response.json().catch(() => null);
 
       if (!response.ok) {
@@ -759,10 +777,8 @@ const StoryTreeInner = ({ activeNovelId, effectiveUserId, onNavigate }) => {
     try {
       const token = localStorage.getItem("token");
       if (token) {
-        // path/field name ต้องตรงกับสัญญาของ backend (openapi.yaml): /progress ไม่ใช่
-        // /history/progress และฟิลด์ชื่อ current_scene_id ไม่ใช่ scene_id พร้อมต้องส่ง
-        // user_id ไปด้วย (ยึดสัญญาของ backend เป็นหลักตามที่ตรวจสอบแล้ว)
-        await fetch(`${BASE_URL}/progress`, {
+        // 🔗 เชื่อมต่อ POST /api/v1/reading/progress: บันทึกความคืบหน้าการอ่านเมื่อคลิกเลือกโหนดฉาก
+        let progRes = await fetch(`${BASE_URL}/api/v1/reading/progress`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -774,6 +790,20 @@ const StoryTreeInner = ({ activeNovelId, effectiveUserId, onNavigate }) => {
             current_scene_id: Number(targetSceneId),
           }),
         });
+        if (!progRes.ok) {
+          await fetch(`${BASE_URL}/progress`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              user_id: Number(effectiveUserId),
+              novel_id: Number(activeNovelId),
+              current_scene_id: Number(targetSceneId),
+            }),
+          });
+        }
       }
     } catch (err) {
       console.error("เกิด Error ตอนอัปเดตความคืบหน้า:", err);

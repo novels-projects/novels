@@ -1819,3 +1819,13 @@
     font-size: 1.25rem !important;
   }
 }
+
+@keyframes cm-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes se-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}

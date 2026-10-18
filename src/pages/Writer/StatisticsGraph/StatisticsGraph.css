@@ -626,18 +626,35 @@
 .wsg-edge-label-wrap {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  text-align: center;
-  line-height: 1;
+  justify-content: flex-start;
+  text-align: left !important;
+  direction: ltr !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  line-height: 1.3;
   background: #ffffff;
-  padding: 5px 10px;
-  border-radius: 8px;
+  padding: 3px 8px;
+  border-radius: 6px;
   border: 1px solid #ebcbd9;
-  font-size: 0.72rem;
+  font-size: 11px;
   font-weight: 700;
-  color: #54213a;
-  box-shadow: 0 2px 6px rgba(217, 87, 145, 0.08);
-  pointer-events: none;
+  color: #1e293b;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  pointer-events: all;
+  box-sizing: border-box;
+  cursor: pointer;
+  transform-origin: center center;
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1),
+              border-color 0.2s ease,
+              box-shadow 0.2s ease,
+              color 0.2s ease;
+}
+
+.wsg-edge-label-wrap:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(217, 87, 145, 0.16);
+  z-index: 1500;
 }
 
 .wsg-edge-label-wrap.highlighted {
@@ -993,10 +1010,22 @@
 }
 
 .wsg-choice-row-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
   font-size: 0.78rem;
   font-weight: 600;
   color: #334155;
   text-align: left;
+}
+
+.wsg-choice-row-top span:first-child {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: left;
+  direction: ltr;
 }
 
 .wsg-choice-row-bottom {
