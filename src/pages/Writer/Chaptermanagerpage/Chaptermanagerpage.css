@@ -731,9 +731,9 @@
 }
 
 .cm-choice-validation.is-invalid {
-  background: #fef2f2;
-  border: 1px solid #fecaca;
-  color: #b91c1c;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  color: #9a4d00;
 }
 
 @keyframes cmHighlightPulse {
@@ -829,10 +829,10 @@
 
 .cm-choice-form-error {
   padding: 8px 10px;
-  border: 1px solid #fecaca;
+  border: 1px solid #fed7aa;
   border-radius: 8px;
-  background: #fef2f2;
-  color: #b91c1c;
+  background: #fff7ed;
+  color: #9a4d00;
   font-size: 12px;
   font-weight: 700;
   text-align: left;

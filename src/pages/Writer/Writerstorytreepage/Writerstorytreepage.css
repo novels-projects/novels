@@ -1233,6 +1233,17 @@
   margin-bottom: 16px;
 }
 
+.wst-connection-error {
+  margin-top: 8px;
+  padding: 8px 10px;
+  border: 1px solid #fed7aa;
+  border-radius: 8px;
+  background: #fff7ed;
+  color: #9a4d00;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
 .wst-modal-footer {
   padding: 16px 20px;
   display: flex;

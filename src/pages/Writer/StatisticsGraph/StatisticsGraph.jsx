@@ -138,7 +138,11 @@ const isReaderAccessibleNovel = (novel) => {
   if (!novel) return false;
   const status = String(novel?.status ?? novel?.Status ?? "").trim().toLowerCase();
   const isPub = novel?.is_published ?? novel?.IsPublished;
-  const isPublished = isPub === true || isPub === 1 || String(isPub).toLowerCase() === "true" || status === "published";
+  const publishedStatuses = new Set(["publish", "published", "completed-published", "completed_published", "completed+published"]);
+  const hasPublishedFlag = isPub !== null && isPub !== undefined;
+  const isPublished = hasPublishedFlag
+    ? isPub === true || isPub === 1 || String(isPub).toLowerCase() === "true"
+    : publishedStatuses.has(status);
   const isBan = novel?.is_banned ?? novel?.IsBanned;
   const isBanned = isBan === true || isBan === 1 || String(isBan).toLowerCase() === "true" || status === "suspended" || status === "banned";
   return isPublished && !isBanned;
@@ -608,6 +612,7 @@ function StatisticsGraph() {
   const [sceneAnalytics, setSceneAnalytics] = useState(null);
   const [choiceAnalytics, setChoiceAnalytics] = useState(null);
   const [allScenesAnalytics, setAllScenesAnalytics] = useState([]);
+  const [hasLoadedSceneAnalytics, setHasLoadedSceneAnalytics] = useState(false);
   
   // Requirement 2: Edge Analytics State & Status
   const [edgeAnalytics, setEdgeAnalytics] = useState([]);
@@ -665,6 +670,7 @@ function StatisticsGraph() {
     setIsEdgeLoading(true);
     setEdgeError(null);
     setIsNovelReaderAccessible(false);
+    setHasLoadedSceneAnalytics(false);
 
     try {
       const token = localStorage.getItem("token");
@@ -707,8 +713,11 @@ function StatisticsGraph() {
 
       // Process all scenes analytics
       if (scenesAnalyticsSettled.status === "fulfilled") {
-        setAllScenesAnalytics(scenesAnalyticsSettled.value.data?.data || scenesAnalyticsSettled.value.data || []);
+        const scenesData = scenesAnalyticsSettled.value.data?.data || scenesAnalyticsSettled.value.data || [];
+        setAllScenesAnalytics(Array.isArray(scenesData) ? scenesData : []);
+        setHasLoadedSceneAnalytics(true);
       } else {
+        setAllScenesAnalytics([]);
         if (!axios.isCancel(scenesAnalyticsSettled.reason)) {
           console.warn("Scenes analytics fetch warning:", scenesAnalyticsSettled.reason);
         }
@@ -836,9 +845,6 @@ function StatisticsGraph() {
               : getErrorMessage(choiceSettled.reason, "ไม่สามารถโหลดสถิติทางเลือกของฉากนี้ได้"));
           }
         }
-        if (sceneWasUnpublished || choicesWereUnpublished) {
-          fetchData();
-        }
       }
     } catch (err) {
       if (!axios.isCancel(err) && sceneRequestIdRef.current === requestId) {
@@ -850,7 +856,7 @@ function StatisticsGraph() {
         setIsChoiceLoading(false);
       }
     }
-  }, [novelId, fetchData]);
+  }, [novelId]);
 
   useEffect(() => {
     fetchData();
@@ -861,8 +867,7 @@ function StatisticsGraph() {
     return treeData?.Nodes ?? treeData?.nodes ?? treeData?.data?.nodes ?? [];
   }, [treeData]);
 
-  // ใช้รายการ Scene และ Edge จาก Analytics API ซึ่ง Backend กรอง Reachability ตาม Reader Flow แล้ว
-  // เพื่อไม่คำนวณหรือทำซ้ำกติกา Reachability ในหน้า Analytics
+  // ใช้รายการ Scene จาก Analytics API ซึ่ง Backend กรอง Reachability ตาม Reader Flow แล้ว
   const reachableSceneIds = useMemo(
     () => new Set((Array.isArray(allScenesAnalytics) ? allScenesAnalytics : [])
       .map((scene) => normalizeId(scene?.scene_id ?? scene?.SceneID ?? scene?.id ?? scene?.ID))
@@ -873,15 +878,14 @@ function StatisticsGraph() {
   const uniqueNodes = useMemo(() => {
     const seen = new Set();
     if (!isNovelReaderAccessible) return [];
-    const hasReachabilityData = reachableSceneIds.size > 0;
     return rawNodes.filter((scene) => {
       const id = getNodeId(scene);
       if (!id || seen.has(id) || !isPublishedSceneAndChapter(scene)) return false;
-      if (hasReachabilityData && !reachableSceneIds.has(id)) return false;
+      if (hasLoadedSceneAnalytics && !reachableSceneIds.has(id)) return false;
       seen.add(id);
       return true;
     });
-  }, [rawNodes, isNovelReaderAccessible, reachableSceneIds]);
+  }, [rawNodes, isNovelReaderAccessible, hasLoadedSceneAnalytics, reachableSceneIds]);
 
   const analyticsEdges = useMemo(() => {
     const publishedNodeIds = new Set(uniqueNodes.map(getNodeId));
@@ -2489,7 +2493,7 @@ function StatisticsGraph() {
                     {rawNodes.length === 0
                       ? "ยังไม่ได้สร้างฉากในนิยายเรื่องนี้"
                       : (!isNovelReaderAccessible
-                        ? "นิยายยังอยู่ในสถานะฉบับร่าง (Draft)"
+                        ? "นิยายเรื่องนี้ยังไม่ได้เปิดเผยแพร่"
                         : "ยังไม่มีฉากที่เปิดเผยแพร่ให้ผู้อ่านเข้าถึงได้")}
                   </h3>
 
@@ -2497,14 +2501,16 @@ function StatisticsGraph() {
                     {rawNodes.length === 0
                       ? "คุณยังไม่ได้สร้างฉากใดๆ ในนิยายเรื่องนี้ เริ่มต้นสร้างตอนและฉากแรกได้ในหน้าจัดการตอน"
                       : (!isNovelReaderAccessible
-                        ? "หน้านี้จะแสดงสถิติการอ่านและการเลือกเส้นทางเมื่อนิยายเรื่องนี้ได้รับการเผยแพร่เรียบร้อยแล้ว"
-                        : "คุณมีฉากในระบบแล้ว แต่ฉากเหล่านั้นยังอยู่ในสถานะฉบับร่าง (Draft) หรือยังไม่ได้ถูกเผยแพร่ ระบบสถิติจะแสดงผลเฉพาะฉากที่เผยแพร่แล้วเท่านั้น")}
+                        ? "เปิดสถานะเผยแพร่ระดับนิยายในหน้าจัดการข้อมูลนิยายเพื่อให้นักอ่านเข้าถึงได้ ไม่จำเป็นต้องตั้งสถานะจบเรื่อง"
+                        : "ระบบสถิติแสดงเฉพาะฉากที่เผยแพร่แล้วและเข้าถึงได้จากฉากเริ่มต้น โปรดตรวจสอบสถานะเผยแพร่ของบท ฉาก และเส้นทางจากฉากเริ่มต้น")}
                   </p>
 
                   <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", justifyContent: "center", marginTop: "6px" }}>
                     <button
                       type="button"
-                      onClick={() => navigate(`/writer/${novelId}/chapters`)}
+                      onClick={() => navigate(rawNodes.length > 0 && !isNovelReaderAccessible
+                        ? `/writer/${novelId}/edit`
+                        : `/writer/${novelId}/chapters`)}
                       style={{
                         padding: "9px 18px",
                         borderRadius: "12px",
@@ -2522,9 +2528,11 @@ function StatisticsGraph() {
                     >
                       {rawNodes.length === 0 ? (
                         <>ไปสร้างฉากใหม่ในหน้าจัดการตอน</>
+                      ) : (!isNovelReaderAccessible ? (
+                        <>ไปตั้งค่าเผยแพร่นิยาย</>
                       ) : (
-                        <>ไปหน้าจัดการตอนและเผยแพร่</>
-                      )}
+                        <>ไปตรวจสอบสถานะฉากและเส้นทาง</>
+                      ))}
                     </button>
                     {rawNodes.length > 0 && (
                       <button

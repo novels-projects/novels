@@ -134,6 +134,25 @@ const ChoiceCard = ({
 
   // 🔍 หาตำแหน่ง Index ของฉากต้นทางปัจจุบันในไทม์ไลน์ใหญ่
   const fromSceneIndex = allScenes.findIndex(s => String(s.sceneId) === String(currentSceneId));
+  const selectedTargetScene = findSceneByValue(subScene);
+  const targetSceneIndex = allScenes.findIndex(
+    (scene) => String(scene.sceneId) === String(selectedTargetScene?.sceneId)
+  );
+  const connectionBlockReason = subScene
+    ? getChoiceConnectionBlockReason(
+      currentSceneId,
+      selectedTargetScene?.sceneId,
+      allTargetOptions,
+      choice.id
+    )
+    : null;
+  const normalizedConnectionBlockReason = connectionBlockReason || (
+    subScene && (fromSceneIndex === -1 || targetSceneIndex === -1)
+      ? "invalid"
+      : subScene && targetSceneIndex <= fromSceneIndex
+        ? "backward"
+        : null
+  );
 
   const sameChapterScenes = allScenes.filter((scene) => String(scene.chapterId) === String(currentChapterId));
   // 🛡️ กรอง "ตอนอื่น" ใน dropdown ด้วยกฎ Forward-Only เช่นกัน: ตอนที่ไม่มีฉากใดอยู่ข้างหน้า
@@ -161,6 +180,7 @@ const ChoiceCard = ({
   });
 
   const handleScopeChange = (scopeValue) => {
+    setFormError("");
     setTargetType(scopeValue);
     if (scopeValue === "same") {
       setSelectedChapterId(currentChapterId);
@@ -184,6 +204,7 @@ const ChoiceCard = ({
   };
 
   const handleChapterChange = (chapterId) => {
+    setFormError("");
     setSelectedChapterId(chapterId);
     // เมื่อเปลี่ยนตอน ให้ล้างค่าฉากเก่าเพื่อให้ผู้ใช้เลือกใหม่จากข้อความเริ่มต้น "กรุณาเลือกฉากปลายทาง"
     setSubScene("");
@@ -192,6 +213,7 @@ const ChoiceCard = ({
 
   const handleSubSceneChange = (val) => {
     setSubScene(val);
+    setFormError("");
     const found = findSceneByValue(val);
     if (found) setTargetLabel(found.label || found.chapterTitle);
   };
@@ -212,20 +234,13 @@ const ChoiceCard = ({
       return;
     }
 
-    const targetScene = findSceneByValue(subScene);
-    const targetSceneId = targetScene ? targetScene.sceneId : "";
-    const targetSceneIndex = allScenes.findIndex(s => String(s.sceneId) === String(targetSceneId));
-
     if (fromSceneIndex === -1 || targetSceneIndex === -1) {
-      setFormError("❌ ไม่พบข้อมูลตำแหน่งของฉากในระบบ กรุณาตรวจสอบอีกครั้ง");
+      setFormError("ไม่พบข้อมูลตำแหน่งของฉากในระบบ กรุณาตรวจสอบอีกครั้ง");
       return;
     }
 
-    const targetBlockReason = getChoiceConnectionBlockReason(currentSceneId, targetSceneId, allTargetOptions, choice.id);
-    const isBackward = targetSceneIndex <= fromSceneIndex;
-    if (targetBlockReason || isBackward) {
-      const reason = targetBlockReason || "backward";
-      setFormError(`❌ ไม่สามารถบันทึกได้: ${getChoiceConnectionMessage(reason)}`);
+    if (normalizedConnectionBlockReason) {
+      setFormError(`ไม่สามารถบันทึกได้: ${getChoiceConnectionMessage(normalizedConnectionBlockReason)}`);
       return;
     }
 
@@ -438,7 +453,7 @@ const ChoiceCard = ({
           console.error("ลบฉากปลายทางที่สร้างค้างไว้ไม่สำเร็จ:", rollbackError);
         }
       }
-      setFormError(`❌ เกิดข้อผิดพลาด: ${err.message}`);
+      setFormError(`เกิดข้อผิดพลาด: ${err.message}`);
     } finally {
       setIsCreatingNewScene(false);
     }
@@ -759,6 +774,16 @@ const ChoiceCard = ({
                             </option>
                           ))}
                         </select>
+                        {subScene && (
+                          <div
+                            role={normalizedConnectionBlockReason ? "alert" : "status"}
+                            className={`se-choice__validation ${normalizedConnectionBlockReason ? "is-invalid" : "is-valid"}`}
+                          >
+                            {normalizedConnectionBlockReason
+                              ? getChoiceConnectionMessage(normalizedConnectionBlockReason)
+                              : "เส้นทางนี้เชื่อมต่อได้ ไม่พบลูปในโครงสร้างเรื่อง"}
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -828,7 +853,9 @@ const ChoiceCard = ({
                   onClick={handleSaveEdit}
                   disabled={forwardOnlySceneOptions.length === 0 || isSavingChoice}
                   aria-busy={isSavingChoice}
-                  title={forwardOnlySceneOptions.length === 0 ? "ไม่มีฉากที่ปลอดภัยให้เลือกโยง จึงยังยืนยันไม่ได้" : undefined}
+                  title={forwardOnlySceneOptions.length === 0
+                    ? "ไม่มีฉากที่ปลอดภัยให้เลือกโยง จึงยังยืนยันไม่ได้"
+                    : undefined}
                   style={{
                     padding: "10px 20px",
                     fontSize: "0.88rem",

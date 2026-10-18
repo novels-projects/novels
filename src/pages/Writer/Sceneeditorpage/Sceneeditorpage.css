@@ -1014,9 +1014,33 @@
   border-color: #94a3b8;
 }
 .se-choice__error {
-  color: #dc2626;
   margin-top: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid #fed7aa;
+  background: #fff7ed;
+  color: #9a4d00;
   font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.se-choice__validation {
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.se-choice__validation.is-valid {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  color: #15803d;
+}
+
+.se-choice__validation.is-invalid {
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  color: #9a4d00;
 }
 
 .se-choice__created-feedback {
