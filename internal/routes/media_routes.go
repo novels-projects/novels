@@ -9,5 +9,7 @@ import (
 )
 
 func registerMediaRoutes(mux *http.ServeMux, media service.MediaService, novel service.NovelService, writer service.WriterService) {
-	mux.Handle("/upload/image", middleware.RequestLogger(middleware.RequireAuth(handlers.UploadImageHandler(media, novel, writer))))
+	uploadHandler := middleware.RequestLogger(middleware.RequireAuth(handlers.UploadImageHandler(media, novel, writer)))
+	mux.Handle("/upload/image", uploadHandler)
+	mux.Handle("/api/v1/media/upload", uploadHandler)
 }

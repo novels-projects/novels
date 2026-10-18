@@ -10,7 +10,13 @@ import (
 
 func chapterSubRouter(scene service.SceneService, chapter service.ChapterService, novel service.NovelService, writer service.WriterService, audit service.AuditService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		path := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/chapters/"), "/")
+		path := r.URL.Path
+		if strings.HasPrefix(path, "/api/v1/chapters/") {
+			path = strings.TrimPrefix(path, "/api/v1/chapters/")
+		} else {
+			path = strings.TrimPrefix(path, "/chapters/")
+		}
+		path = strings.TrimSuffix(path, "/")
 		switch {
 		// 📖 GET /chapters/:id/scenes - อ่านได้ทั่วไป
 		case r.Method == http.MethodGet && strings.HasSuffix(path, "/scenes"):

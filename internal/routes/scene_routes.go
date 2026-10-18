@@ -10,7 +10,13 @@ import (
 
 func sceneSubRouter(scene service.SceneService, novel service.NovelService, writer service.WriterService, chapter service.ChapterService, social service.SocialService, notificationService service.NotificationService, audit service.AuditService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		path := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/scenes/"), "/")
+		path := r.URL.Path
+		if strings.HasPrefix(path, "/api/v1/scenes/") {
+			path = strings.TrimPrefix(path, "/api/v1/scenes/")
+		} else {
+			path = strings.TrimPrefix(path, "/scenes/")
+		}
+		path = strings.TrimSuffix(path, "/")
 		switch {
 		// 🔒 PUT /scenes/:id/position - อัปเดตพิกัด Node ใน Story Tree
 		case r.Method == http.MethodPut && strings.HasSuffix(path, "/position"):

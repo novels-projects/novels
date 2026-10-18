@@ -10,7 +10,13 @@ import (
 
 func novelSubRouter(novel service.NovelService, scene service.SceneService, chapter service.ChapterService, social service.SocialService, writer service.WriterService, reading service.ReadingService, notificationService service.NotificationService, audit service.AuditService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		path := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/novels/"), "/")
+		path := r.URL.Path
+		if strings.HasPrefix(path, "/api/v1/novels/") {
+			path = strings.TrimPrefix(path, "/api/v1/novels/")
+		} else {
+			path = strings.TrimPrefix(path, "/novels/")
+		}
+		path = strings.TrimSuffix(path, "/")
 
 		switch {
 		case r.Method == http.MethodPut && strings.HasSuffix(path, "/chapters/reorder"):
@@ -22,7 +28,7 @@ func novelSubRouter(novel service.NovelService, scene service.SceneService, chap
 			handlers.GetCommentCountByNovelHandler(social)(w, r)
 		case r.Method == http.MethodGet && strings.HasSuffix(path, "/comments"):
 			handlers.GetCommentsByNovelHandler(social)(w, r)
-		case r.Method == http.MethodGet && strings.HasSuffix(path, "/story-tree"):
+		case r.Method == http.MethodGet && (strings.HasSuffix(path, "/story-tree") || strings.HasSuffix(path, "/story-graph")):
 			handlers.GetStoryTreeHandler(scene, novel, writer)(w, r)
 		case r.Method == http.MethodGet && strings.HasSuffix(path, "/start"):
 			handlers.StartReadingHandler(scene, novel, writer, chapter)(w, r)
