@@ -300,6 +300,8 @@ const NovelDetailPage = () => {
   );
 
   const getCurrentUser = () => {
+    const token = localStorage.getItem("token");
+    if (!token) return null;
     const userJson = localStorage.getItem("user");
     if (!userJson) return null;
     try {
@@ -338,6 +340,8 @@ const NovelDetailPage = () => {
 
 
   const getCurrentUserId = () => {
+    const token = localStorage.getItem("token");
+    if (!token) return 0;
     const user = getCurrentUser();
     return user?.id || user?.user_id || 0;
   };
@@ -604,9 +608,12 @@ const NovelDetailPage = () => {
           isBookmarked: isBookmarked,
         });
 
-        let isFollowing = Boolean(data.is_following || data.isFollowing || nData.is_following || nData.isFollowing);
+        let isFollowing = false;
 
-        if (token && finalWriterId) {
+        // 🟢 ตรวจสอบสถานะการติดตามเฉพาะเมื่อมี token และ userId (ผู้ใช้ล็อกอินแล้วเท่านั้น)
+        // Guest จะต้องเป็น false เสมอ ห้ามดึงค่าจาก data หรือ local_following_writers
+        if (token && userId > 0 && finalWriterId) {
+          isFollowing = Boolean(data.is_following || data.isFollowing || nData.is_following || nData.isFollowing);
           try {
             const followCheckRes = await fetch(`${API_BASE_URL}/api/users/following-writers`, { headers });
             if (followCheckRes.ok) {
@@ -620,16 +627,18 @@ const NovelDetailPage = () => {
           } catch (e) {
             console.warn("Failed to check following writers status:", e);
           }
-        }
 
-        if (!isFollowing && finalWriterId) {
-          try {
-            const localSaved = localStorage.getItem("local_following_writers");
-            const list = localSaved ? JSON.parse(localSaved) : [];
-            if (Array.isArray(list) && list.some(w => Number(w.id || w.writer_id) === Number(finalWriterId))) {
-              isFollowing = true;
-            }
-          } catch (e) {}
+          if (!isFollowing) {
+            try {
+              const localSaved = localStorage.getItem("local_following_writers");
+              const list = localSaved ? JSON.parse(localSaved) : [];
+              if (Array.isArray(list) && list.some(w => Number(w.id || w.writer_id) === Number(finalWriterId))) {
+                isFollowing = true;
+              }
+            } catch (e) {}
+          }
+        } else {
+          isFollowing = false;
         }
 
         setIsFollowingAuthor(isFollowing);
@@ -707,8 +716,11 @@ const fetchFirstSceneAndNavigate = async (previewSuffix) => {
       const token = localStorage.getItem("token");
       if (token) headers["Authorization"] = `Bearer ${token}`;
 
-      const previewQuery = isPreview ? "&preview=true" : "";
-      const treeResponse = await fetch(`${API_BASE_URL}/novels/${id}/story-tree?user_id=${userId}${previewQuery}`, { headers });
+      const params = new URLSearchParams();
+      if (userId > 0 && !isPreview) params.append("user_id", userId);
+      if (isPreview) params.append("preview", "true");
+      const qs = params.toString() ? `?${params.toString()}` : "";
+      const treeResponse = await fetch(`${API_BASE_URL}/novels/${id}/story-tree${qs}`, { headers });
 
       const treePayload = await treeResponse.json().catch(() => null);
       const treeData = treePayload?.data || treePayload || {};
@@ -1003,7 +1015,7 @@ const fetchFirstSceneAndNavigate = async (previewSuffix) => {
   };
 
   const currentUserId = getCurrentUserId();
-  const isLoggedIn = currentUserId > 0;
+  const isLoggedIn = Boolean(localStorage.getItem("token") && currentUserId > 0);
   const isAdmin = isLoggedIn && isCurrentUserAdmin();
 
   // นักเขียนเจ้าของนิยายไม่ควรเห็นปุ่ม "ติดตาม" สำหรับตัวเอง
@@ -1505,8 +1517,8 @@ const fetchFirstSceneAndNavigate = async (previewSuffix) => {
         />
 
         <EndingCollection
-          isOpen={showEndingModal && isLoggedIn}
-          endings={endings}
+          isOpen={showEndingModal}
+          endings={isLoggedIn ? endings : []}
           onClose={() => setShowEndingModal(false)}
           onViewStoryMap={(sceneId) => handleStoryMap(sceneId)}
         />

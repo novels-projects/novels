@@ -131,7 +131,6 @@ const WriterLayout = ({ children, onNavigate }) => {
 
   const handleSelectNovel = async (novel) => {
     localStorage.setItem("selectedNovel", JSON.stringify(novel));
-    window.dispatchEvent(new Event("storage"));
     window.dispatchEvent(new Event("novel-selected"));
     setShowSelector(false);
 
@@ -697,8 +696,9 @@ const refreshAuthToken = async () => {
     });
 
     if (!res.ok) {
-      localStorage.removeItem('token');
-      localStorage.removeItem('refresh_token');
+      ["token", "refresh_token", "user", "user_id", "local_following_writers"].forEach((k) =>
+        localStorage.removeItem(k)
+      );
       return false;
     }
 
@@ -716,8 +716,9 @@ const refreshAuthToken = async () => {
     return true;
   } catch (error) {
     console.error('Failed to refresh auth token:', error);
-    localStorage.removeItem('token');
-    localStorage.removeItem('refresh_token');
+    ["token", "refresh_token", "user", "user_id", "local_following_writers"].forEach((k) =>
+      localStorage.removeItem(k)
+    );
     return false;
   }
 };
@@ -917,8 +918,9 @@ function App() {
       if (!token || isTokenExpired(token)) {
         const refreshed = await refreshAuthToken();
         if (!refreshed) {
-          localStorage.removeItem('token');
-          localStorage.removeItem('refresh_token');
+          ["token", "refresh_token", "user", "user_id", "local_following_writers"].forEach((k) =>
+            localStorage.removeItem(k)
+          );
         }
       }
 

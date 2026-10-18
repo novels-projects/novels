@@ -53,6 +53,8 @@ const NovelProgressBar = ({
   };
 
   const getCurrentUserId = () => {
+    const token = localStorage.getItem("token");
+    if (!token) return 0;
     const userJson = localStorage.getItem("user");
     if (!userJson) return 0;
     try {
@@ -65,6 +67,8 @@ const NovelProgressBar = ({
 
   const checkIsAdmin = () => {
     if (isAdmin) return true;
+    const token = localStorage.getItem("token");
+    if (!token) return false;
     try {
       const userJson = localStorage.getItem("user");
       if (userJson) {
@@ -74,7 +78,6 @@ const NovelProgressBar = ({
       }
     } catch {}
     try {
-      const token = localStorage.getItem("token");
       if (token) {
         const parts = token.split(".");
         if (parts.length === 3) {

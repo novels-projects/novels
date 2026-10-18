@@ -36,12 +36,29 @@ export default function FollowButton({
 }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [isFollowed, setIsFollowed] = useState(isFollowing);
+  const [isFollowed, setIsFollowed] = useState(false);
   const [isSparking, setIsSparking] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
 
   useEffect(() => {
-    setIsFollowed(isFollowing);
+    const token = localStorage.getItem("token");
+    // ผู้เยี่ยมชม (Guest) ที่ยังไม่เข้าสู่ระบบ ห้ามแสดงสถานะติดตามแล้ว
+    if (!token) {
+      setIsFollowed(false);
+    } else {
+      setIsFollowed(Boolean(isFollowing));
+    }
   }, [isFollowing]);
+
+  // ปิด modal เมื่อกด Escape
+  useEffect(() => {
+    if (!showAuthModal) return;
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape") setShowAuthModal(false);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [showAuthModal]);
 
   const handleFollowClick = async (e) => {
     e.preventDefault();
@@ -49,17 +66,17 @@ export default function FollowButton({
 
     if (loading) return;
 
+    const token = localStorage.getItem("token");
+    // 🟢 ถ้าเป็น Guest ให้แสดง Popup แจ้งเตือนเข้าสู่ระบบ/สมัครสมาชิก ไม่ยิง API ไม่เซฟข้อมูล
+    if (!token) {
+      setShowAuthModal(true);
+      return;
+    }
+
     setLoading(true);
     setError(null);
 
     try {
-      const token = localStorage.getItem("token");
-      if (!token) {
-        showToast("กรุณาเข้าสู่ระบบก่อน", { type: "info" });
-        window.location.href = "/login-register";
-        return;
-      }
-
       const userId = localStorage.getItem("user_id") || (() => {
         const userJson = localStorage.getItem("user");
         if (!userJson) return null;
@@ -249,6 +266,57 @@ export default function FollowButton({
           {getText()}
         </span>
       </button>
+
+      {/* 🟢 Popup แจ้งเตือนเมื่อ Guest กดติดตาม */}
+      {showAuthModal && (
+        <div
+          className="follow-auth-modal-overlay"
+          onClick={() => setShowAuthModal(false)}
+          role="presentation"
+        >
+          <div
+            className="follow-auth-modal"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="follow-auth-modal-title"
+          >
+            <button
+              type="button"
+              className="follow-auth-modal__close"
+              onClick={() => setShowAuthModal(false)}
+              aria-label="ปิด"
+            >
+              ×
+            </button>
+            <div className="follow-auth-modal__icon" aria-hidden="true">
+              ✨
+            </div>
+            <h3 className="follow-auth-modal__title" id="follow-auth-modal-title">
+              เข้าสู่ระบบเพื่อติดตามนักเขียน
+            </h3>
+            <p className="follow-auth-modal__desc">
+              กรุณาเข้าสู่ระบบหรือสมัครสมาชิกเพื่อติดตามผลงานของ <strong>{writerName}</strong> และรับการแจ้งเตือนตอนใหม่ก่อนใคร
+            </p>
+            <div className="follow-auth-modal__actions">
+              <a
+                href="/login-register"
+                className="follow-auth-modal__btn follow-auth-modal__btn--login"
+                onClick={() => setShowAuthModal(false)}
+              >
+                เข้าสู่ระบบ
+              </a>
+              <a
+                href="/login-register?tab=register"
+                className="follow-auth-modal__btn follow-auth-modal__btn--register"
+                onClick={() => setShowAuthModal(false)}
+              >
+                สมัครสมาชิก
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

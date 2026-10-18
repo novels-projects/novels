@@ -326,8 +326,9 @@
 .wst-toolbar-btn--delete-active {
   background-color: #fef2f2 !important;
   color: #ef4444 !important;
-  border-color: #fecaca !important;
+  border-color: #fca5a5 !important;
   font-weight: 700;
+  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.2);
 }
 
 .wst-toolbar-btn--connect-active {
@@ -499,16 +500,32 @@
 }
 
 .wst-mode-add-node .react-flow__pane,
-.wst-mode-add-node .react-flow__viewport,
-.wst-mode-add-node .react-flow__node {
-  cursor: cell !important;
+.wst-mode-add-node .react-flow__viewport {
+  cursor: crosshair !important;
+}
+
+.wst-mode-add-node .react-flow__node,
+.wst-mode-add-node .wst-node-card {
+  cursor: not-allowed !important;
 }
 
 .wst-mode-delete .react-flow__pane,
-.wst-mode-delete .react-flow__viewport,
+.wst-mode-delete .react-flow__viewport {
+  cursor: default !important;
+}
+
 .wst-mode-delete .react-flow__node,
-.wst-mode-delete .wst-node-card {
-  cursor: not-allowed !important;
+.wst-mode-delete .wst-node-card,
+.wst-mode-delete .react-flow__edge,
+.wst-mode-delete .react-flow__edge-path,
+.wst-mode-delete .wst-edge-choice-wrapper,
+.wst-mode-delete .wst-edge-choice-badge {
+  cursor: pointer !important;
+}
+
+.wst-mode-delete .react-flow__node:hover .wst-node-card {
+  border-color: #ef4444 !important;
+  box-shadow: 0 4px 16px rgba(239, 68, 68, 0.25) !important;
 }
 
 .wst-mode-pan .react-flow__pane,
@@ -570,7 +587,7 @@
 .wst-mode-add-node .react-flow__edge,
 .wst-mode-add-node .react-flow__edge-path,
 .wst-mode-add-node .wst-edge-choice-badge {
-  cursor: cell !important;
+  cursor: crosshair !important;
 }
 
 /* React Flow Handle custom style */
@@ -1375,9 +1392,14 @@
 }
 
 .wst-edge-choice-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+  display: inline-block;
+  vertical-align: middle;
+  text-align: left !important;
+  direction: ltr !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  box-sizing: border-box;
   cursor: pointer;
   transform-origin: center center;
   transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1),
@@ -1394,9 +1416,57 @@
   border: 2px solid #ef4444 !important;
   border-color: #ef4444 !important;
   color: #dc2626 !important;
-  transform: scale(1.1) !important;
+  transform: scale(1.08) !important;
   box-shadow: 0 4px 14px rgba(239, 68, 68, 0.28), 0 0 0 1px rgba(239, 68, 68, 0.2) !important;
   z-index: 3500 !important;
+}
+
+/* Tooltip กล่องลอยแสดงข้อความทางเลือกฉบับเต็มเมื่อ Hover */
+.wst-edge-choice-tooltip {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: #0f172a;
+  color: #f8fafc;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 11.5px;
+  font-weight: 500;
+  line-height: 1.4;
+  white-space: normal;
+  word-break: break-word;
+  max-width: 260px;
+  min-width: 80px;
+  width: max-content;
+  text-align: center;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.28);
+  pointer-events: none;
+  z-index: 4000;
+  animation: wstTooltipFadeIn 0.15s ease-out;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.wst-edge-choice-tooltip::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border-width: 5px;
+  border-style: solid;
+  border-color: #0f172a transparent transparent transparent;
+}
+
+@keyframes wstTooltipFadeIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 4px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
 }
 
 /* ปิด hover effect ทุกรูปแบบของกล่องทางเลือกและเส้นเชื่อมเมื่ออยู่ในโหมด connect, add-node, pan */

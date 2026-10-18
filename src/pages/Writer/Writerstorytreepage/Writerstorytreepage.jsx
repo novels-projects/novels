@@ -17,7 +17,7 @@ import ReactFlow, {
 } from "reactflow";
 import axios from "axios";
 import "./Writerstorytreepage.css";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, Trash2 } from "lucide-react";
 import { TreeCanvasSkeleton, ButtonSpinner } from "../../../components/Skeleton";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
@@ -77,6 +77,79 @@ const WRITER_LEGEND = [
 const normalizeId = (value) => {
   if (value === undefined || value === null || value === "") return "";
   return String(value);
+};
+
+// ค้นหาตำแหน่งว่างบน Canvas ที่ไม่ทับซ้อนกับโหนดฉากที่มีอยู่แล้ว
+const findVacantCanvasPosition = (nodes) => {
+  if (!nodes || nodes.length === 0) {
+    return { x: CANVAS_MARGIN, y: CANVAS_MARGIN };
+  }
+
+  const isOccupied = (x, y) => {
+    return nodes.some((node) => {
+      if (node.id === "cursor-node") return false;
+      const nx = node.position?.x ?? node.x ?? 0;
+      const ny = node.position?.y ?? node.y ?? 0;
+      const nw = node.width || NODE_WIDTH;
+      const nh = node.height || NODE_HEIGHT;
+      const margin = 24;
+
+      return (
+        x < nx + nw + margin &&
+        x + NODE_WIDTH + margin > nx &&
+        y < ny + nh + margin &&
+        y + NODE_HEIGHT + margin > ny
+      );
+    });
+  };
+
+  let maxColX = CANVAS_MARGIN;
+  nodes.forEach((n) => {
+    const nx = n.position?.x ?? n.x ?? 0;
+    if (nx > maxColX) maxColX = nx;
+  });
+
+  const stepX = NODE_WIDTH + 80;
+  const stepY = NODE_HEIGHT + 80;
+
+  // ลองพิจารณาตำแหน่งถัดไปทางขวาของโหนดที่มีอยู่
+  const nextRightPos = { x: maxColX + stepX, y: CANVAS_MARGIN };
+  if (!isOccupied(nextRightPos.x, nextRightPos.y)) {
+    return nextRightPos;
+  }
+
+  // ค้นหาตำแหน่งว่างในกริด
+  for (let r = 0; r < 20; r++) {
+    for (let c = 0; c < 20; c++) {
+      const candidateX = CANVAS_MARGIN + c * stepX;
+      const candidateY = CANVAS_MARGIN + r * stepY;
+      if (!isOccupied(candidateX, candidateY)) {
+        return { x: candidateX, y: candidateY };
+      }
+    }
+  }
+
+  return { x: maxColX + stepX, y: CANVAS_MARGIN };
+};
+
+// ดึงข้อความ error จาก Backend API Response ป้องกันการส่ง object {code, message} ไปแสดงใน React
+const extractErrorMessage = (err, fallback = "เกิดข้อผิดพลาดในการดำเนินการ") => {
+  if (!err) return fallback;
+  if (typeof err === "string") return err;
+  
+  const resData = err.response?.data;
+  if (resData) {
+    if (typeof resData === "string") return resData;
+    if (resData.error) {
+      if (typeof resData.error === "string") return resData.error;
+      if (typeof resData.error.message === "string" && resData.error.message) return resData.error.message;
+      if (typeof resData.error.code === "string" && resData.error.code) return resData.error.code;
+    }
+    if (typeof resData.message === "string" && resData.message) return resData.message;
+  }
+
+  if (typeof err.message === "string" && err.message) return err.message;
+  return fallback;
 };
 
 const stripHtml = (value) => {
@@ -457,7 +530,7 @@ const CustomMultigraphEdge = ({
   });
 
   // คำนวณพิกัดตำแหน่ง Label Badge บนเส้นทาง Edge จริง 100% ด้วยการสุ่มตัวอย่างพิกัดบน SVG Path
-  const badgeWidth = 140;
+  const badgeWidth = 160;
   const badgeHeight = 24;
 
   // คำนวณสัดส่วนตำแหน่ง (ratio) บนเส้นทาง โดยกระจายทางเลือกหลายรายการตามความยาวเส้นทาง
@@ -625,7 +698,8 @@ const CustomMultigraphEdge = ({
                 fontSize: "11px",
                 fontWeight: "700",
                 color: effectiveBadgeColor,
-                textAlign: "center",
+                textAlign: "left",
+                direction: "ltr",
                 whiteSpace: "nowrap",
                 overflow: "hidden",
                 textOverflow: "ellipsis",
@@ -642,6 +716,11 @@ const CustomMultigraphEdge = ({
             >
               {label}
             </div>
+            {activeHover && !isHoverDisabled && label && (
+              <div className="wst-edge-choice-tooltip">
+                {label}
+              </div>
+            )}
           </div>
         </EdgeLabelRenderer>
       )}
@@ -766,10 +845,14 @@ const StoryTreeInner = ({ novelId, onNavigate }) => {
     connectSourceRef.current = connectSource;
   }, [connectSource]);
 
-  // Toast handler
+  // Toast handler - รับประกันว่า message เป็น string เสมอ ไม่ส่ง object หลุดเข้าไปเรนเดอร์ใน React
   const showToast = useCallback((message, type = "success") => {
-    setToast({ message, type });
-    const timer = setTimeout(() => setToast(null), 2500);
+    let cleanMessage = message;
+    if (typeof message === "object" && message !== null) {
+      cleanMessage = message.message || message.error?.message || message.error || message.code || JSON.stringify(message);
+    }
+    setToast({ message: String(cleanMessage ?? ""), type });
+    const timer = setTimeout(() => setToast(null), 3000);
     return () => clearTimeout(timer);
   }, []);
 
@@ -1022,16 +1105,17 @@ let orphanCounter = 0;
       const scene = localMap.get(sceneId);
       const position = positions[sceneId] || { x: CANVAS_MARGIN, y: CANVAS_MARGIN };
 
-      const apiX = scene.node_x ?? scene.NodeX;
-      const apiY = scene.node_y ?? scene.NodeY;
+      const apiX = scene.node_x ?? scene.NodeX ?? scene.x ?? scene.X;
+      const apiY = scene.node_y ?? scene.NodeY ?? scene.y ?? scene.Y;
       const hasSavedPosition = apiX !== null && apiX !== undefined && apiY !== null && apiY !== undefined;
 
       const isOrphan = nodeStatuses[sceneId] === WRITER_NODE_STATUS.ORPHAN;
       let fallbackX = position.x;
       let fallbackY = position.y;
       if (!hasSavedPosition && isOrphan) {
-        const col = orphanCounter % 5;
-        const row = Math.floor(orphanCounter / 5);
+        // จัดวางโหนดที่ยังไม่เชื่อมต่อให้อยู่ในคอลัมน์ถัดไป ไม่ใช้ col=0, row=0 ซึ่งเป็นตำแหน่งของจุดเริ่มต้น
+        const col = (orphanCounter + 1) % 5;
+        const row = Math.floor((orphanCounter + 1) / 5);
         fallbackX = CANVAS_MARGIN + col * NODE_HORIZONTAL_GAP;
         fallbackY = CANVAS_MARGIN + row * NODE_VERTICAL_GAP;
         orphanCounter += 1;
@@ -1644,7 +1728,13 @@ let orphanCounter = 0;
     // รีเซ็ตตัวแปรโหมดลบโหนด
     setSceneToDelete(null);
     setShowDeleteModal(false);
-  }, [clearConnectionState]);
+
+    if (newMode === "add-node") {
+      showToast("เข้าสู่โหมดเพิ่มฉาก: คลิกตำแหน่งว่างบน Canvas เพื่อวางฉากใหม่ (กด Esc เพื่อยกเลิก)", "info");
+    } else if (newMode === "delete") {
+      showToast("เข้าสู่โหมดลบ: คลิกเลือกโหนดฉากหรือเส้นเชื่อมเพื่อลบ (กด Esc เพื่อยกเลิก)", "info");
+    }
+  }, [clearConnectionState, showToast]);
 
   // keydown event listener สำหรับคีย์บอร์ดชอร์ตคัต 'C' และ 'Escape'
   useEffect(() => {
@@ -1843,6 +1933,30 @@ let orphanCounter = 0;
     setSelectedSceneId(tempId); // ตั้งค่าโฟกัสโหนดใหม่
   }, [novelId, onNavigate, showToast, changeMode, interactionMode, setRfNodes, novelChapters]);
 
+  // ตรวจสอบว่าพิกัดตำแหน่งบน Canvas ซ้อนทับกับโหนดฉากเดิมหรือไม่
+  const checkNodeCollision = useCallback((pos, margin = 16) => {
+    if (!pos || !rfNodes || rfNodes.length === 0) return false;
+    const testX = pos.x;
+    const testY = pos.y;
+    const testW = NODE_WIDTH;
+    const testH = NODE_HEIGHT;
+
+    return rfNodes.some((node) => {
+      if (node.id === "cursor-node") return false;
+      const nx = node.position?.x ?? 0;
+      const ny = node.position?.y ?? 0;
+      const nw = node.width || NODE_WIDTH;
+      const nh = node.height || NODE_HEIGHT;
+
+      return (
+        testX < nx + nw + margin &&
+        testX + testW + margin > nx &&
+        testY < ny + nh + margin &&
+        testY + testH + margin > ny
+      );
+    });
+  }, [rfNodes]);
+
   // ฟังก์ชันดักคลิกบน Canvas พื้นหลัง (แสดงโมดอลเลือกตอนสังกัด)
   const handlePaneClick = useCallback((e) => {
     if (interactionMode !== "add-node") {
@@ -1861,30 +1975,52 @@ let orphanCounter = 0;
       x: e.clientX,
       y: e.clientY
     });
+
+    // ป้องกันการสร้างฉากซ้อนทับ: ตรวจสอบตำแหน่งว่างบน Canvas
+    if (checkNodeCollision(flowPos)) {
+      showToast("ตำแหน่งนี้มีฉากอยู่แล้วหรือใกล้ฉากเดิมเกินไป กรุณาคลิกเลือกตำแหน่งว่างบน Canvas เพื่อวางฉากใหม่ค่ะ", "warn");
+      return;
+    }
     
-    setPendingScenePosition({ x: flowPos.x, y: flowPos.y });
+    setPendingScenePosition({ x: Math.round(flowPos.x), y: Math.round(flowPos.y) });
     if (novelChapters.length > 0) {
       const firstChId = novelChapters[0]?.id ?? novelChapters[0]?.chapter_id ?? novelChapters[0]?.ChapterID ?? novelChapters[0]?.chapterId;
       setSelectedMoveChapterId(String(firstChId));
+      const scenesInTargetChapter = rfNodes.filter(
+        (n) => String(n.data?.chapterId ?? n.data?.ChapterID ?? n.data?.chapter_id) === String(firstChId)
+      );
+      setNewSceneTitle(`ฉากที่ ${scenesInTargetChapter.length + 1}`);
     } else {
       setSelectedMoveChapterId("");
+      setNewSceneTitle("ฉากที่ 1");
     }
     setShowAddScenePopup(true);
-  }, [interactionMode, screenToFlowPosition, novelChapters, connectSource, clearConnectionState]);
+  }, [interactionMode, screenToFlowPosition, novelChapters, rfNodes, connectSource, clearConnectionState, checkNodeCollision, showToast]);
 
   const edgeUpdateSuccessful = useRef(true);
 
   const handleAddSceneBackend = async () => {
-    if (!pendingScenePosition || !selectedMoveChapterId) return;
+    if (!selectedMoveChapterId) return;
+    const targetPos = pendingScenePosition || findVacantCanvasPosition(rfNodes);
     const token = localStorage.getItem("token");
     try {
+      const scenesInTargetChapter = rfNodes.filter(
+        (n) => String(n.data?.chapterId ?? n.data?.ChapterID ?? n.data?.chapter_id) === String(selectedMoveChapterId)
+      );
+      const defaultTitle = `ฉากที่ ${scenesInTargetChapter.length + 1}`;
+      const finalTitle = newSceneTitle.trim() || defaultTitle;
+
       const payload = {
         novel_id: parseInt(novelId, 10),
         chapter_id: parseInt(selectedMoveChapterId, 10),
-        title: newSceneTitle.trim() || "ฉากไม่มีชื่อ",
+        title: finalTitle,
         content: "",
-        x: Math.round(pendingScenePosition.x),
-        y: Math.round(pendingScenePosition.y),
+        x: Math.round(targetPos.x),
+        y: Math.round(targetPos.y),
+        node_x: Math.round(targetPos.x),
+        node_y: Math.round(targetPos.y),
+        NodeX: Math.round(targetPos.x),
+        NodeY: Math.round(targetPos.y),
         type: "normal",
         status: "draft",
         is_ending: false,
@@ -1898,13 +2034,33 @@ let orphanCounter = 0;
       const response = await axios.post(`${API_BASE_URL}/scenes`, payload, { headers });
       
       if (response.status === 200 || response.status === 201) {
+        // บันทึกตำแหน่งลง Database จริงทันทีผ่าน PUT /scenes/:id/position
+        const createdSceneId = response.data?.scene_id || response.data?.data?.scene_id || response.data?.id;
+        if (createdSceneId) {
+          try {
+            await axios.put(
+              `${API_BASE_URL}/scenes/${createdSceneId}/position`,
+              {
+                node_x: Math.round(targetPos.x),
+                node_y: Math.round(targetPos.y),
+              },
+              { headers }
+            );
+          } catch (posErr) {
+            console.error("Failed to persist initial scene position:", posErr);
+          }
+        }
+
         showToast("สร้างฉากใหม่เรียบร้อยแล้ว", "success");
         await fetchStoryTreeAndChapters();
         window.dispatchEvent(new Event("novel-data-updated"));
       }
     } catch (err) {
       console.error("Create scene error:", err);
-      const errMsg = err.response?.data?.message || err.response?.data?.error || "เกิดข้อผิดพลาดในการสร้างฉาก (ชื่อฉากอาจซ้ำในตอนเดียวกัน)";
+      const errMsg = extractErrorMessage(
+        err,
+        "เกิดข้อผิดพลาดในการสร้างฉาก (ชื่อฉากอาจซ้ำในตอนเดียวกัน หรือข้อมูลไม่ถูกต้อง)"
+      );
       showToast(errMsg, "warn");
     } finally {
       setShowAddScenePopup(false);
@@ -2657,6 +2813,13 @@ let orphanCounter = 0;
 
     const currentMode = modeRef.current;
 
+    // โหมดเพิ่มฉาก (Add Node Mode) - ดักจับการคลิกทับโหนดเดิม
+    if (currentMode === "add-node") {
+      evt?.stopPropagation?.();
+      showToast("ตำแหน่งนี้มีฉากอยู่แล้ว กรุณาคลิกเลือกตำแหน่งว่างบน Canvas เพื่อวางฉากใหม่ค่ะ", "warn");
+      return;
+    }
+
     // โหมดลบฉาก (Delete Mode)
     if (currentMode === "delete") {
       setSceneToDelete(node);
@@ -2899,14 +3062,14 @@ let orphanCounter = 0;
     if (interactionMode === "add-node") {
       return (
         <span>
-          ✚ <strong>โหมดเพิ่มฉาก:</strong> คลิกตรงพื้นที่ว่างเปล่าใดก็ได้บนบอร์ดแผนภาพเพื่อวางโหนด <strong>ฉากใหม่</strong>
+          ✚ <strong>โหมดเพิ่มฉาก:</strong> คลิกตรงพื้นที่ว่างเปล่าใดก็ได้บนบอร์ดแผนภาพเพื่อวางโหนด <strong>ฉากใหม่</strong> (กด Esc หรือคลิกปุ่มเพิ่มอีกครั้งเพื่อยกเลิก)
         </span>
       );
     }
     if (interactionMode === "delete") {
       return (
         <span style={{ color: "#ef4444" }}>
-          🗑️ <strong>โหมดลบ:</strong> คลิกเลือกโหนดฉากเพื่อลบ
+          🗑️ <strong>โหมดลบ:</strong> คลิกเลือกโหนดฉากหรือเส้นเชื่อมเพื่อลบ (กด Esc หรือคลิกปุ่มลบอีกครั้งเพื่อยกเลิก)
         </span>
       );
     }
@@ -2925,7 +3088,7 @@ let orphanCounter = 0;
     return (
       <div className="wst-page">
         <div className="wst-loading-state">
-          <p className="wst-error-text">⚠️ {error}</p>
+          <p className="wst-error-text">⚠️ {typeof error === "object" && error !== null ? (error.message || error.error || JSON.stringify(error)) : String(error || "")}</p>
           <button className="wst-error-button" type="button" onClick={fetchStoryTreeAndChapters}>
             ลองโหลดใหม่อีกครั้ง
           </button>
@@ -2940,7 +3103,11 @@ let orphanCounter = 0;
       {toast && (
         <div className={`wst-toast ${toast.type}`}>
           <i className={`ti ti-${toast.type === "success" ? "check-circle" : toast.type === "warn" ? "alert-circle" : "info-circle"}`} />
-          <span>{toast.message}</span>
+          <span>
+            {typeof toast.message === "object" && toast.message !== null
+              ? (toast.message.message || toast.message.error?.message || toast.message.error || JSON.stringify(toast.message))
+              : String(toast.message ?? "")}
+          </span>
         </div>
       )}
 
@@ -3302,11 +3469,11 @@ let orphanCounter = 0;
                 <span>เพิ่ม</span>
               </button>
               <button 
-                title="คลิกเลือกโหนดฉากเพื่อลบ" 
+                title="ลบฉากหรือเส้นเชื่อม" 
                 className={`wst-toolbar-btn ${interactionMode==='delete' ? 'wst-toolbar-btn--delete-active':''}`}
                 onClick={() => changeMode(interactionMode === 'delete' ? 'select' : 'delete')}
               >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18M8 6V4h8v2M10 11v6M14 11v6M5 6l1 13a1 1 0 001 1h10a1 1 0 001-1l1-13"/></svg>
+                <Trash2 size={18} />
                 <span>ลบ</span>
               </button>
               <button 
@@ -3472,7 +3639,17 @@ let orphanCounter = 0;
               ) : (
                 <select 
                   value={selectedMoveChapterId}
-                  onChange={(e) => setSelectedMoveChapterId(e.target.value)}
+                  onChange={(e) => {
+                    const nextChId = e.target.value;
+                    setSelectedMoveChapterId(nextChId);
+                    // หากยังไม่ได้พิมพ์ชื่อเอง หรือชื่อเดิมเป็น "ฉากที่ X" ให้ช่วยคำนวณชื่อเริ่มต้นของตอนใหม่ให้ทันที
+                    if (!newSceneTitle.trim() || newSceneTitle.startsWith("ฉากที่ ")) {
+                      const scenesInNextCh = rfNodes.filter(
+                        (n) => String(n.data?.chapterId ?? n.data?.ChapterID ?? n.data?.chapter_id) === String(nextChId)
+                      );
+                      setNewSceneTitle(`ฉากที่ ${scenesInNextCh.length + 1}`);
+                    }
+                  }}
                   style={{
                     width: '100%', padding: '12px 16px', borderRadius: '12px',
                     border: '1.5px solid #bfdbfe', fontSize: '14.5px', fontFamily: 'inherit',
@@ -3507,15 +3684,15 @@ let orphanCounter = 0;
                 ยกเลิก
               </button>
               <button 
-                disabled={novelChapters.length === 0 || !newSceneTitle.trim()}
+                disabled={novelChapters.length === 0}
                 onClick={handleAddSceneBackend}
                 style={{
                   padding: '10px 24px', borderRadius: '20px', border: 'none',
                   background: 'linear-gradient(135deg, #1d4ed8 0%, #1e3a8a 100%)',
-                  color: '#ffffff', cursor: (novelChapters.length === 0 || !newSceneTitle.trim()) ? 'not-allowed' : 'pointer',
+                  color: '#ffffff', cursor: novelChapters.length === 0 ? 'not-allowed' : 'pointer',
                   fontSize: '14px', fontWeight: '700', transition: 'all 0.2s',
                   boxShadow: '0 4px 12px rgba(29, 78, 216, 0.25)',
-                  opacity: (novelChapters.length === 0 || !newSceneTitle.trim()) ? 0.5 : 1
+                  opacity: novelChapters.length === 0 ? 0.5 : 1
                 }}
               >
                 ตกลงสร้างฉาก

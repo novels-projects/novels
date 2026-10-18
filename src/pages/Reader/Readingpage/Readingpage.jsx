@@ -60,6 +60,8 @@ const ReadingPage = ({
   };
 
   const getCurrentUserId = () => {
+    const token = localStorage.getItem("token");
+    if (!token) return 0;
     const userJson = localStorage.getItem("user");
     if (!userJson) return 0;
     try {
@@ -72,6 +74,8 @@ const ReadingPage = ({
   };
 
   const checkIsAdmin = () => {
+    const token = localStorage.getItem("token");
+    if (!token) return false;
     try {
       const userJson = localStorage.getItem("user");
       if (userJson) {
@@ -81,7 +85,6 @@ const ReadingPage = ({
       }
     } catch {}
     try {
-      const token = localStorage.getItem("token");
       if (token) {
         const parts = token.split(".");
         if (parts.length === 3) {
@@ -103,7 +106,11 @@ const ReadingPage = ({
   // เดิม checkIsAdmin()/getCurrentUserId() ถูกเรียกตรงๆ ทุก render (parse JSON + decode JWT
   // ซ้ำทุกครั้งที่ state ไหนๆ ในหน้าเปลี่ยน) ครอบด้วย useMemo ให้คำนวณใหม่เฉพาะตอน mount
   const isAdmin = useMemo(() => checkIsAdmin(), []);
-  const effectiveUserId = useMemo(() => getCurrentUserId() || userId, [userId]);
+  const effectiveUserId = useMemo(() => {
+    const token = localStorage.getItem("token");
+    if (!token) return 0;
+    return getCurrentUserId() || userId || 0;
+  }, [userId]);
 
   const [currentSceneId, setCurrentSceneId] = useState(initialSceneId || sceneId || null);
   const [sceneData, setSceneData] = useState(null);

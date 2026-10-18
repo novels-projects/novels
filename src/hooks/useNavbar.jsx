@@ -85,7 +85,7 @@ export function useAuthUser() {
                 }).catch(() => {});
             }
         } finally {
-            ["token", "refresh_token", "user", "user_email", "selectedNovel"].forEach((k) =>
+            ["token", "refresh_token", "user", "user_id", "user_email", "selectedNovel", "local_following_writers"].forEach((k) =>
                 localStorage.removeItem(k)
             );
             setIsLoggedIn(false);

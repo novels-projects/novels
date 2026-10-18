@@ -379,6 +379,12 @@ const HomePage = ({ onNavigate }) => {
 
   useEffect(() => {
     if (!featuredWriter?.id) return;
+    const token = localStorage.getItem("token");
+    if (!token) {
+      setIsFollowed(false);
+      setFollowerOffset(0);
+      return;
+    }
     try {
       const saved = localStorage.getItem("local_following_writers");
       const list = saved ? JSON.parse(saved) : [];

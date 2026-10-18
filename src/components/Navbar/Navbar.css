@@ -285,18 +285,41 @@
   background: #f8fafc;
   border: 1.5px solid #e5e7eb;
   border-radius: 999px;
-  padding: 0 14px;
+  padding: 0 10px 0 14px;
   height: 40px;
   width: 210px;
   box-sizing: border-box;
   transition: all 0.2s ease;
 }
 
-.navbar__search--focused {
+.navbar__search--focused,
+.navbar__search:focus-within {
   border-color: var(--pink-500);
   background: #ffffff;
   box-shadow: 0 0 0 4px rgba(236, 72, 153, .08);
-  width: 240px;
+  width: 260px;
+}
+
+.navbar__search--has-value {
+  width: 260px;
+}
+
+.navbar__search-icon-btn {
+  background: transparent;
+  border: none;
+  padding: 0;
+  margin: 0;
+  outline: none !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #94a3b8;
+  flex-shrink: 0;
+}
+
+.navbar__search-icon-btn:focus-visible {
+  outline: none !important;
 }
 
 .navbar__search-icon {
@@ -308,14 +331,16 @@
   transition: color 0.18s;
 }
 
-.navbar__search--focused .navbar__search-icon {
+.navbar__search--focused .navbar__search-icon,
+.navbar__search:focus-within .navbar__search-icon {
   color: var(--pink-500);
 }
 
 .navbar__search-input {
-  border: none;
-  background: transparent;
-  outline: none;
+  border: none !important;
+  background: transparent !important;
+  outline: none !important;
+  box-shadow: none !important;
   font-family: 'Sarabun', sans-serif;
   font-size: 14px;
   color: #1e293b;
@@ -330,11 +355,78 @@
   appearance: none;
 }
 
+.navbar__search-input:focus,
+.navbar__search-input:focus-visible {
+  outline: none !important;
+  outline-offset: 0 !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
 .navbar__search-input::-webkit-search-decoration,
 .navbar__search-input::-webkit-search-cancel-button,
 .navbar__search-input::-webkit-search-results-button,
 .navbar__search-input::-webkit-search-results-decoration {
-  -webkit-appearance: none;
+  -webkit-appearance: none !important;
+  display: none !important;
+}
+
+/* ── Search Actions Group (กากบาท | ค้นหา) ── */
+.navbar__search-actions {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.navbar__search-action-btn {
+  background: transparent;
+  border: none;
+  outline: none !important;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border-radius: 50%;
+  transition: all 0.18s ease;
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  color: #94a3b8;
+}
+
+.navbar__search-action-btn:focus-visible {
+  outline: none !important;
+  box-shadow: 0 0 0 2px rgba(236, 72, 153, 0.2);
+}
+
+.navbar__search-clear-btn {
+  color: #94a3b8;
+}
+
+.navbar__search-clear-btn:hover {
+  color: #e11d48;
+  background-color: #ffe4e6;
+}
+
+.navbar__search-submit-btn {
+  color: var(--pink-500, #ec4899);
+}
+
+.navbar__search-submit-btn:hover {
+  color: #be185d;
+  background-color: rgba(236, 72, 153, 0.12);
+}
+
+.navbar__search-divider {
+  display: inline-block;
+  width: 1px;
+  height: 14px;
+  background-color: #cbd5e1;
+  margin: 0 2px;
+  flex-shrink: 0;
 }
 
 /* SEARCH OVERLAY DROPDOWN */
@@ -1075,6 +1167,10 @@
   .navbar__search {
     width: 165px;
   }
+  .navbar__search--focused,
+  .navbar__search--has-value {
+    width: 230px;
+  }
   .nav-switch-btn {
     padding: 6px 12px;
     font-size: 12px;
@@ -1121,11 +1217,12 @@
   .navbar__search {
     width: 160px;
     height: 38px;
-    padding: 0 12px;
+    padding: 0 10px 0 12px;
   }
 
-  .navbar__search--focused {
-    width: 200px;
+  .navbar__search--focused,
+  .navbar__search--has-value {
+    width: 215px;
   }
 
   .selected-novel-btn {
@@ -1174,15 +1271,16 @@
   .navbar__search {
     width: 135px;
     height: 36px;
-    padding: 0 10px;
+    padding: 0 8px 0 10px;
   }
 
   .navbar__search-input {
     font-size: 13px;
   }
 
-  .navbar__search--focused {
-    width: 170px;
+  .navbar__search--focused,
+  .navbar__search--has-value {
+    width: 195px;
   }
 
   .selected-novel-btn {
@@ -1244,7 +1342,7 @@
   .navbar__search {
     width: 96px;
     height: 34px;
-    padding: 0 8px;
+    padding: 0 6px 0 8px;
     gap: 4px;
   }
 
@@ -1252,8 +1350,23 @@
     font-size: 12px;
   }
 
-  .navbar__search--focused {
-    width: 130px;
+  .navbar__search--focused,
+  .navbar__search--has-value {
+    width: 160px;
+  }
+
+  .navbar__search--has-value .navbar__search-icon-btn {
+    display: none;
+  }
+
+  .navbar__search-action-btn {
+    width: 20px;
+    height: 20px;
+  }
+
+  .navbar__search-divider {
+    height: 12px;
+    margin: 0 1px;
   }
 
   .selected-novel-btn {
@@ -1304,11 +1417,12 @@
   .navbar__search {
     width: 80px;
     height: 32px;
-    padding: 0 6px;
+    padding: 0 5px 0 6px;
   }
 
-  .navbar__search--focused {
-    width: 115px;
+  .navbar__search--focused,
+  .navbar__search--has-value {
+    width: 145px;
   }
 
   .selected-novel-btn {

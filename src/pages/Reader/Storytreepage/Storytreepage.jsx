@@ -235,6 +235,8 @@ const StoryTreeInner = ({ activeNovelId, effectiveUserId, onNavigate }) => {
   const navigate = useNavigate();
 
   const checkIsAdmin = () => {
+    const token = localStorage.getItem("token");
+    if (!token) return false;
     try {
       const userJson = localStorage.getItem("user");
       if (userJson) {
@@ -244,7 +246,6 @@ const StoryTreeInner = ({ activeNovelId, effectiveUserId, onNavigate }) => {
       }
     } catch {}
     try {
-      const token = localStorage.getItem("token");
       if (token) {
         const parts = token.split(".");
         if (parts.length === 3) {
@@ -633,6 +634,21 @@ const StoryTreeInner = ({ activeNovelId, effectiveUserId, onNavigate }) => {
   }, [computedNodes]);
 
   const endingsForModal = useMemo(() => {
+    const token = localStorage.getItem("token");
+    if (!token || !effectiveUserId) {
+      // 🟢 Guest mode: ห้ามแสดงฉากจบที่ปลดล็อกในบัญชีส่วนตัว (is_unlocked เป็น false ทั้งหมด)
+      const rawList = (endings && endings.length > 0) ? endings : (treeData?.endings || treeData?.ending_list || []);
+      return rawList.map((item) => ({
+        ...item,
+        id: item.id || item.ending_id,
+        scene_id: item.scene_id || item.sceneId || item.id,
+        title: item.title || item.ending_title || item.name || "ฉากจบ",
+        description: stripHtml(item.description || item.ending_description || item.summary || item.content || ""),
+        type: item.type || item.ending_type || "ending",
+        is_unlocked: false,
+      }));
+    }
+
     if (endings && endings.length > 0) {
       return endings;
     }
@@ -645,9 +661,9 @@ const StoryTreeInner = ({ activeNovelId, effectiveUserId, onNavigate }) => {
       title: item.title || item.ending_title || item.name || "ฉากจบ",
       description: stripHtml(item.description || item.ending_description || item.summary || item.content || ""),
       type: item.type || item.ending_type || "ending",
-      is_unlocked: item.is_unlocked ?? item.unlocked ?? true,
+      is_unlocked: Boolean(item.is_unlocked || item.unlocked),
     }));
-  }, [endings, treeData]);
+  }, [endings, treeData, effectiveUserId]);
 
   const handleFocusCurrent = useCallback(() => {
     if (!nodesInitialized) return;
@@ -1106,6 +1122,8 @@ const StoryTreePage = (props) => {
   const activeNovelId = props.novelId || urlNovelId;
 
   const getCurrentUserId = () => {
+    const token = localStorage.getItem("token");
+    if (!token) return 0;
     const userJson = localStorage.getItem("user");
     if (!userJson) return 0;
     try {
@@ -1116,7 +1134,7 @@ const StoryTreePage = (props) => {
     }
   };
 
-  const effectiveUserId = getCurrentUserId() || props.userId || 0;
+  const effectiveUserId = localStorage.getItem("token") ? (getCurrentUserId() || props.userId || 0) : 0;
 
   return (
     <ReactFlowProvider>

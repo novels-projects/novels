@@ -237,8 +237,8 @@ export default function WriterProfile() {
           console.warn("ดึงรายการนิยายล้มเหลว:", e);
         }
 
-        // 1. ตรวจสอบสถานะการติดตามจากข้อมูล writerData
-        let followingState = Boolean(writerData.is_following || writerData.isFollowing);
+        // 1. ตรวจสอบสถานะการติดตามจากข้อมูล writerData (เฉพาะเมื่อมี token เท่านั้น)
+        let followingState = Boolean(token && (writerData.is_following || writerData.isFollowing));
 
         // 2. ตรวจสอบสถานะการติดตามจาก /api/users/following-writers (ตรงกับหน้านักเขียนที่ติดตามและหน้ารายละเอียดนิยาย)
         if (!followingState && token && !computedIsOwner) {
@@ -268,8 +268,8 @@ export default function WriterProfile() {
           }
         }
 
-        // 3. ตรวจสอบสถานะการติดตามจาก local_following_writers ใน localStorage (ตรงกับหน้ารายละเอียดนิยายและหน้านักเขียนที่ติดตาม)
-        if (!followingState && !computedIsOwner) {
+        // 3. ตรวจสอบสถานะการติดตามจาก local_following_writers ใน localStorage (เฉพาะผู้ใช้ที่เข้าสู่ระบบแล้ว)
+        if (token && !followingState && !computedIsOwner) {
           try {
             const localSaved = localStorage.getItem("local_following_writers");
             const list = localSaved ? JSON.parse(localSaved) : [];

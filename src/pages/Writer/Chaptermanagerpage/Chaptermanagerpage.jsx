@@ -762,62 +762,101 @@ const NovelBanner = ({ novel, chapters, onEdit, onToggleStatus, isUpdatingNovelS
       </div>
 
       {!isPublishedNovel && !isCompletedNovel && (
-        <div
-          className="cm-banner__draft-note w-full mt-0"
-          style={{
-            width: '100%',
-            maxWidth: '100%',
-            margin: '0',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: '12px',
-            flexWrap: 'wrap'
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span>✨</span>
-            <span>นิยายยังเป็นฉบับร่าง — ผู้เขียนและผู้ดูแลเท่านั้นที่เห็นเรื่องนี้ และทุกตอนจะยังไม่แสดงให้ผู้อ่านเห็น</span>
-          </div>
-          <button
-            type="button"
-            onClick={() => {
-              if (statusInfo.isBanned) {
-                alert(BAN_ACTION_BLOCKED_MSG);
-                return;
-              }
-              onToggleStatus("published");
-            }}
-            disabled={isUpdatingNovelStatus || statusInfo.isBanned}
+        statusInfo.isBanned ? (
+          <div
+            className="cm-banner__draft-note cm-banner__draft-note--banned w-full mt-0"
             style={{
-              backgroundColor: '#16a34a',
-              color: '#ffffff',
-              border: 'none',
-              padding: '6px 16px',
-              borderRadius: '9999px',
-              fontSize: '12.5px',
-              fontWeight: '700',
-              fontFamily: "'Sarabun', sans-serif",
-              cursor: (isUpdatingNovelStatus || statusInfo.isBanned) ? 'not-allowed' : 'pointer',
-              boxShadow: '0 2px 6px rgba(22, 163, 74, 0.2)',
-              display: 'inline-flex',
+              width: '100%',
+              maxWidth: '100%',
+              margin: '0',
+              display: 'flex',
               alignItems: 'center',
-              gap: '6px',
-              transition: 'all 0.2s ease',
-              whiteSpace: 'nowrap',
-              flexShrink: 0,
-            }}
-            onMouseOver={(e) => {
-              if (!isUpdatingNovelStatus && !statusInfo.isBanned) e.currentTarget.style.backgroundColor = '#15803d';
-            }}
-            onMouseOut={(e) => {
-              if (!isUpdatingNovelStatus && !statusInfo.isBanned) e.currentTarget.style.backgroundColor = '#16a34a';
+              justifyContent: 'space-between',
+              gap: '12px',
+              flexWrap: 'wrap',
+              backgroundColor: '#fff1f2',
+              border: '1.5px solid #fecdd3',
+              borderRadius: '12px',
+              padding: '10px 16px',
+              color: '#9f1239'
             }}
           >
-            <Check size={14} strokeWidth={2.5} />
-            <span>{isUpdatingNovelStatus ? "กำลังเผยแพร่..." : "เผยแพร่นิยาย"}</span>
-          </button>
-        </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '16px' }}>⚠️</span>
+              <span style={{ fontWeight: '700', fontSize: '13.5px', fontFamily: "'Sarabun', sans-serif" }}>
+                นิยายโดนแบน จึงไม่สามารถเผยแพร่ได้จนกว่าจะแก้ไขให้ถูกต้องตามเงื่อนไข
+              </span>
+            </div>
+            <span
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '6px 14px',
+                borderRadius: '9999px',
+                fontSize: '12px',
+                fontWeight: '700',
+                fontFamily: "'Sarabun', sans-serif",
+                backgroundColor: '#ffe4e6',
+                color: '#e11d48',
+                border: '1px solid #fda4af'
+              }}
+            >
+              🔒 ระงับการเผยแพร่
+            </span>
+          </div>
+        ) : (
+          <div
+            className="cm-banner__draft-note w-full mt-0"
+            style={{
+              width: '100%',
+              maxWidth: '100%',
+              margin: '0',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '12px',
+              flexWrap: 'wrap'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span>✨</span>
+              <span>นิยายยังเป็นฉบับร่าง — ผู้เขียนและผู้ดูแลเท่านั้นที่เห็นเรื่องนี้ และทุกตอนจะยังไม่แสดงให้ผู้อ่านเห็น</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => onToggleStatus("published")}
+              disabled={isUpdatingNovelStatus}
+              style={{
+                backgroundColor: '#16a34a',
+                color: '#ffffff',
+                border: 'none',
+                padding: '6px 16px',
+                borderRadius: '9999px',
+                fontSize: '12.5px',
+                fontWeight: '700',
+                fontFamily: "'Sarabun', sans-serif",
+                cursor: isUpdatingNovelStatus ? 'not-allowed' : 'pointer',
+                boxShadow: '0 2px 6px rgba(22, 163, 74, 0.2)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                transition: 'all 0.2s ease',
+                whiteSpace: 'nowrap',
+                flexShrink: 0,
+              }}
+              onMouseOver={(e) => {
+                if (!isUpdatingNovelStatus) e.currentTarget.style.backgroundColor = '#15803d';
+              }}
+              onMouseOut={(e) => {
+                if (!isUpdatingNovelStatus) e.currentTarget.style.backgroundColor = '#16a34a';
+              }}
+            >
+              <Check size={14} strokeWidth={2.5} />
+              <span>{isUpdatingNovelStatus ? "กำลังเผยแพร่..." : "เผยแพร่นิยาย"}</span>
+            </button>
+          </div>
+        )
       )}
     </div>
   );
@@ -1467,10 +1506,6 @@ const SceneCard = ({
   };
 
   const handleCreateSceneFromChoice = async ({ title, chapterId: targetChapterId }) => {
-    if (isNovelBanned) {
-      throw new Error("นิยายถูกระงับ ไม่สามารถเพิ่มฉากได้");
-    }
-
     const authToken = getToken();
     if (!authToken) throw new Error("กรุณาเข้าสู่ระบบก่อนเพิ่มฉาก");
 
@@ -1602,7 +1637,10 @@ const SceneCard = ({
   const handleToggleSceneStatus = async (e) => {
     const nextStatus = e.target.value;
     if (nextStatus === sceneStatus) return;
-    if (isNovelBanned) { alert(BAN_ACTION_BLOCKED_MSG); return; } // ⛔ ห้ามเผยแพร่ฉาก ถ้านิยายถูกแบน
+    if (isNovelBanned && nextStatus === "published") {
+      alert("นิยายโดนแบน จึงไม่สามารถเผยแพร่ฉากได้จนกว่าจะแก้ไขให้ถูกต้องตามเงื่อนไขค่ะ");
+      return;
+    }
     setIsUpdatingSceneStatus(true);
 
     try {
@@ -1748,10 +1786,10 @@ const SceneCard = ({
           {/* Dropdown เปลี่ยนสถานะการเผยแพร่ */}
           <PillStatusDropdown
             value={sceneStatus}
-            disabled={isUpdatingSceneStatus || isNovelBanned}
+            disabled={isUpdatingSceneStatus || (isNovelBanned && !isPublishedScene)}
             onChange={(newVal) => {
-              if (isNovelBanned) {
-                alert(BAN_ACTION_BLOCKED_MSG);
+              if (isNovelBanned && newVal === "published") {
+                alert("นิยายโดนแบน จึงไม่สามารถเผยแพร่ฉากได้จนกว่าจะแก้ไขให้ถูกต้องตามเงื่อนไขค่ะ");
                 return;
               }
               handleToggleSceneStatus({ target: { value: newVal } });
@@ -2203,10 +2241,14 @@ const ChapterPanel = ({
   };
 
   const handleToggleStatus = async () => {
-    if (blockIfBanned(novel)) return; // ⛔ ห้ามเปลี่ยนสถานะเผยแพร่ของตอน ถ้านิยายถูกแบน
     const currentStatus = (chapter?.status || chapter?.Status || "draft").toString().toLowerCase();
     const isPublishedChapter = currentStatus === "published" || currentStatus === "active";
     const nextStatus = isPublishedChapter ? "draft" : "published";
+
+    if (isNovelBanned && nextStatus === "published") {
+      alert("นิยายโดนแบน จึงไม่สามารถเผยแพร่ตอนได้จนกว่าจะแก้ไขให้ถูกต้องตามเงื่อนไขค่ะ");
+      return;
+    }
 
     setIsUpdatingStatus(true);
     try {
@@ -2281,11 +2323,15 @@ const ChapterPanel = ({
   };
 
   const handleUpdateChapterStatus = async (nextStatus) => {
-    if (blockIfBanned(novel)) return;
     const currentStatus = (chapter?.status || chapter?.Status || "draft").toString().toLowerCase();
     const targetStatus = nextStatus === "published" ? "published" : "draft";
 
     if (currentStatus === targetStatus) return;
+
+    if (isNovelBanned && targetStatus === "published") {
+      alert("นิยายโดนแบน จึงไม่สามารถเผยแพร่ตอนได้จนกว่าจะแก้ไขให้ถูกต้องตามเงื่อนไขค่ะ");
+      return;
+    }
 
     setIsUpdatingStatus(true);
     try {
@@ -2360,6 +2406,10 @@ const ChapterPanel = ({
   };
 
   const handlePublishAllScenes = async () => {
+    if (isNovelBanned) {
+      alert("นิยายโดนแบน จึงไม่สามารถเผยแพร่ฉากได้จนกว่าจะแก้ไขให้ถูกต้องตามเงื่อนไขค่ะ");
+      return;
+    }
     const scenesList = chapter?.scenes || [];
     const draftScenes = scenesList.filter(s => {
       const status = (s.status || "draft").toString().toLowerCase();
@@ -2569,10 +2619,10 @@ const ChapterPanel = ({
             {/* 1. Dropdown เปลี่ยนสถานะเผยแพร่/ฉบับร่าง */}
             <PillStatusDropdown
               value={isChapterDraft ? "draft" : "published"}
-              disabled={isUpdatingStatus || isNovelBanned}
+              disabled={isUpdatingStatus || (isNovelBanned && isChapterDraft)}
               onChange={(newVal) => {
-                if (isNovelBanned) {
-                  alert(BAN_ACTION_BLOCKED_MSG);
+                if (isNovelBanned && newVal === "published") {
+                  alert("นิยายโดนแบน จึงไม่สามารถเผยแพร่ตอนได้จนกว่าจะแก้ไขให้ถูกต้องตามเงื่อนไขค่ะ");
                   return;
                 }
                 handleUpdateChapterStatus(newVal);
@@ -2703,8 +2753,6 @@ const ChapterPanel = ({
         
         <button
           onClick={() => onAddScene && onAddScene(chapterId)}
-          disabled={isNovelBanned}
-          title={isNovelBanned ? BAN_ACTION_BLOCKED_MSG : undefined}
           style={{
             backgroundColor: '#ec4899',
             color: '#ffffff',
@@ -2713,7 +2761,7 @@ const ChapterPanel = ({
             borderRadius: '20px',
             fontSize: '14px',
             fontWeight: '700',
-            cursor: isNovelBanned ? 'not-allowed' : 'pointer',
+            cursor: 'pointer',
             marginLeft: '16px',
             display: 'inline-flex',
             alignItems: 'center',
@@ -2721,8 +2769,8 @@ const ChapterPanel = ({
             transition: 'all 0.2s ease',
             outline: 'none'
           }}
-          onMouseOver={(e) => { if(!isNovelBanned) e.currentTarget.style.backgroundColor = '#db2777'; }}
-          onMouseOut={(e) => { if(!isNovelBanned) e.currentTarget.style.backgroundColor = '#ec4899'; }}
+          onMouseOver={(e) => { e.currentTarget.style.backgroundColor = '#db2777'; }}
+          onMouseOut={(e) => { e.currentTarget.style.backgroundColor = '#ec4899'; }}
         >
           <span style={{ fontSize: '16px', fontWeight: '800' }}>+</span> เพิ่มฉาก
         </button>
@@ -2906,7 +2954,6 @@ const ChapterManagerPage = ({ onNavigate, novelId }) => {
             cover_image: normalized.cover_image || normalized.coverImage || null,
           };
           localStorage.setItem("selectedNovel", JSON.stringify(selObj));
-          window.dispatchEvent(new Event("storage"));
           window.dispatchEvent(new Event("novel-selected"));
         } catch (e) {}
       }
@@ -3035,11 +3082,7 @@ const ChapterManagerPage = ({ onNavigate, novelId }) => {
 
   const handleAddChapter = async () => {
     if (!currentNovelId) return;
-    const statusInfo = getNovelStatusInfo(novel);
-    if (statusInfo.isBanned) {
-      alert('นิยายถูกระงับ ไม่สามารถเพิ่มตอนได้');
-      return;
-    }
+    const isBanned = getNovelStatusInfo(novel).isBanned;
     setIsSubmittingChapter(true);
     try {
       const episodeNumber = (chapters?.length || 0) + 1;
@@ -3048,7 +3091,7 @@ const ChapterManagerPage = ({ onNavigate, novelId }) => {
         novel_id: Number(currentNovelId),
         episode: episodeNumber,
         title,
-        status: draftChapterStatus || "draft"
+        status: isBanned ? "draft" : (draftChapterStatus || "draft")
       };
 
       const authToken = getToken();
@@ -3112,10 +3155,6 @@ const ChapterManagerPage = ({ onNavigate, novelId }) => {
 
   const handleAddScene = (chapterId) => {
     if (!chapterId) return;
-    if (getNovelStatusInfo(novel).isBanned) {
-      alert('นิยายถูกระงับ ไม่สามารถเพิ่มฉากได้');
-      return;
-    }
     setCreateSceneChapterId(chapterId);
     setNewSceneTitle("");
     setCreateSceneError("");
@@ -3391,10 +3430,6 @@ const ChapterManagerPage = ({ onNavigate, novelId }) => {
 
   const handleDeleteChapter = async (chapterId) => {
     if (!chapterId) return;
-    if (getNovelStatusInfo(novel).isBanned) {
-      alert('นิยายถูกระงับ ไม่สามารถลบตอนได้');
-      return;
-    }
     openConfirmDialog({
       title: "ยืนยันการลบตอน",
       message: "การกระทำนี้จะลบฉากทั้งหมดในตอนนี้ด้วย",
@@ -3520,7 +3555,6 @@ const ChapterManagerPage = ({ onNavigate, novelId }) => {
           <button 
             className="cm-sidebar__add" 
             onClick={openCreateChapterForm} 
-            disabled={getNovelStatusInfo(novel).isBanned}
             style={{
               display: "flex",
               alignItems: "center",
@@ -3920,7 +3954,6 @@ const ChapterManagerPage = ({ onNavigate, novelId }) => {
             </p>
             <button
               onClick={openCreateChapterForm}
-              disabled={getNovelStatusInfo(novel).isBanned}
               style={{
                 background: 'linear-gradient(135deg, #db2777 0%, #be185d 100%)',
                 color: '#ffffff',
@@ -3992,22 +4025,28 @@ const ChapterManagerPage = ({ onNavigate, novelId }) => {
               />
               
               <label style={{ display: "block", marginTop: "12px", marginBottom: "6px", fontSize: "13px", fontWeight: "700", color: "#475569" }}>สถานะตอนแรกเริ่ม</label>
-              <select
-                className="cm-select"
-                value={draftChapterStatus}
-                onChange={(e) => setDraftChapterStatus(e.target.value)}
-                style={{
-                  width: "100%",
-                  padding: "10px 12px",
-                  borderRadius: "8px",
-                  border: "1.5px solid #cbd5e1",
-                  fontSize: "14px",
-                  background: "#ffffff"
-                }}
-              >
-                <option value="draft">ฉบับร่าง (Draft)</option>
-                <option value="published">เผยแพร่เลย (Published)</option>
-              </select>
+              {getNovelStatusInfo(novel).isBanned ? (
+                <div style={{ fontSize: '13px', color: '#991b1b', background: '#fef2f2', padding: '10px 12px', borderRadius: '8px', border: '1px solid #fee2e2', lineHeight: 1.5 }}>
+                  🔒 นิยายอยู่ในสถานะระงับการเผยแพร่ ตอนใหม่จะถูกสร้างเป็น <strong>ฉบับร่าง</strong> อัตโนมัติ
+                </div>
+              ) : (
+                <select
+                  className="cm-select"
+                  value={draftChapterStatus}
+                  onChange={(e) => setDraftChapterStatus(e.target.value)}
+                  style={{
+                    width: "100%",
+                    padding: "10px 12px",
+                    borderRadius: "8px",
+                    border: "1.5px solid #cbd5e1",
+                    fontSize: "14px",
+                    background: "#ffffff"
+                  }}
+                >
+                  <option value="draft">ฉบับร่าง (Draft)</option>
+                  <option value="published">เผยแพร่เลย (Published)</option>
+                </select>
+              )}
             </div>
 
             <div className="se-modal-actions" style={{ display: "flex", gap: "10px", width: "100%" }}>

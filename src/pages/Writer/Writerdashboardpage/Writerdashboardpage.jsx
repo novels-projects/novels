@@ -138,7 +138,6 @@ const WriterDashboardPage = ({ onNavigate, onSelectNovel }) => {
 
   const handleEdit = (novelObj) => {
     localStorage.setItem("selectedNovel", JSON.stringify(novelObj));
-    window.dispatchEvent(new Event("storage"));
     window.dispatchEvent(new Event("novel-selected"));
     const id = novelObj.id || novelObj.novel_id;
     onNavigate("chapters", { novelId: id });
@@ -146,7 +145,6 @@ const WriterDashboardPage = ({ onNavigate, onSelectNovel }) => {
 
   const handleTree = (novelObj) => {
     localStorage.setItem("selectedNovel", JSON.stringify(novelObj));
-    window.dispatchEvent(new Event("storage"));
     window.dispatchEvent(new Event("novel-selected"));
     const id = novelObj.id || novelObj.novel_id;
     onNavigate("story-tree", { novelId: id });
@@ -154,7 +152,6 @@ const WriterDashboardPage = ({ onNavigate, onSelectNovel }) => {
 
   const handleAnalytics = (novelObj) => {
     localStorage.setItem("selectedNovel", JSON.stringify(novelObj));
-    window.dispatchEvent(new Event("storage"));
     window.dispatchEvent(new Event("novel-selected"));
     const id = novelObj.id || novelObj.novel_id;
     onNavigate("analytics", { novelId: id });

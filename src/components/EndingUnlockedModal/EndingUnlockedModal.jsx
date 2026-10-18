@@ -141,9 +141,27 @@ export default function EndingUnlockedModal({
   useEffect(() => {
     if (!isOpen || !novelId || !currentScene) return;
 
+    const token = localStorage.getItem("token");
+    const userId = (() => {
+      if (!token) return 0;
+      try {
+        const u = JSON.parse(localStorage.getItem("user") || "{}");
+        return u?.id || u?.user_id || 0;
+      } catch {
+        return 0;
+      }
+    })();
+
+    // 🟢 ถ้าเป็น Guest ห้ามบันทึกประวัติการปลดล็อกฉากจบลงใน LocalStorage
+    if (!token || !userId) {
+      setIsNewUnlock(false);
+      triggerConfetti();
+      return;
+    }
+
     const sceneId = currentScene.scene_id || currentScene.id;
-    const historyKey = `unlocked_endings_history_${novelId}`;
-    const detailsKey = `unlocked_ending_details_${novelId}`;
+    const historyKey = `unlocked_endings_history_${userId}_${novelId}`;
+    const detailsKey = `unlocked_ending_details_${userId}_${novelId}`;
 
     try {
       const savedHistory = JSON.parse(localStorage.getItem(historyKey) || "[]");
@@ -191,13 +209,26 @@ export default function EndingUnlockedModal({
     const slots = ["good", "bad", "true", "secret"];
     const allEndingsArr = Array.isArray(allNovelEndings) ? allNovelEndings : [];
 
+    const token = localStorage.getItem("token");
+    const userId = (() => {
+      if (!token) return 0;
+      try {
+        const u = JSON.parse(localStorage.getItem("user") || "{}");
+        return u?.id || u?.user_id || 0;
+      } catch {
+        return 0;
+      }
+    })();
+
     let savedDetails = {};
     let savedHistory = [];
-    try {
-      savedDetails = JSON.parse(localStorage.getItem(`unlocked_ending_details_${novelId}`) || "{}");
-      savedHistory = JSON.parse(localStorage.getItem(`unlocked_endings_history_${novelId}`) || "[]");
-    } catch (e) {
-      // ignore
+    if (token && userId) {
+      try {
+        savedDetails = JSON.parse(localStorage.getItem(`unlocked_ending_details_${userId}_${novelId}`) || "{}");
+        savedHistory = JSON.parse(localStorage.getItem(`unlocked_endings_history_${userId}_${novelId}`) || "[]");
+      } catch (e) {
+        // ignore
+      }
     }
 
     return slots.map((typeKey) => {

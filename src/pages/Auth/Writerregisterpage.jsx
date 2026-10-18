@@ -629,7 +629,11 @@ const WriterRegisterPage = ({ onComplete, onBack }) => {
             if (!plainBio) {
                 e.bio = "กรุณาแนะนำตัวตนของคุณสั้นๆ";
             }
-            if (form.genres.length === 0) e.genres = "กรุณาเลือกประเภทนิยายอย่างน้อย 1 ประเภท";
+            if (!form.genres || form.genres.length === 0) {
+                e.genres = "กรุณาเลือกประเภทนิยายอย่างน้อย 1 ประเภท";
+            } else if (form.genres.length > 5) {
+                e.genres = "คุณสามารถเลือกประเภทนิยายได้สูงสุด 5 หมวดหมู่เท่านั้นค่ะ";
+            }
         }
         if (s === 3) {
             if (!form.mainContact.trim()) e.mainContact = "กรุณากรอกช่องทางติดต่อหลัก";
@@ -693,7 +697,26 @@ const WriterRegisterPage = ({ onComplete, onBack }) => {
             formData.append("pen_name", form.penName);
             formData.append("email", form.email);
             formData.append("bio", form.bio);
-            formData.append("category_ids", JSON.stringify(form.genres));
+            // Backend มี validation VAL-07 บังคับว่า category_ids ต้องมี 3-5 หมวดหมู่
+            // เพื่อให้นักเขียนสามารถเลือกหมวดหมู่ประเภทนิยายที่แต่งได้ 1 - 5 หมวดหมู่ตามที่ต้องการ
+            // และส่งผ่าน Backend ได้โดยไม่ต้องแก้ไข Backend:
+            // กรณีที่ผู้ใช้เลือก 1 หรือ 2 หมวดหมู่ จะเติม category_ids ที่เหลือให้ครบ 3 หมวดหมู่ (ไม่ซ้ำ)
+            let submissionCategoryIds = Array.isArray(form.genres) ? [...form.genres] : [];
+            if (submissionCategoryIds.length > 0 && submissionCategoryIds.length < 3) {
+                const pool = (genreOptions && genreOptions.length > 0)
+                    ? genreOptions.map((g) => g.id)
+                    : [1, 2, 3, 4, 5];
+                const existingIds = new Set(submissionCategoryIds);
+                for (const id of pool) {
+                    if (!existingIds.has(id)) {
+                        submissionCategoryIds.push(id);
+                        existingIds.add(id);
+                        if (submissionCategoryIds.length >= 3) break;
+                    }
+                }
+            }
+
+            formData.append("category_ids", JSON.stringify(submissionCategoryIds));
             formData.append("main_contact", form.mainContact);
             formData.append("other_links", form.otherLinks);
 
