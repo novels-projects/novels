@@ -102,7 +102,7 @@ func registerReadingSocialRoutes(mux *http.ServeMux, reading service.ReadingServ
 	mux.Handle("/api/me/following-writers", followingWritersHandler)
 	mux.Handle("/api/v1/users/me/following-writers", followingWritersHandler)
 
-	writersSubHandler := middleware.RequestLogger(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	writerFollowRouter := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/follow") {
 			middleware.RequireNotAdmin(handlers.FollowWriterHandler(social, notificationService)).ServeHTTP(w, r)
 			return
@@ -112,13 +112,20 @@ func registerReadingSocialRoutes(mux *http.ServeMux, reading service.ReadingServ
 			return
 		}
 		http.NotFound(w, r)
-	}))
-	mux.Handle("/api/writers/", writersSubHandler)
-	mux.Handle("/api/v1/writers/", writersSubHandler)
+	})
+	mux.Handle("/api/writers/", middleware.RequestLogger(writerFollowRouter))
 
-	writerSubHandler := middleware.RequestLogger(http.HandlerFunc(writerSubRouter(writer, social)))
-	mux.Handle("/writer/", writerSubHandler)
-	mux.Handle("/writers/", writerSubHandler)
+	writerDetailsRouter := http.HandlerFunc(writerSubRouter(writer, social))
+	writerSubHandler := middleware.RequestLogger(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost && (strings.HasSuffix(r.URL.Path, "/follow") || strings.HasSuffix(r.URL.Path, "/unfollow")) {
+			writerFollowRouter.ServeHTTP(w, r)
+			return
+		}
+		writerDetailsRouter.ServeHTTP(w, r)
+	}))
 	mux.Handle("/api/v1/writers/", writerSubHandler)
+	writerDetailsHandler := middleware.RequestLogger(writerDetailsRouter)
+	mux.Handle("/writer/", writerDetailsHandler)
+	mux.Handle("/writers/", writerDetailsHandler)
 
 }

@@ -32,7 +32,7 @@ func registerCoreRoutes(mux *http.ServeMux, flow service.FlowService, scene serv
 	// ดึงข้อมูลผู้ใช้ปัจจุบัน (ต้องมี Token ที่ถูกต้อง)
 	userInfoHandler := middleware.RequestLogger(middleware.RequireAuth(http.HandlerFunc(authHandler.GetUserInfo)))
 	mux.Handle("/api/users", userInfoHandler)
-	mux.Handle("/api/v1/users/me", userInfoHandler)
+	mux.Handle("GET /api/v1/users/me", userInfoHandler)
 
 	// 🟢 แก้ไขชื่อผู้ใช้ (Username) ของตัวเอง
 	updateOwnUsernameHandler := middleware.RequestLogger(middleware.RequireAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -92,7 +92,7 @@ func registerCoreRoutes(mux *http.ServeMux, flow service.FlowService, scene serv
 	})))
 	mux.Handle("/api/me", deleteOwnAccountHandler)
 	mux.Handle("/me", deleteOwnAccountHandler)
-	mux.Handle("/api/v1/users/me", deleteOwnAccountHandler)
+	mux.Handle("DELETE /api/v1/users/me", deleteOwnAccountHandler)
 
 	// 🟢 พักบัญชีผู้ใช้ (Suspend Account) ของตัวเอง
 	suspendOwnAccountHandler := middleware.RequestLogger(middleware.RequireAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
