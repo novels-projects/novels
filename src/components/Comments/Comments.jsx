@@ -1,22 +1,8 @@
 import React, { useState, useEffect, useMemo } from "react";
+import { formatMinioUrl, getAvatar, saveUserAvatar, saveWriterAvatar, resolveAvatarAsync } from "../../utils/avatarService";
 import "./Comments.css";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
-
-// จัดการแปลง URL รูปภาพ MinIO จาก Docker network ให้เป็น localhost ที่เบราว์เซอร์เปิดได้
-const formatMinioUrl = (url) => {
-  if (!url || typeof url !== "string") return null;
-  const trimmed = url.trim();
-  if (!trimmed) return null;
-  let formatted = trimmed;
-  if (formatted.includes("http://minio:9000")) {
-    formatted = formatted.replace("http://minio:9000", "http://localhost:9000");
-  }
-  if (formatted.startsWith("/")) {
-    formatted = `http://localhost:9000${formatted}`;
-  }
-  return formatted;
-};
 
 // สีพาสเทลสำหรับ avatar คอมเมนต์ — เลือกตามชื่อผู้ใช้แบบ deterministic
 // (คนเดิมจะได้สีเดิมเสมอ ไม่ต้องเก็บ state เพิ่ม)
@@ -90,6 +76,8 @@ const Comments = ({
   subtitle = "แบ่งปันความรู้สึกของคุณได้ที่นี่",
   readOnly = false,
 }) => {
+  const [, setAvatarUpdateTick] = useState(0);
+
   // ดึงข้อมูลผู้ใช้ปัจจุบันจาก prop หรือ localStorage
   const resolvedCurrentUser = useMemo(() => {
     if (currentUser && typeof currentUser === "object") return currentUser;
@@ -100,6 +88,42 @@ const Comments = ({
       return null;
     }
   }, [currentUser]);
+
+  // บันทึกรูปโปรไฟล์ของผู้ใช้ปัจจุบันและผู้แต่งนิยายเข้าสู่ Avatar Registry อัตโนมัติ
+  useEffect(() => {
+    if (resolvedCurrentUser) {
+      saveUserAvatar(resolvedCurrentUser);
+    }
+  }, [resolvedCurrentUser]);
+
+  useEffect(() => {
+    if (novelAuthor) {
+      saveWriterAvatar(novelAuthor);
+    }
+  }, [novelAuthor]);
+
+  // รับฟัง Event การอัปเดตรูปโปรไฟล์ของระบบ เพื่อรีเรนเดอร์คอมเมนต์ทันทีที่รูปโหลดเสร็จ
+  useEffect(() => {
+    const handleAvatarUpdate = () => {
+      setAvatarUpdateTick((prev) => prev + 1);
+    };
+    window.addEventListener("storyverse_avatar_updated", handleAvatarUpdate);
+    return () => window.removeEventListener("storyverse_avatar_updated", handleAvatarUpdate);
+  }, []);
+
+  // วนลูปตรวจสอบและดึงรูปโปรไฟล์ของคอมเมนต์ที่ยังไม่มีรูปในเครื่อง
+  useEffect(() => {
+    if (!Array.isArray(comments) || comments.length === 0) return;
+
+    comments.forEach((c) => {
+      const uid = Number(c.user_id || c.userId || 0);
+      const username = (c.username || c.author || "").trim();
+      const existing = getAvatar({ userId: uid, username, novelId: c.novel_id });
+      if (!existing && (uid || username)) {
+        resolveAvatarAsync({ userId: uid, username, novelId: c.novel_id });
+      }
+    });
+  }, [comments]);
 
   const effectiveUserId = useMemo(() => {
     if (currentUserId && Number(currentUserId) > 0) return Number(currentUserId);
@@ -192,6 +216,18 @@ const Comments = ({
     // 3. ถ้าเป็นคอมเมนต์ของบัญชีที่ล็อกอินอยู่ปัจจุบัน ให้ใช้รูปโปรไฟล์ของตนเอง
     else if (isCurrentUser && currentUserAvatar) {
       resolvedAvatar = currentUserAvatar;
+    }
+    // 4. ดึงรูปโปรไฟล์ของคนอื่นจาก Avatar Registry (รองรับทั้งผู้ใช้งานอื่น และนักเขียนอื่น)
+    else {
+      const regAvatar = getAvatar({
+        userId: uid,
+        username,
+        novelId: c.novel_id,
+        writerId: isAuthor ? (resolvedAuthorWriterId || undefined) : undefined,
+      });
+      if (regAvatar) {
+        resolvedAvatar = regAvatar;
+      }
     }
 
     // ถ้าเคยโหลดภาพนี้ไม่สำเร็จ ให้เคลียร์เป็น null เพื่อใช้ Default Avatar แทน

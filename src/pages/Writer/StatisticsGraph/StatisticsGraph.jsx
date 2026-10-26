@@ -442,8 +442,8 @@ const AnalyticsEdge = ({
     offset: edgeOffset,
   });
 
-  const badgeWidth = 140;
-  const badgeHeight = 24;
+  const badgeWidth = 160;
+  const badgeHeight = 26;
 
   let baseRatio = 0.5;
   if (outCount > 1) {
@@ -518,24 +518,75 @@ const AnalyticsEdge = ({
               style={{
                 backgroundColor: "#ffffff",
                 border: `1.5px solid ${style.stroke || "#64748b"}`,
-                borderRadius: "10px",
-                padding: "4px 10px",
-                fontSize: "0.75rem",
+                borderRadius: "6px",
+                padding: "3px 8px",
+                fontSize: "11px",
                 fontWeight: 700,
                 color: "#1e293b",
                 boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
                 whiteSpace: "nowrap",
-                maxWidth: "260px",
+                maxWidth: `${badgeWidth}px`,
                 overflow: "hidden",
                 textOverflow: "ellipsis",
                 display: "inline-flex",
                 alignItems: "center",
-                justifyContent: "center",
-                textAlign: "center",
+                textAlign: "left",
+                direction: "ltr",
+                boxSizing: "border-box",
+                cursor: "pointer",
+                fontFamily: '"Outfit", "Sarabun", sans-serif',
+                lineHeight: "1.3",
               }}
               title={typeof label === "string" ? label : undefined}
             >
-              {label}
+              {data?.choiceName ? (
+                <>
+                  <span
+                    style={{
+                      display: "inline-block",
+                      maxWidth: data?.pctDisplay ? "calc(100% - 46px)" : "100%",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                      textAlign: "left",
+                      direction: "ltr",
+                      verticalAlign: "middle",
+                    }}
+                  >
+                    {data.choiceName}
+                  </span>
+                  {data?.pctDisplay && (
+                    <span
+                      style={{
+                        marginLeft: "4px",
+                        fontWeight: 700,
+                        color: data?.hasData
+                          ? (data?.pctValue >= 60 ? "#059669" : data?.pctValue >= 30 ? "#d97706" : "#64748b")
+                          : "#64748b",
+                        whiteSpace: "nowrap",
+                        flexShrink: 0,
+                        verticalAlign: "middle",
+                      }}
+                    >
+                      ({data.pctDisplay})
+                    </span>
+                  )}
+                </>
+              ) : (
+                <span
+                  style={{
+                    display: "inline-block",
+                    maxWidth: "100%",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                    textAlign: "left",
+                    direction: "ltr",
+                  }}
+                >
+                  {label}
+                </span>
+              )}
             </div>
           </div>
         </EdgeLabelRenderer>
@@ -677,12 +728,28 @@ function StatisticsGraph() {
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
 
       // Requirement 1 & 2: Send token to all requests including story-tree and new edge analytics
+      // 🔗 เชื่อมต่อ GET /api/v1/novels/:id/story-tree (หรือ /novels/:id/story-tree): ดึงผังโครงสร้าง Story Tree ของนิยาย
+      // 🔗 เชื่อมต่อ GET /api/v1/writer/novels/:id/analytics: ดึงสถิติภาพรวมของนิยายสำหรับนักเขียน
+      // 🔗 เชื่อมต่อ GET /api/v1/writer/novels/:id/analytics/scenes: ดึงสถิติรายฉากทั้งหมดของนิยาย
+      // 🔗 เชื่อมต่อ GET /api/v1/writer/novels/:id/analytics/edges: ดึงสถิติทางเลือกและเส้นทางที่ผู้อ่านเลือก
+      // 🔗 เชื่อมต่อ GET /api/v1/writers/me/novels: ดึงรายการนิยายของนักเขียนที่ล็อกอินอยู่
+      const fetchTreePromise = axios.get(`${API_BASE_URL}/api/v1/novels/${novelId}/story-tree`, { headers, signal: controller.signal })
+        .catch(err => {
+          if (axios.isCancel(err)) throw err;
+          return axios.get(`${API_BASE_URL}/novels/${novelId}/story-tree`, { headers, signal: controller.signal });
+        });
+      const fetchNovelsPromise = axios.get(`${API_BASE_URL}/api/v1/writers/me/novels`, { headers, signal: controller.signal })
+        .catch(err => {
+          if (axios.isCancel(err)) throw err;
+          return axios.get(`${API_BASE_URL}/api/me/novels`, { headers, signal: controller.signal });
+        });
+
       const [treeSettled, analyticsSettled, scenesAnalyticsSettled, edgeAnalyticsSettled, novelsSettled] = await Promise.allSettled([
-        axios.get(`${API_BASE_URL}/novels/${novelId}/story-tree`, { headers, signal: controller.signal }),
+        fetchTreePromise,
         axios.get(`${API_BASE_URL}/api/v1/writer/novels/${novelId}/analytics`, { headers, signal: controller.signal }),
         axios.get(`${API_BASE_URL}/api/v1/writer/novels/${novelId}/analytics/scenes`, { headers, signal: controller.signal }),
         axios.get(`${API_BASE_URL}/api/v1/writer/novels/${novelId}/analytics/edges`, { headers, signal: controller.signal }),
-        axios.get(`${API_BASE_URL}/api/me/novels`, { headers, signal: controller.signal }),
+        fetchNovelsPromise,
       ]);
 
       if (controller.signal.aborted || mainAbortRef.current !== controller) {
@@ -808,6 +875,8 @@ function StatisticsGraph() {
     const headers = token ? { Authorization: `Bearer ${token}` } : {};
 
     try {
+      // 🔗 เชื่อมต่อ GET /api/v1/writer/novels/:id/analytics/scenes/:sceneId: ดึงสถิติจำนวนคนอ่านและยอดเข้าชมของฉากนี้
+      // 🔗 เชื่อมต่อ GET /api/v1/writer/novels/:id/analytics/scenes/:sceneId/choices: ดึงสถิติสัดส่วนการคลิกเลือกทางเลือกแต่ละข้อของฉากนี้
       const [sceneSettled, choiceSettled] = await Promise.allSettled([
         axios.get(
           `${API_BASE_URL}/api/v1/writer/novels/${novelId}/analytics/scenes/${sceneId}`,
@@ -1296,14 +1365,18 @@ function StatisticsGraph() {
       let hasData = false;
       let pctValue = null;
 
+      let pctDisplay = "-";
       if (isEdgeLoading) {
         // API loading -> display "-"
+        pctDisplay = "-";
         edgeLabelDisplay = choiceName ? `${choiceName} (-)` : "-";
       } else if (edgeError) {
         // API error -> display "ไม่มีข้อมูล"
+        pctDisplay = "ไม่มีข้อมูล";
         edgeLabelDisplay = choiceName ? `${choiceName} (ไม่มีข้อมูล)` : "ไม่มีข้อมูล";
       } else if (!matchedEdge) {
         // No edge analytics -> display "-"
+        pctDisplay = "-";
         edgeLabelDisplay = choiceName ? `${choiceName} (-)` : "-";
       } else {
         // Matched edge exists
@@ -1312,6 +1385,7 @@ function StatisticsGraph() {
           hasData = true;
           pctValue = Number(pct);
           const formattedPct = formatPercentage(pctValue);
+          pctDisplay = formattedPct;
           edgeLabelDisplay = choiceName ? `${choiceName} (${formattedPct})` : formattedPct;
 
           if (pctValue >= 60) {
@@ -1325,6 +1399,7 @@ function StatisticsGraph() {
             strokeColor = "#64748B";
           }
         } else {
+          pctDisplay = "-";
           edgeLabelDisplay = choiceName ? `${choiceName} (-)` : "-";
           strokeColor = "#64748B";
           strokeWidth = 2.0;
@@ -1356,7 +1431,10 @@ function StatisticsGraph() {
         },
         data: {
           pct: pctValue,
+          pctValue,
           hasData,
+          choiceName,
+          pctDisplay,
           choiceId: edgeChoiceId,
           allEdges: edgeList,
           allNodes: finalNodes,
@@ -2208,17 +2286,44 @@ function StatisticsGraph() {
                                   boxShadow: isTop ? "0 2px 8px rgba(217, 119, 6, 0.12)" : "0 1px 3px rgba(0,0,0,0.02)"
                                 }}
                               >
-                                <div className="wsg-choice-row-top" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                                  <span style={{ fontWeight: 800, fontSize: "0.82rem", color: isTop ? "#92400e" : "#0f172a" }}>
+                                <div className="wsg-choice-row-top" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px" }}>
+                                  <span 
+                                    title={choice.label ? `ปุ่ม: "${choice.label}"` : undefined}
+                                    style={{ 
+                                      fontWeight: 800, 
+                                      fontSize: "0.82rem", 
+                                      color: isTop ? "#92400e" : "#0f172a",
+                                      whiteSpace: "nowrap",
+                                      overflow: "hidden",
+                                      textOverflow: "ellipsis",
+                                      textAlign: "left",
+                                      direction: "ltr",
+                                      flex: 1,
+                                      minWidth: 0,
+                                    }}
+                                  >
                                     ปุ่ม: "{choice.label || "ไม่มีข้อความ"}"
                                   </span>
                                   {isTop && (
-                                    <span className="wsg-top-choice-badge" style={{ backgroundColor: "#d97706", color: "#ffffff", padding: "3px 8px", borderRadius: "12px", fontSize: "0.65rem", fontWeight: 800, display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                                    <span className="wsg-top-choice-badge" style={{ backgroundColor: "#d97706", color: "#ffffff", padding: "3px 8px", borderRadius: "12px", fontSize: "0.65rem", fontWeight: 800, display: "inline-flex", alignItems: "center", gap: "4px", flexShrink: 0 }}>
                                       <Trophy size={12} color="#ffffff" /> ปุ่มที่นิยมที่สุด
                                     </span>
                                   )}
                                 </div>
-                                <div style={{ fontSize: "0.74rem", color: "#475569", marginTop: "4px", fontWeight: 600, textAlign: "left" }}>
+                                <div 
+                                  style={{ 
+                                    fontSize: "0.74rem", 
+                                    color: "#475569", 
+                                    marginTop: "4px", 
+                                    fontWeight: 600, 
+                                    textAlign: "left",
+                                    whiteSpace: "nowrap",
+                                    overflow: "hidden",
+                                    textOverflow: "ellipsis",
+                                    direction: "ltr",
+                                  }}
+                                  title={hasTarget ? `ไปยัง: ${targetLabel} - ${choice.target_scene_title || "ไม่มีชื่อฉาก"}` : undefined}
+                                >
                                   {hasTarget ? (
                                     <span>ไปยัง: <strong style={{ color: "#0f172a", fontWeight: 800 }}>{targetLabel}</strong> - {choice.target_scene_title || "ไม่มีชื่อฉาก"}</span>
                                   ) : (

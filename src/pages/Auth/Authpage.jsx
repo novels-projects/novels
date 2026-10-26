@@ -7,6 +7,7 @@
 import React, { useState, useEffect } from "react";
 import Cropper from "react-easy-crop";
 import getCroppedImg from "../../utils/cropImage.js";
+import { saveUserAvatar } from "../../utils/avatarService";
 import "./AuthPage.css";
 
 // ══════════════════════════════════════════════════════════
@@ -174,11 +175,19 @@ const LoginForm = ({ onSwitchToRegister }) => {
     setIsLoading(true);
     setErrors({});
     try {
-      const res = await fetch('/api/login', {
+      // 🔗 เชื่อมต่อ POST /api/v1/auth/login: ส่งอีเมลและรหัสผ่านเพื่อเข้าสู่ระบบ รับ JWT Token และข้อมูลผู้ใช้
+      let res = await fetch('/api/v1/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: email.trim(), password }),
       });
+      if (res.status === 404) {
+        res = await fetch('/api/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: email.trim(), password }),
+        });
+      }
 
       const raw = await res.text().catch(() => "");
       let data = {};
@@ -209,6 +218,7 @@ const LoginForm = ({ onSwitchToRegister }) => {
       }
       if (data.user) {
         localStorage.setItem('user', JSON.stringify(data.user));
+        saveUserAvatar(data.user);
       }
       setIsLoading(false);
       window.location.href = '/';
@@ -593,10 +603,17 @@ const RegisterForm = ({ onSwitchToLogin }) => {
         formData.append('profileImage', profileFile);
       }
 
-      const res = await fetch('/api/register', {
+      // 🔗 เชื่อมต่อ POST /api/v1/auth/register: ส่งข้อมูลผู้ใช้ใหม่ (username, email, password, profileImage) เพื่อสมัครสมาชิก
+      let res = await fetch('/api/v1/auth/register', {
         method: 'POST',
         body: formData, 
       });
+      if (res.status === 404) {
+        res = await fetch('/api/register', {
+          method: 'POST',
+          body: formData, 
+        });
+      }
 
       const data = await res.json().catch(() => ({}));
 
@@ -616,6 +633,7 @@ const RegisterForm = ({ onSwitchToLogin }) => {
       }
       if (data.user) {
         localStorage.setItem('user', JSON.stringify(data.user));
+        saveUserAvatar(data.user);
       }
 
       setIsLoading(false);

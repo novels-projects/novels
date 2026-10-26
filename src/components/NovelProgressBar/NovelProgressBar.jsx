@@ -53,6 +53,8 @@ const NovelProgressBar = ({
   };
 
   const getCurrentUserId = () => {
+    const token = localStorage.getItem("token");
+    if (!token) return 0;
     const userJson = localStorage.getItem("user");
     if (!userJson) return 0;
     try {
@@ -65,6 +67,8 @@ const NovelProgressBar = ({
 
   const checkIsAdmin = () => {
     if (isAdmin) return true;
+    const token = localStorage.getItem("token");
+    if (!token) return false;
     try {
       const userJson = localStorage.getItem("user");
       if (userJson) {
@@ -74,7 +78,6 @@ const NovelProgressBar = ({
       }
     } catch {}
     try {
-      const token = localStorage.getItem("token");
       if (token) {
         const parts = token.split(".");
         if (parts.length === 3) {
@@ -107,7 +110,8 @@ const NovelProgressBar = ({
           const headers = token ? { Authorization: `Bearer ${token}` } : {};
 
           const query = isPreview ? "?preview=true" : "";
-          const res = await axios.get(`${API_BASE_URL}/novels/${novelId}/story-tree${query}`, { headers });
+          // 🔗 เชื่อมต่อ GET /api/v1/novels/:id/story-tree: เพื่อดึงโครงสร้างต้นไม้เนื้อเรื่องสำหรับแสดงแผนผัง Progress Bar ในโหมดพรีวิว
+          const res = await axios.get(`${API_BASE_URL}/api/v1/novels/${novelId}/story-tree${query}`, { headers });
           const treeData = res.data?.data || res.data;
           const rawNodes = treeData?.nodes || [];
 
@@ -163,7 +167,8 @@ const NovelProgressBar = ({
         const headers = token ? { Authorization: `Bearer ${token}` } : {};
         const query = (userId > 0 && !effectiveIsAdmin) ? `?user_id=${userId}` : "";
 
-        const res = await axios.get(`${API_BASE_URL}/novels/${novelId}/story-tree${query}`, { headers });
+        // 🔗 เชื่อมต่อ GET /api/v1/novels/:id/story-tree: เพื่อดึงโครงสร้างต้นไม้เนื้อเรื่องพร้อมสถานะฉากที่ผู้ใช้อ่านไปแล้วมาแสดงความคืบหน้า
+        const res = await axios.get(`${API_BASE_URL}/api/v1/novels/${novelId}/story-tree${query}`, { headers });
         const treeData = res.data?.data || res.data;
 
         if (treeData && isMounted) {

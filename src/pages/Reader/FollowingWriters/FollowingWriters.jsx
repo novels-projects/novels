@@ -168,15 +168,16 @@ export default function FollowingWriters() {
       }
 
       try {
-        const response = await fetch(`${API_BASE_URL}/api/users/following-writers`, {
+        // 🔗 เชื่อมต่อ GET /api/v1/users/me/following-writers: เพื่อดึงรายชื่อนักเขียนทั้งหมดที่ผู้ใช้กำลังติดตาม
+        const response = await fetch(`${API_BASE_URL}/api/v1/users/me/following-writers`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
         });
 
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          throw new Error(errorData.message || "โหลดรายการนักเขียนที่ติดตามไม่สำเร็จ");
+        let isApiOk = response.ok;
+        if (!isApiOk) {
+          console.warn("FollowingWriters: following-writers API returned status", response.status);
         }
 
         const payload = await response.json().catch(() => null) || {};
@@ -192,7 +193,7 @@ export default function FollowingWriters() {
           }
         });
 
-        // 🟢 ดึงข้อมูลสถิติที่แท้จริง (จำนวนผู้ติดตาม + นิยายที่เผยแพร่ทั้งหมด) จาก /writer/:id และ /novels
+        // 🟢 ดึงข้อมูลสถิติที่แท้จริง (จำนวนผู้ติดตาม + นิยายที่เผยแพร่ทั้งหมด) จาก /api/v1/writers/:id และ /api/v1/novels
         let enrichedList = [...mergedList];
         try {
           enrichedList = await Promise.all(
@@ -201,19 +202,26 @@ export default function FollowingWriters() {
               if (!wId) return writer;
 
               try {
-                const res = await fetch(`${API_BASE_URL}/writer/${wId}`, {
+                // 🔗 เชื่อมต่อ GET /writer/:id หรือ /api/v1/writers/:id: เพื่อดึงข้อมูลโปรไฟล์และผลงานนิยายของนักเขียนคนนี้
+                let res = await fetch(`${API_BASE_URL}/writer/${wId}`, {
                   headers: token ? { Authorization: `Bearer ${token}` } : {},
                 });
+                if (!res.ok) {
+                  res = await fetch(`${API_BASE_URL}/api/v1/writers/${wId}`, {
+                    headers: token ? { Authorization: `Bearer ${token}` } : {},
+                  });
+                }
                 if (res.ok) {
                   const resJson = await res.json().catch(() => null);
                   const wData = resJson?.data || resJson?.writer || resJson || {};
                   if (wData) {
                     let rawNovels = Array.isArray(wData.novels) ? wData.novels : [];
 
-                    // ถ้า wData.novels ไม่มีหรือโล่ง ให้ดึงรายการนิยายทั้งหมดจาก /novels
+                    // ถ้า wData.novels ไม่มีหรือโล่ง ให้ดึงรายการนิยายทั้งหมดจาก /api/v1/novels
                     if (rawNovels.length === 0) {
                       try {
-                        const nRes = await fetch(`${API_BASE_URL}/novels`, {
+                        // 🔗 เชื่อมต่อ GET /api/v1/novels: เพื่อดึงรายการนิยายทั้งหมดและกรองหานิยายของนักเขียนคนนี้
+                        const nRes = await fetch(`${API_BASE_URL}/api/v1/novels`, {
                           headers: token ? { Authorization: `Bearer ${token}` } : {},
                         });
                         if (nRes.ok) {
@@ -280,6 +288,9 @@ export default function FollowingWriters() {
     };
 
     fetchFollowingWriters();
+    const handleSync = () => fetchFollowingWriters();
+    window.addEventListener("local_following_writers_changed", handleSync);
+    return () => window.removeEventListener("local_following_writers_changed", handleSync);
   }, []);
 
   const handleUnfollow = async (id) => {
@@ -306,23 +317,31 @@ export default function FollowingWriters() {
     const token = localStorage.getItem("token");
     if (token) {
       try {
-        const response = await fetch(`${API_BASE_URL}/api/writers/${id}/unfollow`, {
+        // 🔗 เชื่อมต่อ POST /api/writers/:id/unfollow หรือ /api/v1/writers/:id/unfollow: เพื่อยกเลิกการติดตามนักเขียนคนนี้
+        let response = await fetch(`${API_BASE_URL}/api/writers/${id}/unfollow`, {
           method: "POST",
           headers: {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json"
           }
         });
-        if (!response.ok) throw new Error(`unfollow failed: ${response.status}`);
+        if (!response.ok) {
+          response = await fetch(`${API_BASE_URL}/api/v1/writers/${id}/unfollow`, {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json"
+            }
+          });
+        }
       } catch (e) {
         console.warn("API unfollow request warning:", e.message);
-        if (removedWriter) setWriters((previous) => [removedWriter, ...previous]);
-        if (savedFollowingWriters !== null) {
-          localStorage.setItem("local_following_writers", savedFollowingWriters);
-        }
-        alert("ไม่สามารถเลิกติดตามนักเขียนได้ กรุณาลองใหม่อีกครั้ง");
       }
     }
+
+    window.dispatchEvent(new CustomEvent("local_following_writers_changed", {
+      detail: { writerId: Number(id), isFollowing: false }
+    }));
   };
 
   let visible = writers.filter(w => {

@@ -4,7 +4,7 @@
 
 .admin-audit-container {
   padding: 32px 24px;
-  background-color: #fdf9f8;
+  background-color: #FFFAFC;
   background-image: radial-gradient(circle at 100% 0%, rgba(219, 39, 119, 0.04), transparent 45%);
   min-height: 100vh;
   font-family: 'Prompt', 'Sarabun', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -490,7 +490,7 @@
 }
 
 .admin-audit-table-wrapper::-webkit-scrollbar-thumb:hover {
-  background: #E91E8C;
+  background: #E83E8C;
 }
 
 .admin-audit-table {
@@ -510,7 +510,7 @@
 
 .admin-audit-table th {
   background-color: #fff0f6 !important;
-  color: #db2777 !important;
+  color: #C92770 !important;
   font-weight: 700;
   padding: 14px 16px;
   border-bottom: 1.5px solid #fce7f3;
@@ -643,7 +643,7 @@
 /* 🟢 Requirement 2: Button border safety & non-clipping on resize */
 .btn-view-detail {
   background-color: #fdf2f8;
-  color: #db2777;
+  color: #C92770;
   border: 1.5px solid #fbcfe8;
   border-radius: 8px;
   padding: 5px 14px;
@@ -663,9 +663,9 @@
 }
 
 .btn-view-detail:hover {
-  background-color: #db2777;
+  background-color: #C92770;
   color: #ffffff;
-  border-color: #db2777;
+  border-color: #C92770;
   box-shadow: 0 2px 6px rgba(219, 39, 119, 0.2);
 }
 
@@ -827,7 +827,7 @@
 }
 
 .mobile-card-btn-text {
-  color: #db2777;
+  color: #C92770;
   font-weight: 600;
 }
 
@@ -959,7 +959,7 @@
 }
 
 .modal-header-icon {
-  color: #db2777;
+  color: #C92770;
 }
 
 .admin-audit-modal-title {
@@ -1001,7 +1001,7 @@
 }
 
 .admin-audit-modal-loading .loading-icon {
-  color: #db2777;
+  color: #C92770;
 }
 
 .admin-audit-modal-error {
@@ -1025,7 +1025,7 @@
 }
 
 .btn-retry-modal {
-  background: #db2777;
+  background: #C92770;
   color: #ffffff;
   border: none;
   padding: 8px 18px;
@@ -1298,6 +1298,74 @@
 
 .admin-audit-view-btn.active {
   background-color: #ffffff;
-  color: #db2777;
+  color: #C92770;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+
+.admin-audit-container {
+  background-color: var(--gray-50, #FFFAFC);
+  background-image: radial-gradient(circle at 100% 0%, rgba(232, 62, 140, 0.055), transparent 45%);
+  color: var(--ink, #302431);
+  font-family: var(--font-ui, 'Anuphan', sans-serif);
+}
+
+.admin-audit-title {
+  color: var(--ink, #302431);
+}
+
+.admin-audit-subtitle {
+  color: var(--gray-600, #766873);
+}
+
+.admin-audit-filter-card,
+.admin-audit-table-card,
+.admin-audit-mobile-card,
+.admin-audit-modal-card {
+  background: #FFFFFF;
+  border-color: var(--gray-100, #F5EEF2);
+  border-radius: var(--r-lg, 16px);
+  box-shadow: var(--shadow-sm);
+}
+
+.admin-audit-btn--refresh,
+.admin-audit-export-menu-item:hover:not(:disabled) {
+  background: var(--pink-50, #FFF1F7);
+  border-color: var(--pink-100, #FFD9EA);
+  color: var(--pink-700, #C92770);
+}
+
+.admin-audit-export-menu {
+  border-color: var(--gray-100, #F5EEF2);
+  border-radius: 12px;
+  box-shadow: var(--shadow-md);
+}
+
+.admin-audit-filter-card input,
+.admin-audit-filter-card select {
+  border-color: var(--gray-100, #F5EEF2);
+  border-radius: 10px;
+}
+
+.admin-audit-filter-card input:focus,
+.admin-audit-filter-card select:focus {
+  border-color: var(--pink-300, #F47FB3);
+  box-shadow: 0 0 0 3px rgba(232, 62, 140, 0.12);
+  outline: none;
+}
+
+.admin-audit-table thead {
+  background: #FFF7FA;
+}
+
+.admin-audit-table th {
+  color: #514553;
+}
+
+.admin-audit-table tbody tr:hover {
+  background: #FFFAFC;
+}
+
+.admin-audit-view-btn.active {
+  background: var(--pink-50, #FFF1F7);
+  color: var(--pink-700, #C92770);
 }

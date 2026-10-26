@@ -603,3 +603,73 @@
   from { transform: scale(0.92); opacity: 0; }
   to { transform: scale(1); opacity: 1; }
 }
+
+.cnp {
+  color: var(--ink, #302431);
+}
+
+.cnp__card {
+  border-color: var(--gray-100, #F5EEF2);
+  border-radius: var(--r-lg, 16px);
+  box-shadow: var(--shadow-sm);
+}
+
+.cnp__section-header {
+  border-bottom-color: var(--gray-100, #F5EEF2);
+  background: linear-gradient(180deg, #FFFFFF, #FFFAFC);
+}
+
+.cnp__input,
+.cnp__textarea,
+.cnp__select,
+.cnp input,
+.cnp textarea,
+.cnp select {
+  border-color: var(--gray-100, #F5EEF2);
+  border-radius: 10px;
+  background-color: #FFFFFF;
+}
+
+.cnp__input:focus,
+.cnp__textarea:focus,
+.cnp__select:focus,
+.cnp input:focus,
+.cnp textarea:focus,
+.cnp select:focus {
+  border-color: var(--pink-300, #F47FB3);
+  box-shadow: 0 0 0 3px rgba(232, 62, 140, 0.12);
+  outline: none;
+}
+
+.cnp__title,
+.cnp__section-title,
+.cnp__label {
+  color: var(--ink, #302431);
+  font-family: var(--font-ui, 'Anuphan', sans-serif);
+}
+
+.cnp__error-banner {
+  border-radius: 12px;
+}
+
+.cnp__cover-preview,
+.cnp__preview {
+  border-color: var(--pink-100, #FFD9EA);
+  border-radius: 14px;
+}
+
+.cnp__submit,
+.cnp__submit-btn,
+.cnp__button--primary {
+  background: var(--pink-500, #E83E8C);
+  border-color: var(--pink-500, #E83E8C);
+  border-radius: 10px;
+  color: #FFFFFF;
+}
+
+.cnp__submit:hover,
+.cnp__submit-btn:hover,
+.cnp__button--primary:hover {
+  background: var(--pink-700, #C92770);
+  border-color: var(--pink-700, #C92770);
+}

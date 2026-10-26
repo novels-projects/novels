@@ -1,23 +1,23 @@
 /* ดีไซน์หน้าแสดงหมวดหมู่และการค้นหาเวอร์ชันพรีเมียม */
 :root {
-  --pink-500: #e91e63;
-  --pink-600: #db2777;
-  --pink-50: #fdf2f8;
-  --pink-100: #fbcfe8;
-  --pink-border: #F4B8DC;
-  --slate-900: #0f172a;
-  --slate-800: #1e293b;
-  --slate-700: #334155;
-  --slate-500: #64748b;
-  --slate-100: #f1f5f9;
+  --pink-500: #E83E8C;
+  --pink-600: #C92770;
+  --pink-50: #FFF1F7;
+  --pink-100: #FFD9EA;
+  --pink-border: #F3BCD5;
+  --slate-900: #302431;
+  --slate-800: #403343;
+  --slate-700: #514553;
+  --slate-500: #766B76;
+  --slate-100: #F5EEF2;
   --white: #ffffff;
-  --bg-cream: #faf9f6;
+  --bg-cream: #FFFAFC;
 }
 
 .search-page {
   min-height: 100vh;
-  background-color: #fffafe;
-  font-family: 'Prompt', 'Sarabun', sans-serif;
+  background-color: #FFFAFC;
+  font-family: 'Anuphan', sans-serif;
   color: var(--slate-900);
   padding: 50px 20px 80px;
 }
@@ -704,6 +704,59 @@
   color: var(--slate-500);
   font-size: 0.88rem;
   margin: 0;
+}
+
+.search-page {
+  color: #302431;
+}
+
+.category-hero-banner {
+  border-radius: 24px;
+  border-color: rgba(232, 62, 140, 0.14);
+  background: linear-gradient(135deg, #FFF0F7 0%, #FFF8FC 62%, #F6F1FF 100%);
+  box-shadow: 0 10px 30px rgba(124, 59, 94, 0.045);
+}
+
+.theme-card {
+  border-width: 1px;
+  border-radius: 16px;
+  background: #FFFFFF;
+  box-shadow: 0 2px 8px rgba(62, 34, 52, 0.035);
+}
+
+.theme-card.selected {
+  background: #E83E8C;
+  border-color: #E83E8C;
+  box-shadow: 0 6px 16px rgba(232, 62, 140, 0.19);
+}
+
+.toolbar-bar {
+  border-color: rgba(88, 42, 65, 0.1);
+  border-radius: 16px;
+  box-shadow: 0 4px 16px rgba(62, 34, 52, 0.035);
+}
+
+.novel-grid-card,
+.novel-horiz-card {
+  border-radius: 14px;
+  border-color: rgba(88, 42, 65, 0.1);
+  box-shadow: 0 2px 8px rgba(62, 34, 52, 0.035);
+}
+
+.novel-grid-card:hover,
+.novel-horiz-card:hover {
+  border-color: #F3BCD5;
+  box-shadow: 0 10px 24px rgba(62, 34, 52, 0.085);
+}
+
+.novel-grid-cover,
+.novel-horiz-cover {
+  background-color: #FFF1F7;
+}
+
+.search-page :is(.page-nav-btn, .page-num-btn) {
+  border-color: rgba(88, 42, 65, 0.12);
+  border-radius: 10px;
 }
 
 @media (max-width: 768px) {

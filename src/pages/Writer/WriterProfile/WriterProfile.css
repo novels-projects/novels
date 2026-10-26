@@ -1,24 +1,24 @@
 /* WriterProfile.css - Soft Pink & Reader Theme UI */
 
-:root {
-  --pink-500: #e91e63;
-  --pink-600: #db2777;
-  --pink-50: #fdf2f8;
-  --pink-100: #fbcfe8;
-  --pink-border: #F4B8DC;
-  --slate-900: #0f172a;
-  --slate-800: #1e293b;
-  --slate-700: #334155;
-  --slate-500: #64748b;
-  --slate-100: #f1f5f9;
-  --white: #ffffff;
+.profile-wrapper {
+  --pink-500: #E83E8C;
+  --pink-600: #C92770;
+  --pink-50: #FFF1F7;
+  --pink-100: #FFD9EA;
+  --pink-border: #F3BCD5;
+  --slate-900: #302431;
+  --slate-800: #413443;
+  --slate-700: #514553;
+  --slate-500: #766B76;
+  --slate-100: #F5EEF2;
+  --white: #FFFFFF;
 }
 
 .profile-wrapper {
   background-color: #fffafe;
   min-height: 100vh;
   padding: 1.5rem 1rem 3rem 1rem;
-  font-family: 'Prompt', 'Sarabun', 'Inter', system-ui, sans-serif;
+  font-family: 'Anuphan', sans-serif;
   color: var(--slate-900);
 }
 
@@ -1077,4 +1077,194 @@
     flex-direction: column;
     gap: 0.4rem;
   }
+}
+
+.profile-wrapper {
+  background-color: var(--gray-50, #FFFAFC);
+  color: var(--ink, #302431);
+  font-family: var(--font-ui, 'Anuphan', sans-serif);
+}
+
+.profile-header-card,
+.profile-section-card,
+.profile-tab-panel {
+  border-color: var(--gray-100, #F5EEF2);
+  box-shadow: var(--shadow-sm);
+}
+
+.profile-back-button,
+.profile-tab-btn,
+.chip-btn {
+  font-family: var(--font-ui, 'Anuphan', sans-serif);
+}
+
+.profile-back-button:hover,
+.chip-btn.chip-selected {
+  background: var(--pink-50, #FFF1F7);
+  border-color: var(--pink-300, #F47FB3);
+  color: var(--pink-700, #C92770);
+}
+
+.profile-writer-name {
+  color: var(--ink, #302431);
+}
+
+.profile-wrapper {
+  --pink-300: #F47FB3;
+  padding-top: 2rem;
+}
+
+.profile-container {
+  gap: 1.25rem;
+}
+
+.profile-header-card,
+.profile-stat-card,
+.profile-contact-compact,
+.novel-grid-card {
+  border-color: #F1E8EE;
+  box-shadow: var(--shadow-sm);
+}
+
+.profile-header-card,
+.novel-grid-card {
+  border-radius: var(--r-lg, 16px);
+}
+
+.profile-header-banner {
+  background-color: #E83E8C;
+  background-image:
+    radial-gradient(circle at 15% 30%, rgba(255, 255, 255, 0.34), transparent 40%),
+    radial-gradient(circle at 85% 70%, rgba(255, 255, 255, 0.2), transparent 45%),
+    linear-gradient(120deg, #E83E8C, #F47FB3 58%, #FFD9EA);
+}
+
+.profile-back-button,
+.btn-share-profile-pill {
+  border-color: #F1E8EE;
+  color: #514553;
+}
+
+.profile-back-button:hover,
+.btn-share-profile-pill:hover {
+  background: #FFF1F7;
+  border-color: #F47FB3;
+  color: #C92770;
+}
+
+.btn-edit-profile-pill,
+.profile-tab-btn.active {
+  border-color: #E83E8C;
+  background: #E83E8C;
+  color: #FFFFFF;
+  box-shadow: 0 4px 12px rgba(232, 62, 140, 0.18);
+}
+
+.btn-edit-profile-pill:hover,
+.profile-tab-btn.active:hover {
+  background: #C92770;
+  border-color: #C92770;
+}
+
+.profile-writer-bio-rich {
+  background: #FFF7FA;
+  border-left-color: #E83E8C;
+  color: #514553;
+}
+
+.profile-stat-card {
+  border-radius: 14px;
+}
+
+.profile-stat-card:hover,
+.novel-grid-card:hover {
+  border-color: #F3BCD5;
+  box-shadow: var(--shadow-md);
+}
+
+.stat-card--pink {
+  background: linear-gradient(135deg, #FFFFFF, #FFF5F9);
+  border-color: #F3BCD5;
+}
+
+.stat-icon--pink {
+  background: #FFF1F7;
+  color: #C92770;
+}
+
+.contact-compact-chip {
+  background: #FFF1F7;
+  border-color: #FFD9EA;
+  color: #C92770;
+}
+
+.contact-compact-chip:hover {
+  background: #FFD9EA;
+  border-color: #F47FB3;
+  color: #C92770;
+}
+
+.profile-tabs {
+  border-color: #F1E8EE;
+  border-radius: 14px;
+  box-shadow: var(--shadow-sm);
+}
+
+.profile-tab-btn {
+  border-radius: 10px;
+}
+
+.novel-grid-card:hover {
+  border-color: #F3BCD5;
+  box-shadow: 0 10px 24px rgba(62, 34, 52, 0.09);
+}
+
+.novel-grid-cover {
+  border-bottom-color: #F1E8EE;
+}
+
+.edit-profile-modal {
+  border-color: #F1E8EE;
+  border-radius: var(--r-lg, 16px);
+}
+
+.modal-header {
+  border-bottom-color: #F1E8EE;
+}
+
+.modal-close-btn {
+  background: #FFF1F7;
+  color: #766B76;
+}
+
+.modal-close-btn:hover {
+  background: #FFD9EA;
+  color: #C92770;
+}
+
+.form-control-input:focus,
+.quill-wrapper .ql-toolbar.ql-snow,
+.quill-wrapper .ql-container.ql-snow {
+  border-color: #F3BCD5;
+}
+
+.quill-wrapper .ql-toolbar.ql-snow {
+  background: #FFF7FA;
+}
+
+.chip-btn.chip-selected {
+  background: #FFF1F7;
+  border-color: #F47FB3;
+  color: #C92770;
+}
+
+.btn-save-profile {
+  background: #E83E8C;
+  border-color: #E83E8C;
+  color: #FFFFFF;
+}
+
+.btn-save-profile:hover {
+  background: #C92770;
+  border-color: #C92770;
 }

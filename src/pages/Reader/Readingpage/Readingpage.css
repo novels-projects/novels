@@ -4,7 +4,7 @@
     min-height: 100vh;
     background: var(--white);
     color: var(--ink);
-    font-family: var(--reader-font-family, 'Sarabun', sans-serif) !important;
+    font-family: var(--reader-font-family, 'Anuphan', sans-serif) !important;
 }
 
 .rp,
@@ -20,26 +20,26 @@
 .ql-editor strong,
 .ql-editor em,
 .ql-editor a {
-    font-family: var(--reader-font-family, 'Sarabun', sans-serif) !important;
+    font-family: var(--reader-font-family, 'Anuphan', sans-serif) !important;
 }
 
 .rp--theme-light {
     --reader-surface: #ffffff;
-    --reader-surface-soft: #f9fafb;
-    --reader-border: #e5e7eb;
-    --reader-text: #111827;
-    --reader-muted: #6b7280;
-    --reader-accent: #e91e8c;
-    --reader-accent-soft: #fff0f6;
-    --reader-accent-border: #f472b6;
+    --reader-surface-soft: #FFFAFC;
+    --reader-border: #F1E8EE;
+    --reader-text: #302431;
+    --reader-muted: #766B76;
+    --reader-accent: #E83E8C;
+    --reader-accent-soft: #FFF1F7;
+    --reader-accent-border: #F47FB3;
     --tag-start-bg: #e0f2fe;
     --tag-start-color: #0369a1;
     --tag-normal-bg: #dcfce7;
     --tag-normal-color: #15803d;
     --tag-ending-bg: #fef3c7;
     --tag-ending-color: #b45309;
-    background: #fff;
-    color: #111827;
+    background: #FFFFFF;
+    color: #302431;
 }
 
 .rp--theme-cream {
@@ -138,7 +138,7 @@
 .rp__error-state-title {
     margin-bottom: 12px;
     color: var(--reader-text, #334155);
-    font-family: 'Sarabun', sans-serif;
+    font-family: 'Anuphan', sans-serif;
     font-weight: 700;
 }
 
@@ -160,7 +160,7 @@
     border-radius: 8px;
     color: #fff;
     cursor: pointer;
-    font-family: 'Sarabun', sans-serif;
+    font-family: 'Anuphan', sans-serif;
     font-weight: 600;
 }
 
@@ -360,7 +360,7 @@
     gap: 12px;
     width: min(440px, calc(100vw - 32px));
     padding: 14px 16px;
-    font-family: 'Sarabun', sans-serif;
+    font-family: 'Anuphan', sans-serif;
     color: #7c2d12;
     background: #fffaf5;
     border: 1px solid #fed7aa;
@@ -500,7 +500,7 @@
 
 /* ── Chapter title ── */
 .rp__title {
-    font-family: 'Open Sans', serif;
+    font-family: 'Anuphan', sans-serif;
     font-size: clamp(24px, 4vw, 34px);
     font-weight: 700;
     color: var(--ink);
@@ -634,7 +634,7 @@
 }
 
 .rp__bookmark-modal-title {
-    font-family: 'Open Sans', serif;
+    font-family: 'Anuphan', sans-serif;
     font-size: 19px;
     font-weight: 800;
     color: #1e293b;
@@ -642,7 +642,7 @@
 }
 
 .rp__bookmark-modal-text {
-    font-family: 'Sarabun', sans-serif;
+    font-family: 'Anuphan', sans-serif;
     font-size: 14px;
     color: #64748b;
     line-height: 1.6;
@@ -769,7 +769,7 @@
 }
 
 .rp__restart-modal-title {
-    font-family: 'Prompt', 'Sarabun', sans-serif;
+    font-family: 'Anuphan', sans-serif;
     font-size: 1.25rem;
     font-weight: 800;
     color: inherit;
@@ -777,7 +777,7 @@
 }
 
 .rp__restart-modal-text {
-    font-family: 'Sarabun', sans-serif;
+    font-family: 'Anuphan', sans-serif;
     font-size: 0.9rem;
     color: #64748b;
     line-height: 1.55;
@@ -982,7 +982,7 @@
 .rp__body.ql-editor p {
     margin-bottom: 28px;
     text-indent: 2em;
-    font-family: 'Sarabun', sans-serif;
+    font-family: 'Anuphan', sans-serif;
     font-weight: 400;
     letter-spacing: 0.01em;
 }
@@ -1322,7 +1322,7 @@
 .rp--theme-dark .rp__ending-chapter-eyebrow { color: #94a3b8; }
 
 .rp__ending-main-title {
-  font-family: var(--reader-font-family, 'Sarabun', sans-serif);
+  font-family: var(--reader-font-family, 'Anuphan', sans-serif);
   font-size: 21px;
   font-weight: 800;
   color: #0f172a;
@@ -2004,7 +2004,7 @@
 }
 
 .rp__tbc-title {
-    font-family: 'Prompt', 'Sarabun', sans-serif;
+    font-family: 'Anuphan', sans-serif;
     font-size: 22px;
     font-weight: 800;
     color: #0f172a;

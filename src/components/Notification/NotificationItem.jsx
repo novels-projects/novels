@@ -1,5 +1,3 @@
-// src/components/Notification/NotificationItem.jsx
-
 import { useState } from "react";
 import {
   BookOpen,
@@ -9,13 +7,8 @@ import {
   Sparkles,
   Trash2,
 } from "lucide-react";
+import { formatMinioUrl, getAvatar } from "../../utils/avatarService";
 import "./NotificationItem.css";
-
-// ปรับ MinIO URL ให้เปิดใน Browser Localhost ได้
-const formatMinioUrl = (url) => {
-  if (!url || typeof url !== "string") return null;
-  return url.replace("http://minio:9000", "http://localhost:9000");
-};
 
 // สีพาสเทลสำหรับ avatar สำรองแบบ deterministic (คนเดิมได้สีเดิมเสมอตามชื่อ)
 const AVATAR_PALETTE = [
@@ -126,6 +119,15 @@ export default function NotificationItem({
     ) {
       resolvedAvatarUrl = currentUser.pic_profile || null;
     }
+  }
+
+  // ดึงจาก Avatar Registry
+  if (!resolvedAvatarUrl && !isSystem) {
+    resolvedAvatarUrl = getAvatar({
+      userId: notification.actor?.id,
+      username: actorName,
+      novelId: (notification.referenceType === "novel" || notification.type === "novel_update") ? notification.referenceId : null,
+    });
   }
 
   const formattedAvatarUrl = formatMinioUrl(resolvedAvatarUrl);

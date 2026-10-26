@@ -21,7 +21,7 @@
   border-radius: 888px;
   border: 1.5px solid var(--gray-100);
   background: var(--white);
-  font-family: 'Sarabun', sans-serif;
+  font-family: 'Anuphan', sans-serif;
   font-size: 14px;
   font-weight: 500;
   color: var(--gray-600);
@@ -110,7 +110,7 @@
 
 /* Title */
 .novel-detail__title {
-  font-family: 'Open Sans', sans-serif;
+  font-family: 'Anuphan', sans-serif;
   font-size: clamp(28px, 4vw, 42px);
   font-weight: 700;
   color: var(--ink);
@@ -136,7 +136,7 @@
   height: 42px;
   border-radius: 50%;
   background: var(--pink-50, #fdf2f8);
-  border: 1.5px solid var(--pink-100, #fce7f3);
+  border: 1.5px solid var(--pink-100, #FFD9EA);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -157,7 +157,7 @@
   padding: 0;
   border: none;
   background: transparent;
-  font-family: 'Sarabun', sans-serif;
+  font-family: 'Anuphan', sans-serif;
   font-size: 15px;
   font-weight: 700;
   color: #1e293b;
@@ -184,7 +184,7 @@
 
 /* Synopsis */
 .novel-detail__synopsis {
-  font-family: 'Sarabun', sans-serif;
+  font-family: 'Anuphan', sans-serif;
   font-size: 15px;
   color: var(--gray-600);
   line-height: 1.8;
@@ -225,10 +225,10 @@
   padding: 10px 20px;
   height: 42px;
   border-radius: 999px;
-  border: 1.5px solid #fbcfe8;
-  background: linear-gradient(135deg, #fff0f6 0%, #ffe4f1 100%);
-  color: #db2777;
-  font-family: 'Sarabun', sans-serif;
+  border: 1.5px solid #F3BCD5;
+  background: linear-gradient(135deg, #FFF1F7 0%, #ffe4f1 100%);
+  color: #C92770;
+  font-family: 'Anuphan', sans-serif;
   font-size: 14px;
   font-weight: 700;
   cursor: pointer;
@@ -238,9 +238,9 @@
 }
 
 .novel-detail__restart-button:hover {
-  background: linear-gradient(135deg, #ec4899 0%, #db2777 100%);
+  background: linear-gradient(135deg, #ec4899 0%, #C92770 100%);
   color: #ffffff !important;
-  border-color: #db2777;
+  border-color: #C92770;
   transform: translateY(-1.5px);
   box-shadow: 0 4px 14px rgba(236, 72, 153, 0.25);
 }
@@ -254,8 +254,8 @@
   display: flex;
   align-items: center;
   gap: 16px;
-  background: linear-gradient(135deg, #fff0f6 0%, #ffe9f2 100%);
-  border: 1.5px dashed var(--pink-200, #fbcfe8);
+  background: linear-gradient(135deg, #FFF1F7 0%, #FFF8FC 100%);
+  border: 1.5px dashed var(--pink-100, #FFD9EA);
   border-radius: 16px;
   padding: 18px 22px;
   flex-wrap: wrap;
@@ -272,7 +272,7 @@
 }
 
 .novel-detail__guest-cta-title {
-  font-family: 'Sarabun', sans-serif;
+  font-family: 'Anuphan', sans-serif;
   font-size: 14.5px;
   font-weight: 700;
   color: var(--ink);
@@ -280,7 +280,7 @@
 }
 
 .novel-detail__guest-cta-text {
-  font-family: 'Sarabun', sans-serif;
+  font-family: 'Anuphan', sans-serif;
   font-size: 13px;
   color: var(--gray-600);
   line-height: 1.6;
@@ -291,9 +291,9 @@
   padding: 10px 22px;
   border-radius: 999px;
   border: none;
-  background: linear-gradient(135deg, var(--pink-400), var(--pink-500));
+  background: var(--pink-500);
   color: white;
-  font-family: 'Sarabun', sans-serif;
+  font-family: 'Anuphan', sans-serif;
   font-size: 14px;
   font-weight: 700;
   cursor: pointer;
@@ -320,7 +320,7 @@
 }
 
 .novel-detail__section-title {
-  font-family: 'Sarabun', sans-serif;
+  font-family: 'Anuphan', sans-serif;
   font-size: 17px;
   font-weight: 600;
   color: var(--ink);
@@ -332,7 +332,7 @@
 }
 
 .novel-detail__synopsis-detail {
-  font-family: 'Sarabun', sans-serif;
+  font-family: 'Anuphan', sans-serif;
   font-size: 14px;
   color: var(--gray-600);
   line-height: 1.85;
@@ -526,7 +526,7 @@
 }
 
 .novel-detail__modal-title {
-  font-family: 'Sarabun', sans-serif;
+  font-family: 'Anuphan', sans-serif;
   font-size: 19px;
   font-weight: 700;
   color: var(--ink);
@@ -538,7 +538,7 @@
 }
 
 .novel-detail__modal-text {
-  font-family: 'Sarabun', sans-serif;
+  font-family: 'Anuphan', sans-serif;
   font-size: 14px;
   color: var(--gray-600);
   line-height: 1.6;
@@ -570,7 +570,7 @@
   border: none;
   background: var(--pink-500);
   color: var(--white);
-  font-family: 'Sarabun', sans-serif;
+  font-family: 'Anuphan', sans-serif;
   font-weight: 700;
   font-size: 15px;
   cursor: pointer;
@@ -591,7 +591,7 @@
   border: 1px solid var(--gray-100);
   background: var(--white);
   color: var(--gray-600);
-  font-family: 'Sarabun', sans-serif;
+  font-family: 'Anuphan', sans-serif;
   font-weight: 600;
   font-size: 14px;
   cursor: pointer;
@@ -619,7 +619,7 @@
 }
 
 .novel-detail__preview-banner-label {
-  font-family: 'Sarabun', sans-serif;
+  font-family: 'Anuphan', sans-serif;
   font-weight: 700;
   font-size: 14px;
   color: #1e40af;
@@ -632,7 +632,7 @@
   border-radius: 999px;
   padding: 8px 16px;
   cursor: pointer;
-  font-family: 'Sarabun', sans-serif;
+  font-family: 'Anuphan', sans-serif;
   font-weight: 700;
   font-size: 13px;
   transition: background 0.18s ease;
@@ -647,7 +647,7 @@
   background: #fef2f2;
   border-bottom: 1px solid #fecaca;
   padding: 12px 20px;
-  font-family: 'Sarabun', sans-serif;
+  font-family: 'Anuphan', sans-serif;
   font-weight: 600;
   font-size: 13.5px;
   color: #b91c1c;
@@ -674,7 +674,7 @@
   padding: 36px 28px;
   box-shadow: 0 10px 30px rgba(239, 68, 68, 0.08);
   text-align: center;
-  font-family: 'Sarabun', sans-serif;
+  font-family: 'Anuphan', sans-serif;
 }
 
 .novel-detail__banned-header {
@@ -690,7 +690,7 @@
 }
 
 .novel-detail__banned-title {
-  font-family: 'Sarabun', sans-serif;
+  font-family: 'Anuphan', sans-serif;
   font-size: 20px;
   font-weight: 700;
   color: #111827;
@@ -749,7 +749,7 @@
   background: #f3f4f6;
   border: none;
   cursor: pointer;
-  font-family: 'Sarabun', sans-serif;
+  font-family: 'Anuphan', sans-serif;
   font-size: 14.5px;
   font-weight: 600;
   color: #374151;
@@ -786,7 +786,7 @@
   border: none;
   border-radius: 999px;
   cursor: pointer;
-  font-family: 'Sarabun', sans-serif;
+  font-family: 'Anuphan', sans-serif;
   font-weight: 600;
   font-size: 14px;
   display: inline-flex;
@@ -796,7 +796,7 @@
 }
 
 .novel-detail__banned-btn--primary {
-  background: #db2777;
+  background: #C92770;
   color: #ffffff;
   box-shadow: 0 4px 14px rgba(219, 39, 119, 0.3);
 }
@@ -856,7 +856,7 @@
 }
 
 .novel-detail__state-text {
-  font-family: 'Sarabun', sans-serif;
+  font-family: 'Anuphan', sans-serif;
   font-size: 14.5px;
   color: var(--gray-600);
 }
@@ -890,7 +890,7 @@
   padding: 0 20px;
   height: 42px;
   border-radius: 999px;
-  font-family: 'Sarabun', sans-serif;
+  font-family: 'Anuphan', sans-serif;
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
@@ -915,8 +915,8 @@
 }
 
 .action-bar-btn--primary:hover:not(:disabled) {
-  background: #db2777;
-  border-color: #db2777;
+  background: #C92770;
+  border-color: #C92770;
   transform: translateY(-1px);
   box-shadow: 0 6px 18px rgba(245, 38, 162, 0.35);
 }
@@ -930,13 +930,13 @@
 .action-bar-btn--map {
   background: #ffffff;
   color: #334155;
-  border-color: #fbcfe8;
+  border-color: #F3BCD5;
 }
 
 .action-bar-btn--map:hover {
-  background: #fff0f6;
-  border-color: #db2777;
-  color: #db2777;
+  background: #FFF1F7;
+  border-color: #C92770;
+  color: #C92770;
   transform: translateY(-1.5px);
   box-shadow: 0 4px 12px rgba(219, 39, 119, 0.12);
 }
@@ -953,9 +953,9 @@
 }
 
 .action-bar-btn--bookmark:hover:not(:disabled) {
-  background: #fff0f6;
-  color: #db2777;
-  border-color: #f472b6;
+  background: #FFF1F7;
+  color: #C92770;
+  border-color: #F47FB3;
   transform: translateY(-1.5px);
   box-shadow: 0 4px 12px rgba(219, 39, 119, 0.12);
 }
@@ -964,9 +964,9 @@
 .action-bar-btn--like.is-active,
 .action-bar-btn--more.is-active,
 .action-bar-btn--ending.is-active {
-  background: #fce7f3 !important;
-  color: #db2777 !important;
-  border-color: #db2777 !important;
+  background: #FFD9EA !important;
+  color: #C92770 !important;
+  border-color: #C92770 !important;
   box-shadow: 0 4px 12px rgba(219, 39, 119, 0.18) !important;
 }
 
@@ -974,21 +974,21 @@
 .action-bar-btn--like.is-active svg,
 .action-bar-btn--more.is-active svg,
 .action-bar-btn--ending.is-active svg {
-  color: #db2777 !important;
-  stroke: #db2777 !important;
+  color: #C92770 !important;
+  stroke: #C92770 !important;
 }
 
 /* 🟢 Ending Collection Button for Readers Who Have Read Before */
 .action-bar-btn--ending {
   background: #ffffff;
   color: #334155;
-  border-color: #fbcfe8;
+  border-color: #F3BCD5;
 }
 
 .action-bar-btn--ending:hover {
-  background: #fff0f6;
-  border-color: #db2777;
-  color: #db2777;
+  background: #FFF1F7;
+  border-color: #C92770;
+  color: #C92770;
   transform: translateY(-1.5px);
   box-shadow: 0 4px 12px rgba(219, 39, 119, 0.12);
 }
@@ -1006,17 +1006,17 @@
 }
 
 .action-bar-btn--icon-only:hover:not(:disabled) {
-  background: #fff0f6;
-  border-color: #f472b6;
-  color: #db2777;
+  background: #FFF1F7;
+  border-color: #F47FB3;
+  color: #C92770;
   transform: translateY(-1.5px);
   box-shadow: 0 4px 12px rgba(219, 39, 119, 0.15);
 }
 
 .action-bar-btn--icon-only.is-active {
-  background: #fce7f3 !important;
-  color: #db2777 !important;
-  border-color: #db2777 !important;
+  background: #FFD9EA !important;
+  color: #C92770 !important;
+  border-color: #C92770 !important;
   box-shadow: 0 4px 12px rgba(219, 39, 119, 0.18) !important;
 }
 
@@ -1060,7 +1060,7 @@
   border: none;
   background: transparent;
   border-radius: 8px;
-  font-family: 'Sarabun', sans-serif;
+  font-family: 'Anuphan', sans-serif;
   font-size: 13.5px;
   font-weight: 600;
   color: #334155;
@@ -1071,8 +1071,8 @@
 }
 
 .dropdown-menu-item:hover {
-  background: #fff0f6;
-  color: #db2777;
+  background: #FFF1F7;
+  color: #C92770;
 }
 
 .dropdown-menu-item--report:hover {
@@ -1083,7 +1083,7 @@
 /* ── Card "อ่านล่าสุด" (Solid White & Progress Bar) ── */
 .novel-detail__latest-read-card {
   background: #ffffff;
-  border: 1.5px solid #e2e8f0;
+  border: 1px solid rgba(88, 42, 65, 0.1);
   border-radius: 16px;
   padding: 18px 22px;
   display: flex;
@@ -1093,14 +1093,14 @@
   cursor: pointer;
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   box-sizing: border-box;
-  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.03);
+  box-shadow: 0 2px 10px rgba(62, 34, 52, 0.045);
   flex: 1;
   min-height: 120px;
 }
 
 .novel-detail__latest-read-card:hover {
-  border-color: #f472b6;
-  box-shadow: 0 4px 16px rgba(219, 39, 119, 0.12);
+  border-color: #F3BCD5;
+  box-shadow: 0 8px 20px rgba(62, 34, 52, 0.08);
   transform: translateY(-1px);
 }
 
@@ -1130,7 +1130,7 @@
 .latest-read-card__label {
   font-size: 12px;
   font-weight: 700;
-  color: #db2777;
+  color: #C92770;
   text-transform: uppercase;
   letter-spacing: 0.4px;
 }
@@ -1150,7 +1150,7 @@
 .latest-read-card__chapter-title {
   font-size: 15.5px;
   font-weight: 700;
-  color: #0f172a;
+  color: #302431;
   line-height: 1.35;
   word-break: break-word;
 }
@@ -1167,9 +1167,9 @@
   gap: 6px;
   padding: 3px 10px;
   border-radius: 8px;
-  background: #fff0f7;
-  border: 1px solid #fbcfe8;
-  color: #db2777;
+  background: #FFF1F7;
+  border: 1px solid #F3BCD5;
+  color: #C92770;
   font-size: 13px;
   font-weight: 600;
   line-height: 1.4;
@@ -1187,22 +1187,22 @@
 .latest-read-card__count {
   font-size: 13px;
   font-weight: 700;
-  color: #db2777;
+  color: #C92770;
   background: #ffffff;
-  border: 1px solid #fbcfe8;
+  border: 1px solid #F3BCD5;
   padding: 4px 12px;
   border-radius: 999px;
   white-space: nowrap;
-  box-shadow: 0 2px 6px rgba(219, 39, 119, 0.06);
+  box-shadow: 0 2px 6px rgba(62, 34, 52, 0.045);
 }
 
 .latest-read-card__btn {
-  background: linear-gradient(135deg, #f526a2 0%, #db2777 100%);
+  background: #E83E8C;
   color: #ffffff;
   border: none;
   border-radius: 999px;
   padding: 8px 20px;
-  font-family: 'Sarabun', sans-serif;
+  font-family: 'Anuphan', sans-serif;
   font-size: 13.5px;
   font-weight: 700;
   cursor: pointer;
@@ -1224,7 +1224,7 @@
   gap: 6px;
   width: 100%;
   padding-top: 10px;
-  border-top: 1px dashed #fbcfe8;
+  border-top: 1px dashed #F3BCD5;
   margin-top: auto;
 }
 
@@ -1241,14 +1241,14 @@
 }
 
 .latest-read-card__progress-percent {
-  color: #db2777;
+  color: #C92770;
   font-weight: 700;
 }
 
 .latest-read-card__progress-track {
   width: 100%;
   height: 8px;
-  background: #fce7f3;
+  background: #FFD9EA;
   border-radius: 999px;
   overflow: hidden;
   box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.05);
@@ -1256,7 +1256,7 @@
 
 .latest-read-card__progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, #f472b6 0%, #f526a2 50%, #db2777 100%);
+  background: linear-gradient(90deg, #F47FB3 0%, #f526a2 50%, #C92770 100%);
   border-radius: 999px;
   transition: width 0.4s ease;
 }
@@ -1286,7 +1286,7 @@
 }
 
 .discovered-card__title {
-  font-family: 'Open Sans', 'Sarabun', sans-serif;
+  font-family: 'Anuphan', sans-serif;
   font-size: 18px;
   font-weight: 700;
   color: #0f172a;
@@ -1294,16 +1294,16 @@
 }
 
 .discovered-card__subtitle {
-  font-family: 'Sarabun', sans-serif;
+  font-family: 'Anuphan', sans-serif;
   font-size: 13px;
   color: #64748b;
   margin: 4px 0 0 0;
 }
 
 .discovered-card__badge {
-  background: linear-gradient(135deg, #fff0f6 0%, #fce7f3 100%);
-  color: #db2777;
-  border: 1px solid #fbcfe8;
+  background: linear-gradient(135deg, #FFF1F7 0%, #FFD9EA 100%);
+  color: #C92770;
+  border: 1px solid #F3BCD5;
   font-size: 13.5px;
   font-weight: 700;
   padding: 6px 18px;
@@ -1316,6 +1316,56 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+
+.novel-detail {
+  font-family: var(--font-ui, 'Anuphan', sans-serif);
+  color: var(--ink);
+}
+
+.novel-detail__back {
+  border-color: var(--gray-100);
+  border-radius: 10px;
+  font-family: var(--font-ui, 'Anuphan', sans-serif);
+  box-shadow: var(--shadow-sm);
+}
+
+.novel-detail__back:hover {
+  border-color: var(--pink-300);
+  background: var(--pink-50);
+}
+
+.novel-detail__header-card,
+.novel-detail__latest-read-card,
+.discovered-card {
+  border-color: var(--gray-100);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+.novel-detail__title,
+.discovered-card__title {
+  font-family: var(--font-ui, 'Anuphan', sans-serif);
+}
+
+.discovered-card__title {
+  color: var(--ink);
+}
+
+.discovered-card__subtitle {
+  font-family: var(--font-ui, 'Anuphan', sans-serif);
+  color: var(--gray-600);
+}
+
+.discovered-card__header {
+  border-bottom-color: var(--gray-100);
+}
+
+.discovered-card__badge {
+  background: var(--pink-50);
+  border-color: var(--pink-100);
+  color: var(--pink-700);
+  box-shadow: none;
 }
 
 .discovered-item {
@@ -1332,15 +1382,15 @@
 }
 
 .discovered-item:hover {
-  background: #fff0f6;
-  border-color: #fbcfe8;
+  background: #FFF1F7;
+  border-color: #F3BCD5;
   transform: translateX(3px);
 }
 
 .discovered-item--current {
-  background: #fff0f6;
-  border-color: #f472b6;
-  border-left: 4px solid #db2777;
+  background: #FFF1F7;
+  border-color: #F47FB3;
+  border-left: 4px solid #C92770;
 }
 
 .discovered-item__icon {
@@ -1356,8 +1406,8 @@
 }
 
 .discovered-item--current .discovered-item__icon {
-  color: #db2777;
-  background: #fce7f3;
+  color: #C92770;
+  background: #FFD9EA;
 }
 
 .discovered-item__content {
@@ -1387,8 +1437,8 @@
   margin-left: auto;
   font-size: 12px;
   font-weight: 700;
-  color: #db2777;
-  background: #fce7f3;
+  color: #C92770;
+  background: #FFD9EA;
   padding: 3px 10px;
   border-radius: 999px;
   white-space: nowrap;
@@ -1410,7 +1460,7 @@
   border: 1px solid #e2e8f0;
   border-radius: 8px;
   padding: 6px 14px;
-  font-family: 'Sarabun', sans-serif;
+  font-family: 'Anuphan', sans-serif;
   font-size: 13px;
   font-weight: 600;
   color: #475569;
@@ -1419,9 +1469,9 @@
 }
 
 .discovered-page-btn:hover:not(:disabled) {
-  border-color: #f472b6;
-  color: #db2777;
-  background: #fff0f6;
+  border-color: #F47FB3;
+  color: #C92770;
+  background: #FFF1F7;
 }
 
 .discovered-page-btn:disabled {
@@ -1477,7 +1527,7 @@
     justify-content: space-between;
     margin-top: 8px;
     padding-top: 8px;
-    border-top: 1.5px dashed #fbcfe8;
+    border-top: 1.5px dashed #F3BCD5;
   }
 
   .discovered-card {

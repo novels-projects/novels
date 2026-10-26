@@ -49,6 +49,7 @@ import AdminDashboardPage from "./pages/Admin/AdminDashboardPage/AdminDashboardP
 import AuthPage from "./pages/Auth/AuthPage";
 import WriterRegisterPage from "./pages/Auth/WriterRegisterPage";
 
+import "./style/DesignSystem.css";
 import "./style/App.css";
 import "./style/index.css";
 import { i } from "framer-motion/client";
@@ -114,9 +115,15 @@ const WriterLayout = ({ children, onNavigate }) => {
     setLoading(true);
     const token = localStorage.getItem("token");
     try {
-      const res = await fetch(`${API_BASE_URL}/api/me/novels`, {
+      // 🔗 เชื่อมต่อ GET /api/v1/writers/me/novels: ดึงรายการนิยายทั้งหมดของนักเขียน เพื่อแสดงในเมนูดร็อปดาวน์สลับนิยาย
+      let res = await fetch(`${API_BASE_URL}/api/v1/writers/me/novels`, {
         headers: { "Authorization": `Bearer ${token}` }
       });
+      if (res.status === 404) {
+        res = await fetch(`${API_BASE_URL}/api/me/novels`, {
+          headers: { "Authorization": `Bearer ${token}` }
+        });
+      }
       if (res.ok) {
         const data = await res.json();
         const list = data.novels || data.data?.novels || [];
@@ -131,7 +138,6 @@ const WriterLayout = ({ children, onNavigate }) => {
 
   const handleSelectNovel = async (novel) => {
     localStorage.setItem("selectedNovel", JSON.stringify(novel));
-    window.dispatchEvent(new Event("storage"));
     window.dispatchEvent(new Event("novel-selected"));
     setShowSelector(false);
 
@@ -144,12 +150,20 @@ const WriterLayout = ({ children, onNavigate }) => {
       try {
         const token = localStorage.getItem("token");
         const headers = { Authorization: `Bearer ${token}` };
-        const chRes = await fetch(`${API_BASE_URL}/novels/${novelId}/chapters`, { headers });
+        // 🔗 เชื่อมต่อ GET /api/v1/novels/:id/chapters: ดึงรายการตอนของนิยายเพื่อหาตอนแรก
+        let chRes = await fetch(`${API_BASE_URL}/api/v1/novels/${novelId}/chapters`, { headers });
+        if (chRes.status === 400 || chRes.status === 404) {
+          chRes = await fetch(`${API_BASE_URL}/novels/${novelId}/chapters`, { headers });
+        }
         const chData = await chRes.json();
         const chapters = chData?.data?.chapters || chData?.chapters || [];
         if (chapters.length > 0) {
           const chId = chapters[0].id || chapters[0].chapter_id;
-          const scRes = await fetch(`${API_BASE_URL}/chapters/${chId}/scenes`, { headers });
+          // 🔗 เชื่อมต่อ GET /api/v1/chapters/:id/scenes: ดึงรายการฉากในตอนแรกเพื่อเปิดหน้า Scene Editor
+          let scRes = await fetch(`${API_BASE_URL}/api/v1/chapters/${chId}/scenes`, { headers });
+          if (scRes.status === 400 || scRes.status === 404) {
+            scRes = await fetch(`${API_BASE_URL}/chapters/${chId}/scenes`, { headers });
+          }
           const scData = await scRes.json();
           const scenes = scData?.data?.scenes || scData?.scenes || [];
           if (scenes.length > 0) {
@@ -564,26 +578,29 @@ const SceneEditorRoute = () => {
       headers["Authorization"] = `Bearer ${token}`;
     }
 
-    fetch(`${API_BASE_URL}/scenes/${sceneId}`, { headers })
-      .then((res) => {
+    // 🔗 เชื่อมต่อ GET /api/v1/scenes/:id: ดึงข้อมูลฉากเพื่อค้นหา chapterId สำหรับส่งต่อไปยัง SceneEditorPage
+    const loadSceneData = async () => {
+      try {
+        let res = await fetch(`${API_BASE_URL}/api/v1/scenes/${sceneId}`, { headers });
+        if (res.status === 400 || res.status === 404) {
+          res = await fetch(`${API_BASE_URL}/scenes/${sceneId}`, { headers });
+        }
         if (!res.ok) throw new Error(`ไม่สามารถโหลดข้อมูลฉากได้ (${res.status})`);
-        return res.json();
-      })
-      .then((data) => {
+        const data = await res.json();
         if (!active) return;
         const sceneData = data?.data || data || {};
         const resolvedId = sceneData.chapterId ?? sceneData.chapter_id ?? "";
         setChapterId(resolvedId ? String(resolvedId) : fallbackChapterId);
-      })
-      .catch((err) => {
+      } catch (err) {
         if (!active) return;
         console.error("SceneEditorRoute load chapterId error:", err);
         setChapterError(err.message || "เกิดข้อผิดพลาดในการโหลด chapterId");
-      })
-      .finally(() => {
+      } finally {
         if (!active) return;
         setLoadingChapter(false);
-      });
+      }
+    };
+    loadSceneData();
 
     return () => {
       active = false;
@@ -688,7 +705,8 @@ const refreshAuthToken = async () => {
   if (!refreshToken) return false;
 
   try {
-    const res = await fetch(`${API_BASE_URL}/api/refresh`, {
+    // 🔗 เชื่อมต่อ POST /api/v1/auth/refresh: ขอ Token ใหม่โดยใช้ Refresh Token เมื่อ Token ปัจจุบันหมดอายุ
+    let res = await fetch(`${API_BASE_URL}/api/v1/auth/refresh`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -696,9 +714,20 @@ const refreshAuthToken = async () => {
       body: JSON.stringify({ refresh_token: refreshToken }),
     });
 
+    if (res.status === 404) {
+      res = await fetch(`${API_BASE_URL}/api/refresh`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ refresh_token: refreshToken }),
+      });
+    }
+
     if (!res.ok) {
-      localStorage.removeItem('token');
-      localStorage.removeItem('refresh_token');
+      ["token", "refresh_token", "user", "user_id", "local_following_writers"].forEach((k) =>
+        localStorage.removeItem(k)
+      );
       return false;
     }
 
@@ -716,8 +745,9 @@ const refreshAuthToken = async () => {
     return true;
   } catch (error) {
     console.error('Failed to refresh auth token:', error);
-    localStorage.removeItem('token');
-    localStorage.removeItem('refresh_token');
+    ["token", "refresh_token", "user", "user_id", "local_following_writers"].forEach((k) =>
+      localStorage.removeItem(k)
+    );
     return false;
   }
 };
@@ -917,8 +947,9 @@ function App() {
       if (!token || isTokenExpired(token)) {
         const refreshed = await refreshAuthToken();
         if (!refreshed) {
-          localStorage.removeItem('token');
-          localStorage.removeItem('refresh_token');
+          ["token", "refresh_token", "user", "user_id", "local_following_writers"].forEach((k) =>
+            localStorage.removeItem(k)
+          );
         }
       }
 

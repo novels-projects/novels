@@ -14,6 +14,8 @@ import { NovelDetailSkeleton, DataLoadError, ButtonSpinner } from "../../../comp
 import { ShieldAlert, ChevronDown, Pencil, Map, Bookmark, Heart, MoreVertical, RotateCcw, Flag, Play, CheckCircle2, MapPin, Trophy } from "lucide-react";
 import { getBannedRegistry, cleanBanReason, extractBanDetails } from "../../../utils/novelStatus";
 import { showToast } from "../../../utils/toast";
+import { apiFetch } from "../../../utils/apiFetch";
+import { getAvatar, saveWriterAvatar } from "../../../utils/avatarService";
 // Removed authUtils import per user request
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
@@ -300,6 +302,8 @@ const NovelDetailPage = () => {
   );
 
   const getCurrentUser = () => {
+    const token = localStorage.getItem("token");
+    if (!token) return null;
     const userJson = localStorage.getItem("user");
     if (!userJson) return null;
     try {
@@ -338,6 +342,8 @@ const NovelDetailPage = () => {
 
 
   const getCurrentUserId = () => {
+    const token = localStorage.getItem("token");
+    if (!token) return 0;
     const user = getCurrentUser();
     return user?.id || user?.user_id || 0;
   };
@@ -348,7 +354,8 @@ const NovelDetailPage = () => {
     if (!currentNovelId || !userId) return false;
 
     try {
-      const response = await fetch(`${API_BASE_URL}/bookshelves?user_id=${userId}`, { headers });
+      // 🔗 เชื่อมต่อ GET /api/v1/bookshelves?user_id=:id: เพื่อตรวจสอบว่านิยายเรื่องนี้อยู่ในชั้นหนังสือของผู้ใช้หรือไม่
+      const response = await apiFetch(`${API_BASE_URL}/api/v1/bookshelves?user_id=${userId}`, { headers });
       if (!response.ok) return false;
 
       const payload = await response.json().catch(() => null);
@@ -364,7 +371,8 @@ const NovelDetailPage = () => {
 
   const fetchNovelComments = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/novels/${id}/comments`);
+      // 🔗 เชื่อมต่อ GET /api/v1/novels/:id/comments: เพื่อดึงรายการความคิดเห็นทั้งหมดของนิยายเรื่องนี้
+      const response = await apiFetch(`${API_BASE_URL}/api/v1/novels/${id}/comments`);
       if (!response.ok) throw new Error(`failed to load comments: ${response.status}`);
 
       const payload = await response.json().catch(() => null);
@@ -404,7 +412,8 @@ const NovelDetailPage = () => {
         }
 
         const query = userId > 0 && !isCurrentUserAdmin() ? `?user_id=${userId}` : "";
-        const response = await fetch(`${API_BASE_URL}/novels/${id}${query}`, { headers });
+        // 🔗 เชื่อมต่อ GET /api/v1/novels/:id: เพื่อดึงรายละเอียดนิยาย ข้อมูลผู้เขียน และความคืบหน้าการอ่าน
+        const response = await apiFetch(`${API_BASE_URL}/api/v1/novels/${id}${query}`, { headers });
         const payload = await response.json().catch(() => null);
 
         if (!response.ok) {
@@ -433,7 +442,8 @@ const NovelDetailPage = () => {
 
         let chaptersCountFromApi = 0;
         try {
-          const chaptersResponse = await fetch(`${API_BASE_URL}/novels/${id}/chapters`);
+          // 🔗 เชื่อมต่อ GET /api/v1/novels/:id/chapters: เพื่อดึงจำนวนตอนทั้งหมดของนิยาย
+          const chaptersResponse = await apiFetch(`${API_BASE_URL}/api/v1/novels/${id}/chapters`);
           if (chaptersResponse.ok) {
             const chaptersPayload = await chaptersResponse.json();
             const chaptersList = chaptersPayload?.data?.chapters || chaptersPayload?.chapters || [];
@@ -458,7 +468,8 @@ const NovelDetailPage = () => {
         let commentsCount = 0;
 
         try {
-          const countResponse = await fetch(`${API_BASE_URL}/novels/${id}/comments/count`);
+          // 🔗 เชื่อมต่อ GET /api/v1/novels/:id/comments/count: เพื่อดึงจำนวนความคิดเห็นทั้งหมดของนิยาย
+          const countResponse = await apiFetch(`${API_BASE_URL}/api/v1/novels/${id}/comments/count`);
           if (countResponse.ok) {
             const countPayload = await countResponse.json().catch(() => null);
             commentsCount = Number(countPayload?.data?.count ?? countPayload?.count ?? 0) || 0;
@@ -479,7 +490,8 @@ const NovelDetailPage = () => {
 
         if (currentChapterProgress === 0 && progressSceneId) {
           try {
-            const sceneResp = await fetch(`${API_BASE_URL}/scenes/${progressSceneId}`, { headers });
+            // 🔗 เชื่อมต่อ GET /api/v1/scenes/:id: เพื่อดึงข้อมูลตอนของฉากที่อ่านค้างไว้มาคำนวณ Progress
+            const sceneResp = await apiFetch(`${API_BASE_URL}/api/v1/scenes/${progressSceneId}`, { headers });
             if (sceneResp.ok) {
               const scenePayload = await sceneResp.json().catch(() => null);
               const sceneData = scenePayload?.data || scenePayload || {};
@@ -538,7 +550,11 @@ const NovelDetailPage = () => {
 
         if (queryId) {
           try {
-            const wRes = await fetch(`${API_BASE_URL}/writer/${queryId}`, { headers });
+            // 🔗 เชื่อมต่อ GET /api/v1/writers/:id หรือ /writer/:id: เพื่อดึงรูปโปรไฟล์และข้อมูลของนักเขียนผู้แต่งนิยายเรื่องนี้
+            let wRes = await apiFetch(`${API_BASE_URL}/api/v1/writers/${queryId}`, { headers });
+            if (!wRes.ok) {
+              wRes = await apiFetch(`${API_BASE_URL}/writer/${queryId}`, { headers });
+            }
             if (wRes.ok) {
               const wJson = await wRes.json().catch(() => null);
               const wData = wJson?.data || wJson?.writer || wJson || {};
@@ -557,6 +573,26 @@ const NovelDetailPage = () => {
         }
 
         const finalWriterId = realWriterId || queryId;
+
+        // หากยังไม่ได้รูป ให้ค้นหาจาก Avatar Registry หรือข้อมูลผู้แต่ง Seed
+        if (!resolvedAuthorAvatar) {
+          resolvedAuthorAvatar = getAvatar({
+            writerId: finalWriterId,
+            userId: realUserId,
+            username: nData.pen_name || authorDisplayName,
+            novelId: id,
+          });
+        }
+
+        // บันทึกลง Avatar Registry เพื่อให้คอมเมนต์และหน้ารายละเอียดนิยายเข้าถึงได้ทันที
+        if (resolvedAuthorAvatar) {
+          saveWriterAvatar({
+            writer_id: finalWriterId,
+            user_id: realUserId,
+            pen_name: nData.pen_name || authorDisplayName,
+            avatar_url: resolvedAuthorAvatar,
+          });
+        }
 
         setNovel({
           id: nData.novel_id || nData.id || id,
@@ -604,11 +640,15 @@ const NovelDetailPage = () => {
           isBookmarked: isBookmarked,
         });
 
-        let isFollowing = Boolean(data.is_following || data.isFollowing || nData.is_following || nData.isFollowing);
+        let isFollowing = false;
 
-        if (token && finalWriterId) {
+        // 🟢 ตรวจสอบสถานะการติดตามเฉพาะเมื่อมี token และ userId (ผู้ใช้ล็อกอินแล้วเท่านั้น)
+        // Guest จะต้องเป็น false เสมอ ห้ามดึงค่าจาก data หรือ local_following_writers
+        if (token && userId > 0 && finalWriterId) {
+          isFollowing = Boolean(data.is_following || data.isFollowing || nData.is_following || nData.isFollowing);
           try {
-            const followCheckRes = await fetch(`${API_BASE_URL}/api/users/following-writers`, { headers });
+            // 🔗 เชื่อมต่อ GET /api/v1/users/me/following-writers: เพื่อตรวจสอบว่าผู้ใช้ได้ติดตามนักเขียนคนนี้ไว้แล้วหรือไม่
+            const followCheckRes = await apiFetch(`${API_BASE_URL}/api/v1/users/me/following-writers`, { headers });
             if (followCheckRes.ok) {
               const followPayload = await followCheckRes.json().catch(() => null);
               const followBody = followPayload?.data ?? followPayload ?? {};
@@ -620,16 +660,18 @@ const NovelDetailPage = () => {
           } catch (e) {
             console.warn("Failed to check following writers status:", e);
           }
-        }
 
-        if (!isFollowing && finalWriterId) {
-          try {
-            const localSaved = localStorage.getItem("local_following_writers");
-            const list = localSaved ? JSON.parse(localSaved) : [];
-            if (Array.isArray(list) && list.some(w => Number(w.id || w.writer_id) === Number(finalWriterId))) {
-              isFollowing = true;
-            }
-          } catch (e) {}
+          if (!isFollowing) {
+            try {
+              const localSaved = localStorage.getItem("local_following_writers");
+              const list = localSaved ? JSON.parse(localSaved) : [];
+              if (Array.isArray(list) && list.some(w => Number(w.id || w.writer_id) === Number(finalWriterId))) {
+                isFollowing = true;
+              }
+            } catch (e) {}
+          }
+        } else {
+          isFollowing = false;
         }
 
         setIsFollowingAuthor(isFollowing);
@@ -642,7 +684,8 @@ const NovelDetailPage = () => {
 
         if (userId > 0 && !isCurrentUserAdmin() && !isPreview) {
           try {
-            const treeRes = await fetch(`${API_BASE_URL}/novels/${id}/story-tree?user_id=${userId}`, { headers });
+            // 🔗 เชื่อมต่อ GET /api/v1/novels/:id/story-tree?user_id=:userId: เพื่อดึงแผนผัง Story Tree และฉากที่ผู้อ่านเคยปลดล็อกแล้ว
+            const treeRes = await apiFetch(`${API_BASE_URL}/api/v1/novels/${id}/story-tree?user_id=${userId}`, { headers });
             if (treeRes.ok) {
               const treePayload = await treeRes.json().catch(() => null);
               const treeData = treePayload?.data || treePayload || {};
@@ -707,8 +750,12 @@ const fetchFirstSceneAndNavigate = async (previewSuffix) => {
       const token = localStorage.getItem("token");
       if (token) headers["Authorization"] = `Bearer ${token}`;
 
-      const previewQuery = isPreview ? "&preview=true" : "";
-      const treeResponse = await fetch(`${API_BASE_URL}/novels/${id}/story-tree?user_id=${userId}${previewQuery}`, { headers });
+      const params = new URLSearchParams();
+      if (userId > 0 && !isPreview) params.append("user_id", userId);
+      if (isPreview) params.append("preview", "true");
+      const qs = params.toString() ? `?${params.toString()}` : "";
+      // 🔗 เชื่อมต่อ GET /api/v1/novels/:id/story-tree: เพื่อดึงโครงสร้างต้นไม้เนื้อเรื่องหาฉากเริ่มต้น (Start Scene)
+      const treeResponse = await apiFetch(`${API_BASE_URL}/api/v1/novels/${id}/story-tree${qs}`, { headers });
 
       const treePayload = await treeResponse.json().catch(() => null);
       const treeData = treePayload?.data || treePayload || {};
@@ -722,8 +769,8 @@ const fetchFirstSceneAndNavigate = async (previewSuffix) => {
         null;
 
       if (firstScene) {
-        // ✅ ยิง API ไปโหลดข้อมูลฉากเพื่อแกะดูสถานะข้างใน
-        const sceneResp = await fetch(`${API_BASE_URL}/scenes/${firstScene}`, { headers });
+        // ✅ 🔗 เชื่อมต่อ GET /api/v1/scenes/:id: เพื่อตรวจสอบสถานะการเผยแพร่ของฉากเริ่มต้นก่อนนำทางไปหน้าอ่าน
+        const sceneResp = await apiFetch(`${API_BASE_URL}/api/v1/scenes/${firstScene}`, { headers });
         if (sceneResp.ok) {
           const scenePayload = await sceneResp.json().catch(() => null);
           const sceneData = scenePayload?.data || scenePayload || {};
@@ -771,8 +818,8 @@ const fetchFirstSceneAndNavigate = async (previewSuffix) => {
           const token = localStorage.getItem("token");
           if (token) headers["Authorization"] = `Bearer ${token}`;
 
-          // ✅ ยิง API เช็กฉากถัดไปเหมือนกัน
-          const checkResp = await fetch(`${API_BASE_URL}/scenes/${nextSceneId}`, { headers });
+          // ✅ 🔗 เชื่อมต่อ GET /api/v1/scenes/:id: เพื่อตรวจสอบสถานะเผยแพร่ของฉากที่อ่านค้างไว้ก่อนนำทาง
+          const checkResp = await apiFetch(`${API_BASE_URL}/api/v1/scenes/${nextSceneId}`, { headers });
           if (checkResp.ok) {
             const scenePayload = await checkResp.json().catch(() => null);
             const sceneData = scenePayload?.data || scenePayload || {};
@@ -819,7 +866,8 @@ const fetchFirstSceneAndNavigate = async (previewSuffix) => {
 
     try {
       const method = isBookmarked ? "POST" : "DELETE";
-      const url = `${API_BASE_URL}/bookshelves${isBookmarked ? "" : `?novel_id=${id}`}`;
+      // 🔗 เชื่อมต่อ POST /api/v1/bookshelves หรือ DELETE /api/v1/bookshelves?novel_id=:id: เพื่อเพิ่มหรือลบนิยายออกจากชั้นหนังสือ
+      const url = `${API_BASE_URL}/api/v1/bookshelves${isBookmarked ? "" : `?novel_id=${id}`}`;
       const body = isBookmarked ? JSON.stringify({ novel_id: parseInt(id, 10) }) : undefined;
 
       const response = await fetch(url, {
@@ -869,7 +917,8 @@ const fetchFirstSceneAndNavigate = async (previewSuffix) => {
 
     try {
       const method = isLiked ? "POST" : "DELETE";
-      const url = isLiked ? `${API_BASE_URL}/likes` : `${API_BASE_URL}/likes?novel_id=${id}`;
+      // 🔗 เชื่อมต่อ POST /api/v1/likes หรือ DELETE /api/v1/likes?novel_id=:id: เพื่อกดถูกใจหรือยกเลิกถูกใจนิยาย
+      const url = isLiked ? `${API_BASE_URL}/api/v1/likes` : `${API_BASE_URL}/api/v1/likes?novel_id=${id}`;
       const body = isLiked ? JSON.stringify({ novel_id: parseInt(id, 10) }) : undefined;
 
       const response = await fetch(url, {
@@ -925,7 +974,8 @@ const fetchFirstSceneAndNavigate = async (previewSuffix) => {
     setRestartError(null);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/novels/${id}/restart`, {
+      // 🔗 เชื่อมต่อ POST /api/v1/novels/:id/restart: เพื่อรีเซ็ตความคืบหน้าการอ่านและเริ่มอ่านนิยายเรื่องนี้ใหม่ตั้งแต่ฉากแรก
+      const response = await apiFetch(`${API_BASE_URL}/api/v1/novels/${id}/restart`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -975,7 +1025,8 @@ const fetchFirstSceneAndNavigate = async (previewSuffix) => {
 
     setCommentSubmitting(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/comments`, {
+      // 🔗 เชื่อมต่อ POST /api/v1/comments: เพื่อโพสต์ความคิดเห็นใหม่ลงในนิยายเรื่องนี้
+      const response = await apiFetch(`${API_BASE_URL}/api/v1/comments`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -1003,7 +1054,7 @@ const fetchFirstSceneAndNavigate = async (previewSuffix) => {
   };
 
   const currentUserId = getCurrentUserId();
-  const isLoggedIn = currentUserId > 0;
+  const isLoggedIn = Boolean(localStorage.getItem("token") && currentUserId > 0);
   const isAdmin = isLoggedIn && isCurrentUserAdmin();
 
   // นักเขียนเจ้าของนิยายไม่ควรเห็นปุ่ม "ติดตาม" สำหรับตัวเอง
@@ -1020,6 +1071,24 @@ const fetchFirstSceneAndNavigate = async (previewSuffix) => {
   const handleAuthorClick = () => {
     if (authorId) navigate(`/writer/profile/${authorId}`);
   };
+
+  useEffect(() => {
+    const handleFollowChange = (e) => {
+      const token = localStorage.getItem("token");
+      if (!token || !authorId) return;
+      if (e?.detail?.writerId && Number(e.detail.writerId) === Number(authorId)) {
+        setIsFollowingAuthor(Boolean(e.detail.isFollowing));
+      } else {
+        try {
+          const localSaved = localStorage.getItem("local_following_writers");
+          const list = localSaved ? JSON.parse(localSaved) : [];
+          setIsFollowingAuthor(Array.isArray(list) && list.some(w => Number(w.id || w.writer_id) === Number(authorId)));
+        } catch (_) {}
+      }
+    };
+    window.addEventListener("local_following_writers_changed", handleFollowChange);
+    return () => window.removeEventListener("local_following_writers_changed", handleFollowChange);
+  }, [authorId]);
 
   // คำนวณ % ความคืบหน้าการอ่านจากฉากที่ค้นพบ เหมือนกับในหน้าประวัติการอ่าน (HistoryPage)
   const readingPercent = totalTreeNodes > 0
@@ -1483,7 +1552,8 @@ const fetchFirstSceneAndNavigate = async (previewSuffix) => {
                   }
 
                   try {
-                    const response = await fetch(`${API_BASE_URL}/comments?comment_id=${commentId}`, {
+                    // 🔗 เชื่อมต่อ DELETE /api/v1/comments?comment_id=:id: เพื่อลบความคิดเห็นของตัวเองหรือโดยแอดมิน
+                    const response = await apiFetch(`${API_BASE_URL}/api/v1/comments?comment_id=${commentId}`, {
                       method: "DELETE",
                       headers: {
                         Authorization: `Bearer ${token}`,
@@ -1505,8 +1575,8 @@ const fetchFirstSceneAndNavigate = async (previewSuffix) => {
         />
 
         <EndingCollection
-          isOpen={showEndingModal && isLoggedIn}
-          endings={endings}
+          isOpen={showEndingModal}
+          endings={isLoggedIn ? endings : []}
           onClose={() => setShowEndingModal(false)}
           onViewStoryMap={(sceneId) => handleStoryMap(sceneId)}
         />

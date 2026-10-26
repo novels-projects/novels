@@ -1,9 +1,10 @@
 // ⚠️ รอการแก้ไขโค้ดเรื่อง Backend PUT /novels/:id ล้างสถานะการถูกระงับ (suspended) เมื่อผู้เขียนแก้ไขรูปปกหรือข้อมูลนิยาย
 import React, { useState, useEffect, useCallback } from "react";
 import "./WriterDashboardPage.css";
-import { getNovelStatusInfo, registerBannedNovel, cleanBanReason, extractBanDetails, getBannedRegistry, getCardBanReason } from "../../../utils/novelStatus";
+import { getNovelStatusInfo, registerBannedNovel, unregisterBannedNovel, cleanBanReason, extractBanDetails, getBannedRegistry, getCardBanReason } from "../../../utils/novelStatus";
 import { WriterDashboardSkeleton, DataLoadError, ButtonSpinner } from "../../../components/Skeleton";
 import { ShieldAlert, X, Layers, FileText, Pencil, BarChart2, Library, Book, Heart, Eye, Bookmark } from "lucide-react";
+import { apiFetch } from "../../../utils/apiFetch";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
 
@@ -60,7 +61,8 @@ const WriterDashboardPage = ({ onNavigate, onSelectNovel }) => {
       const headers = buildAuthHeaders();
       if (!headers) throw new Error("กรุณาเข้าสู่ระบบก่อนดูแดชบอร์ดนักเขียน");
 
-      const response = await fetch(`${API_BASE_URL}/api/me/novels`, { headers });
+      // 🔗 เชื่อมต่อ GET /api/v1/writers/me/novels: เพื่อดึงรายการนิยายทั้งหมดที่ผู้เขียนคนนี้สร้างขึ้นมาแสดงในหน้าแดชบอร์ดนักเขียน พร้อมคำนวณยอดสถิติรวม
+      const response = await apiFetch(`${API_BASE_URL}/api/v1/writers/me/novels`, { headers });
       
       if (!response.ok) {
         if (response.status === 401) throw new Error("เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่อีกครั้ง");
@@ -87,6 +89,8 @@ const WriterDashboardPage = ({ onNavigate, onSelectNovel }) => {
           const statusInfo = getNovelStatusInfo(novel);
           if (statusInfo.isBanned) {
             registerBannedNovel(novel.id || novel.novel_id, novel);
+          } else {
+            unregisterBannedNovel(novel.id || novel.novel_id);
           }
           calculatedViews += novel.total_views ?? novel.view_count ?? novel.stats?.views ?? novel.views ?? 0;
           calculatedLikes += novel.total_likes ?? novel.like_count ?? novel.stats?.likes ?? novel.likes ?? 0;
@@ -114,12 +118,25 @@ const WriterDashboardPage = ({ onNavigate, onSelectNovel }) => {
     fetchDashboardData();
   }, [fetchDashboardData]);
 
+  useEffect(() => {
+    const handleNovelUnbanned = () => {
+      fetchDashboardData();
+    };
+    window.addEventListener("novel-unbanned", handleNovelUnbanned);
+    window.addEventListener("storage", handleNovelUnbanned);
+    return () => {
+      window.removeEventListener("novel-unbanned", handleNovelUnbanned);
+      window.removeEventListener("storage", handleNovelUnbanned);
+    };
+  }, [fetchDashboardData]);
+
   const handleDeleteNovel = async (novelId) => {
     try {
       const headers = buildAuthHeaders();
       if (!headers) throw new Error("กรุณาเข้าสู่ระบบก่อนลบนิยาย");
 
-      const response = await fetch(`${API_BASE_URL}/novels/${novelId}`, {
+      // 🔗 เชื่อมต่อ DELETE /api/v1/novels/:id: เพื่อส่งคำขอลบนิยายเรื่องที่ต้องการออกจากระบบ
+      const response = await apiFetch(`${API_BASE_URL}/api/v1/novels/${novelId}`, {
         method: "DELETE",
         headers,
       });
@@ -138,7 +155,6 @@ const WriterDashboardPage = ({ onNavigate, onSelectNovel }) => {
 
   const handleEdit = (novelObj) => {
     localStorage.setItem("selectedNovel", JSON.stringify(novelObj));
-    window.dispatchEvent(new Event("storage"));
     window.dispatchEvent(new Event("novel-selected"));
     const id = novelObj.id || novelObj.novel_id;
     onNavigate("chapters", { novelId: id });
@@ -146,7 +162,6 @@ const WriterDashboardPage = ({ onNavigate, onSelectNovel }) => {
 
   const handleTree = (novelObj) => {
     localStorage.setItem("selectedNovel", JSON.stringify(novelObj));
-    window.dispatchEvent(new Event("storage"));
     window.dispatchEvent(new Event("novel-selected"));
     const id = novelObj.id || novelObj.novel_id;
     onNavigate("story-tree", { novelId: id });
@@ -154,7 +169,6 @@ const WriterDashboardPage = ({ onNavigate, onSelectNovel }) => {
 
   const handleAnalytics = (novelObj) => {
     localStorage.setItem("selectedNovel", JSON.stringify(novelObj));
-    window.dispatchEvent(new Event("storage"));
     window.dispatchEvent(new Event("novel-selected"));
     const id = novelObj.id || novelObj.novel_id;
     onNavigate("analytics", { novelId: id });

@@ -1,13 +1,13 @@
 /* src/pages/StoryTree/StoryTreePage.css */
 
 .stp {
-  --pink: #F526A2;
-  --pink-rgb: 245, 38, 162;
-  --pink-dark: #d1208c;
+  --pink: #E83E8C;
+  --pink-rgb: 232, 62, 140;
+  --pink-dark: #C92770;
   --ease: cubic-bezier(0.16, 1, 0.3, 1);
 
   min-height: 100vh;
-  background: linear-gradient(180deg, #fcfbfd 0%, #f8fafc 220px);
+  background: linear-gradient(180deg, #FFFAFC 0%, #FFFFFF 220px);
   padding-bottom: 60px;
 }
 
@@ -70,7 +70,7 @@
   border-radius: 9px;
   background: transparent;
   color: #7c6785;
-  font-family: 'Sarabun', sans-serif;
+  font-family: 'Anuphan', sans-serif;
   font-size: 12px;
   font-weight: 700;
   cursor: pointer;
@@ -111,7 +111,7 @@
   border: 1.5px solid #ef4444;
   background: #fef2f2;
   color: #dc2626;
-  font-family: 'Sarabun', sans-serif;
+  font-family: 'Anuphan', sans-serif;
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
@@ -133,7 +133,7 @@
   border: 1.5px solid #cbd5e1;
   background: #ffffff;
   color: #334155;
-  font-family: 'Sarabun', sans-serif;
+  font-family: 'Anuphan', sans-serif;
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
@@ -165,7 +165,7 @@
   border: 1.5px solid #f59e0b;
   background: #fffbe8;
   color: #d97706;
-  font-family: 'Sarabun', sans-serif;
+  font-family: 'Anuphan', sans-serif;
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
@@ -184,7 +184,7 @@
   border-radius: 24px;
   border: 1.5px solid #e2e8f0;
   background: #ffffff;
-  font-family: 'Sarabun', sans-serif;
+  font-family: 'Anuphan', sans-serif;
   font-size: 13px;
   font-weight: 500;
   color: #475569;
@@ -218,7 +218,7 @@
 }
 
 .stp__title {
-  font-family: 'Sarabun', sans-serif;
+  font-family: 'Anuphan', sans-serif;
   font-size: clamp(20px, 3vw, 26px);
   font-weight: 700;
   color: #1e293b;
@@ -308,7 +308,7 @@
   font-size: 25px;
   line-height: 1;
   color: #0f172a;
-  font-family: 'Sarabun', sans-serif;
+  font-family: 'Anuphan', sans-serif;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.3px;
 }
@@ -475,7 +475,7 @@
   border-radius: 10px;
   background: #fff8fc;
   color: var(--pink-dark);
-  font-family: 'Sarabun', sans-serif;
+  font-family: 'Anuphan', sans-serif;
   font-size: 12px;
   font-weight: 700;
   cursor: pointer;
@@ -507,7 +507,7 @@
   border: 1px solid #cbd5e1;
   border-radius: 4px;
   padding: 3px 7px;
-  font-family: 'Sarabun', sans-serif;
+  font-family: 'Anuphan', sans-serif;
   font-size: 11px;
   font-weight: 500;
   color: #4a5568;
@@ -694,7 +694,7 @@
 }
 
 .stp__placeholder-title {
-  font-family: 'Sarabun', sans-serif;
+  font-family: 'Anuphan', sans-serif;
   font-size: 20px;
   font-weight: 700;
   color: #1e293b;
@@ -714,7 +714,7 @@
   border-radius: 24px;
   background: var(--pink);
   color: #ffffff;
-  font-family: 'Sarabun', sans-serif;
+  font-family: 'Anuphan', sans-serif;
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
@@ -965,6 +965,98 @@
   cursor: not-allowed;
 }
 
+.stp {
+  font-family: var(--font-ui, 'Anuphan', sans-serif);
+  color: var(--ink, #302431);
+}
+
+.stp__view-toggle {
+  border-color: var(--gray-100, #F5EEF2);
+  background: var(--pink-50, #FFF1F7);
+}
+
+.stp__view-toggle-btn.is-active {
+  color: var(--pink-700, #C92770);
+  box-shadow: var(--shadow-sm);
+}
+
+.stp__focus-btn,
+.stp__back,
+.stp__modal-cancel {
+  border-color: var(--gray-100, #F5EEF2);
+  color: var(--gray-600, #766873);
+}
+
+.stp__focus-btn:hover,
+.stp__modal-cancel:hover {
+  background: var(--pink-50, #FFF1F7);
+  border-color: var(--pink-300, #F47FB3);
+  color: var(--pink-700, #C92770);
+}
+
+.stp__back:hover,
+.stp__scene-list-meta button:hover {
+  background: var(--pink-50, #FFF1F7);
+}
+
+.stp__header-eyebrow,
+.stp__scene-list-number,
+.stp__scene-list-status--current {
+  background: var(--pink-50, #FFF1F7);
+  color: var(--pink-700, #C92770);
+}
+
+.stp__title {
+  color: var(--ink, #302431);
+}
+
+.stp__subtitle,
+.stp__scene-list-copy span,
+.stp__scene-list-date,
+.stp__scene-list-copy p {
+  color: var(--gray-600, #766873);
+}
+
+.stp__survey-stats,
+.stp__flow-wrapper,
+.stp__scene-list-item,
+.stp__modal-card,
+.stp__placeholder-card {
+  border-color: var(--gray-100, #F5EEF2);
+  box-shadow: var(--shadow-sm);
+}
+
+.stp__scene-list-item:hover {
+  border-color: var(--pink-100, #FFD9EA);
+  box-shadow: var(--shadow-md);
+}
+
+.stp__scene-list-copy h2,
+.stp__survey-number,
+.stp__modal-title,
+.stp__placeholder-title {
+  color: var(--ink, #302431);
+}
+
+.stp__scene-list-meta button {
+  border-color: var(--pink-100, #FFD9EA);
+  background: var(--pink-50, #FFF1F7);
+  color: var(--pink-700, #C92770);
+}
+
+.story-node--current {
+  background: var(--pink-50, #FFF1F7);
+}
+
+.story-node__badge,
+.stp__placeholder-tag {
+  color: var(--pink-700, #C92770);
+}
+
+.stp__placeholder-card {
+  border-radius: var(--r-lg, 16px);
+}
+
 .stp__loading-state, .stp__error-state {
   padding: 80px 20px;
   text-align: center;
@@ -986,7 +1078,7 @@
   border-radius: 24px;
   background: var(--pink);
   color: #ffffff;
-  font-family: 'Sarabun', sans-serif;
+  font-family: 'Anuphan', sans-serif;
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;

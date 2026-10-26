@@ -12,6 +12,7 @@ import Comments from "../../../components/Comments/Comments";
 import EndingUnlockedModal, { ENDING_DEFINITIONS } from "../../../components/EndingUnlockedModal/EndingUnlockedModal";
 import AdminModeBanner from "../../../components/AdminModeBanner/AdminModeBanner";
 import { ReadingPageSkeleton, DataLoadError, ButtonSpinner } from "../../../components/Skeleton";
+import { getAvatar, saveWriterAvatar } from "../../../utils/avatarService";
 
 const BASE_URL = import.meta.env?.VITE_API_BASE_URL || "http://localhost:8080";
 
@@ -60,6 +61,8 @@ const ReadingPage = ({
   };
 
   const getCurrentUserId = () => {
+    const token = localStorage.getItem("token");
+    if (!token) return 0;
     const userJson = localStorage.getItem("user");
     if (!userJson) return 0;
     try {
@@ -72,6 +75,8 @@ const ReadingPage = ({
   };
 
   const checkIsAdmin = () => {
+    const token = localStorage.getItem("token");
+    if (!token) return false;
     try {
       const userJson = localStorage.getItem("user");
       if (userJson) {
@@ -81,7 +86,6 @@ const ReadingPage = ({
       }
     } catch {}
     try {
-      const token = localStorage.getItem("token");
       if (token) {
         const parts = token.split(".");
         if (parts.length === 3) {
@@ -103,7 +107,11 @@ const ReadingPage = ({
   // เดิม checkIsAdmin()/getCurrentUserId() ถูกเรียกตรงๆ ทุก render (parse JSON + decode JWT
   // ซ้ำทุกครั้งที่ state ไหนๆ ในหน้าเปลี่ยน) ครอบด้วย useMemo ให้คำนวณใหม่เฉพาะตอน mount
   const isAdmin = useMemo(() => checkIsAdmin(), []);
-  const effectiveUserId = useMemo(() => getCurrentUserId() || userId, [userId]);
+  const effectiveUserId = useMemo(() => {
+    const token = localStorage.getItem("token");
+    if (!token) return 0;
+    return getCurrentUserId() || userId || 0;
+  }, [userId]);
 
   const [currentSceneId, setCurrentSceneId] = useState(initialSceneId || sceneId || null);
   const [sceneData, setSceneData] = useState(null);
@@ -141,9 +149,11 @@ const ReadingPage = ({
     let isSubscribed = true;
     const fetchNovelAuthor = async () => {
       try {
-        const token = localStorage.getItem("token");
-        const headers = token ? { Authorization: `Bearer ${token}` } : {};
-        const res = await fetch(`${BASE_URL}/novels/${novelId}`, { headers });
+        // 🔗 เชื่อมต่อ GET /api/v1/novels/:id: ดึงข้อมูลรายละเอียดของนิยายเพื่อตรวจสอบผู้แต่ง
+        let res = await fetch(`${BASE_URL}/api/v1/novels/${novelId}`, { headers });
+        if (!res.ok) {
+          res = await fetch(`${BASE_URL}/novels/${novelId}`, { headers });
+        }
         if (!res.ok) return;
 
         const payload = await res.json().catch(() => null);
@@ -155,7 +165,11 @@ const ReadingPage = ({
 
         if (authorWriterId) {
           try {
-            const wRes = await fetch(`${BASE_URL}/writer/${authorWriterId}`);
+            // 🔗 เชื่อมต่อ GET /api/v1/writers/:id: ดึงข้อมูลโปรไฟล์ของนักเขียนผู้แต่งนิยาย
+            let wRes = await fetch(`${BASE_URL}/api/v1/writers/${authorWriterId}`);
+            if (!wRes.ok) {
+              wRes = await fetch(`${BASE_URL}/writer/${authorWriterId}`);
+            }
             if (wRes.ok) {
               const wJson = await wRes.json().catch(() => null);
               const wData = wJson?.data || wJson?.writer || wJson || {};
@@ -167,6 +181,24 @@ const ReadingPage = ({
               }
             }
           } catch {}
+        }
+
+        if (!resolvedAvatar) {
+          resolvedAvatar = getAvatar({
+            writerId: authorWriterId,
+            userId: authorUserId,
+            username: nData.pen_name || nData.author_name,
+            novelId: novelId,
+          });
+        }
+
+        if (resolvedAvatar) {
+          saveWriterAvatar({
+            writer_id: authorWriterId,
+            user_id: authorUserId,
+            pen_name: nData.pen_name || nData.author_name,
+            avatar_url: resolvedAvatar,
+          });
         }
 
         if (isSubscribed) {
@@ -193,7 +225,11 @@ const ReadingPage = ({
     if (!sceneId) return;
 
     try {
-      const response = await fetch(`${BASE_URL}/scenes/${sceneId}/comments`);
+      // 🔗 เชื่อมต่อ GET /api/v1/scenes/:id/comments: ดึงรายการความคิดเห็นทั้งหมดในฉากนี้
+      let response = await fetch(`${BASE_URL}/api/v1/scenes/${sceneId}/comments`);
+      if (!response.ok) {
+        response = await fetch(`${BASE_URL}/scenes/${sceneId}/comments`);
+      }
       if (!response.ok) {
         throw new Error(`failed to load comments (${response.status})`);
       }
@@ -215,13 +251,13 @@ const ReadingPage = ({
     try {
       const stored = JSON.parse(localStorage.getItem("readingSettings"));
       return {
-        fontFamily: stored?.fontFamily || "Sarabun",
+        fontFamily: stored?.fontFamily || "Anuphan",
         fontSize: stored?.fontSize || 18,
         theme: stored?.theme || "light",
       };
     } catch {
       return {
-        fontFamily: "Sarabun",
+        fontFamily: "Anuphan",
         fontSize: 18,
         theme: "light",
       };
@@ -236,6 +272,8 @@ const ReadingPage = ({
 
   const getFontFamilyString = (value) => {
     switch (value) {
+      case "Anuphan":
+        return "'Anuphan', sans-serif";
       case "Sarabun":
         return "'Sarabun', sans-serif";
       case "Open Sans":
@@ -245,7 +283,7 @@ const ReadingPage = ({
       case "Kanit":
         return "'Kanit', sans-serif";
       default:
-        return "'Sarabun', sans-serif";
+        return "'Anuphan', sans-serif";
     }
   };
 
@@ -258,7 +296,11 @@ const ReadingPage = ({
     if (!currentNovelId || !userId) return false;
 
     try {
-      const response = await fetch(`${BASE_URL}/bookshelves?user_id=${userId}`, { headers });
+      // 🔗 เชื่อมต่อ GET /api/v1/bookshelves?user_id=:id: ตรวจสอบสถานะว่านิยายเรื่องนี้อยู่ในชั้นหนังสือของผู้ใช้หรือไม่
+      let response = await fetch(`${BASE_URL}/api/v1/bookshelves?user_id=${userId}`, { headers });
+      if (!response.ok) {
+        response = await fetch(`${BASE_URL}/bookshelves?user_id=${userId}`, { headers });
+      }
       if (!response.ok) return false;
 
       const payload = await response.json().catch(() => null);
@@ -310,7 +352,8 @@ const ReadingPage = ({
       if (!effectiveUserId) {
         console.warn("No logged-in user found, skipping progress save.");
       } else {
-        const progressRes = await fetch(`${BASE_URL}/progress`, {
+        // 🔗 เชื่อมต่อ POST /api/v1/reading/progress: บันทึกความคืบหน้าการอ่านของผู้ใช้ (ฉากปัจจุบัน)
+        let progressRes = await fetch(`${BASE_URL}/api/v1/reading/progress`, {
           method: "POST",
           headers,
           body: JSON.stringify({
@@ -319,6 +362,17 @@ const ReadingPage = ({
             current_scene_id: parseInt(sId)
           })
         });
+        if (!progressRes.ok) {
+          progressRes = await fetch(`${BASE_URL}/progress`, {
+            method: "POST",
+            headers,
+            body: JSON.stringify({
+              user_id: parseInt(effectiveUserId),
+              novel_id: parseInt(nId),
+              current_scene_id: parseInt(sId)
+            })
+          });
+        }
 
         if (!progressRes.ok) {
           const errText = await progressRes.text();
@@ -326,7 +380,8 @@ const ReadingPage = ({
         }
 
         if ((sceneType === "ending" || sceneType === "Ending") && effectiveUserId) {
-          const endingRes = await fetch(`${BASE_URL}/user-endings`, {
+          // 🔗 เชื่อมต่อ POST /api/v1/reading/user-endings: บันทึกประวัติการปลดล็อกฉากจบของผู้อ่าน
+          let endingRes = await fetch(`${BASE_URL}/api/v1/reading/user-endings`, {
             method: "POST",
             headers,
             body: JSON.stringify({
@@ -335,6 +390,17 @@ const ReadingPage = ({
               scene_id: parseInt(sId)
             })
           });
+          if (!endingRes.ok) {
+            endingRes = await fetch(`${BASE_URL}/user-endings`, {
+              method: "POST",
+              headers,
+              body: JSON.stringify({
+                user_id: parseInt(effectiveUserId),
+                novel_id: parseInt(nId),
+                scene_id: parseInt(sId)
+              })
+            });
+          }
 
           if (!endingRes.ok) {
             const errText = await endingRes.text();
@@ -343,7 +409,11 @@ const ReadingPage = ({
 
           // ดึงรายการฉากจบทั้งหมดของนิยายเรื่องนี้เพื่อนำมาแสดงใน Pop-up Modal
           try {
-            const allEndingsRes = await fetch(`${BASE_URL}/novels/${nId}/endings?user_id=${effectiveUserId}`, { headers });
+            // 🔗 เชื่อมต่อ GET /api/v1/novels/:id/endings: ดึงรายการฉากจบทั้งหมดของนิยายเรื่องนี้
+            let allEndingsRes = await fetch(`${BASE_URL}/api/v1/novels/${nId}/endings?user_id=${effectiveUserId}`, { headers });
+            if (!allEndingsRes.ok) {
+              allEndingsRes = await fetch(`${BASE_URL}/novels/${nId}/endings?user_id=${effectiveUserId}`, { headers });
+            }
             if (allEndingsRes.ok) {
               const endingsPayload = await allEndingsRes.json();
               const fetchedEndings =
@@ -397,9 +467,11 @@ useEffect(() => {
                                  activeSceneId === "new";
 
         if (isInvalidSceneId) {
-          url = `${BASE_URL}/novels/${novelId}/start${query}`;
+          // 🔗 เชื่อมต่อ GET /api/v1/novels/:id/start: ดึงฉากเริ่มต้น (First Scene) ของนิยาย
+          url = `${BASE_URL}/api/v1/novels/${novelId}/start${query}`;
         } else {
-          url = `${BASE_URL}/scenes/${activeSceneId}${query}`;
+          // 🔗 เชื่อมต่อ GET /api/v1/scenes/:id: ดึงเนื้อหาฉากนิยายปัจจุบันที่กำลังอ่าน
+          url = `${BASE_URL}/api/v1/scenes/${activeSceneId}${query}`;
         }
 
         const token = localStorage.getItem("token");
@@ -409,7 +481,12 @@ useEffect(() => {
           headers["Authorization"] = `Bearer ${token}`;
         }
 
-        const response = await fetch(url, { headers });
+        let response = await fetch(url, { headers });
+        if (!response.ok && url.includes("/api/v1/")) {
+          // Fallback สำหรับ backend ที่ตัวดึง ID ยังรองรับเฉพาะพาธเดิม
+          const fallbackUrl = url.replace("/api/v1/", "/");
+          response = await fetch(fallbackUrl, { headers });
+        }
         if (isStale) return;
 
         if (response.status === 404) {
@@ -542,7 +619,8 @@ useEffect(() => {
         if (!effectiveUserId) {
           console.warn("No logged-in user found, skipping choice history save.");
         } else {
-          const response = await fetch(`${BASE_URL}/choice-history`, {
+          // 🔗 เชื่อมต่อ POST /api/v1/reading/choice-histories: บันทึกการตัดสินใจเลือกทางเลือกของผู้อ่าน
+          let response = await fetch(`${BASE_URL}/api/v1/reading/choice-histories`, {
             method: "POST",
             headers,
             body: JSON.stringify({
@@ -550,6 +628,16 @@ useEffect(() => {
               choice_id: parseInt(choice.choice_id)
             })
           });
+          if (!response.ok) {
+            response = await fetch(`${BASE_URL}/choice-history`, {
+              method: "POST",
+              headers,
+              body: JSON.stringify({
+                user_id: parseInt(effectiveUserId),
+                choice_id: parseInt(choice.choice_id)
+              })
+            });
+          }
 
           if (!response.ok) {
             setIsTransitioning(false);
@@ -645,18 +733,30 @@ useEffect(() => {
       const headers = { "Content-Type": "application/json" };
       if (token) headers.Authorization = `Bearer ${token}`;
 
-      // 🎯 backend ดึง user_id จาก token ผ่าน middleware.RequireAuth เอง (ไม่อ่านจาก body/query)
-      // ฝั่งนี้เลยส่งแค่ novel_id พอ — DELETE อ่าน novel_id จาก query, POST อ่านจาก JSON body
-      const response = nextValue
-        ? await fetch(`${BASE_URL}/bookshelves`, {
+      // 🔗 เชื่อมต่อ POST /api/v1/bookshelves หรือ DELETE /api/v1/bookshelves: เพิ่มหรือลบนิยายออกจากชั้นหนังสือ
+      let response = nextValue
+        ? await fetch(`${BASE_URL}/api/v1/bookshelves`, {
             method: "POST",
             headers,
             body: JSON.stringify({ novel_id: parseInt(novelId) }),
           })
-        : await fetch(`${BASE_URL}/bookshelves?novel_id=${novelId}`, {
+        : await fetch(`${BASE_URL}/api/v1/bookshelves?novel_id=${novelId}`, {
             method: "DELETE",
             headers,
           });
+
+      if (!response.ok) {
+        response = nextValue
+          ? await fetch(`${BASE_URL}/bookshelves`, {
+              method: "POST",
+              headers,
+              body: JSON.stringify({ novel_id: parseInt(novelId) }),
+            })
+          : await fetch(`${BASE_URL}/bookshelves?novel_id=${novelId}`, {
+              method: "DELETE",
+              headers,
+            });
+      }
 
       if (!response.ok) {
         throw new Error(`bookshelf update failed (${response.status})`);
@@ -686,10 +786,18 @@ useEffect(() => {
         const headers = {};
         if (token) headers["Authorization"] = `Bearer ${token}`;
 
-        const response = await fetch(`${BASE_URL}/progress?user_id=${effectiveUserId}&novel_id=${novelId}`, {
+        // 🔗 เชื่อมต่อ DELETE /api/v1/reading/progress: รีเซ็ตความคืบหน้าการอ่านนิยายเรื่องนี้เพื่อเริ่มต้นอ่านใหม่
+        let response = await fetch(`${BASE_URL}/api/v1/reading/progress?user_id=${effectiveUserId}&novel_id=${novelId}`, {
           method: "DELETE",
           headers,
         });
+
+        if (!response.ok) {
+          response = await fetch(`${BASE_URL}/progress?user_id=${effectiveUserId}&novel_id=${novelId}`, {
+            method: "DELETE",
+            headers,
+          });
+        }
 
         if (!response.ok) {
           const errText = await response.text();
@@ -754,7 +862,8 @@ useEffect(() => {
         content: trimmed,
       };
 
-      const response = await fetch(`${BASE_URL}/comments`, {
+      // 🔗 เชื่อมต่อ POST /api/v1/comments: ส่งความคิดเห็นใหม่ในฉากนิยาย
+      let response = await fetch(`${BASE_URL}/api/v1/comments`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -762,6 +871,17 @@ useEffect(() => {
         },
         body: JSON.stringify(bodyPayload),
       });
+
+      if (!response.ok) {
+        response = await fetch(`${BASE_URL}/comments`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(bodyPayload),
+        });
+      }
 
       const payload = await response.json().catch(() => null);
       if (!response.ok) {
@@ -789,12 +909,22 @@ useEffect(() => {
     }
 
     try {
-      const response = await fetch(`${BASE_URL}/comments?comment_id=${commentId}`, {
+      // 🔗 เชื่อมต่อ DELETE /api/v1/comments?comment_id=:id: ลบความคิดเห็นของผู้ใช้
+      let response = await fetch(`${BASE_URL}/api/v1/comments?comment_id=${commentId}`, {
         method: "DELETE",
         headers: {
           Authorization: `Bearer ${token}`,
         },
       });
+
+      if (!response.ok) {
+        response = await fetch(`${BASE_URL}/comments?comment_id=${commentId}`, {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+      }
 
       if (!response.ok) {
         const payload = await response.json().catch(() => null);

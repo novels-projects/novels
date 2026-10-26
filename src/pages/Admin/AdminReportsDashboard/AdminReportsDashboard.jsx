@@ -27,6 +27,8 @@ import {
     ArrowUp
 } from "lucide-react";
 import "./AdminReportsDashboard.css";
+import { apiFetch } from "../../../utils/apiFetch";
+import { unregisterBannedNovel } from "../../../utils/novelStatus";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
 
@@ -61,6 +63,18 @@ const getApiErrorMessage = async (res, fallback) => {
     } catch {
         return fallback;
     }
+};
+
+// ตรวจสอบว่ารายงานนี้เป็น "คำขอปลดแบน" หรือไม่ (ทั้งจาก report_type, status หรือข้อความเหตุผล)
+const isAppealReport = (report) => {
+    if (!report) return false;
+    const type = (report.report_type || "").toLowerCase();
+    const status = (report.status || "").toLowerCase();
+    if (type === "appeal" || status === "appeal_pending") return true;
+    const reason = (report.reason || "").trim();
+    if (reason.startsWith("[คำขอปลดแบน]") || reason.startsWith("[ขอปลดแบน]")) return true;
+    if (reason.toLowerCase().includes("คำขอปลดแบน") || reason.toLowerCase().includes("ขอปลดแบน")) return true;
+    return false;
 };
 
 // 🟢 Component for displaying Category Tags in Table (Explicit 2-Row Grid: Line 1 = Cats 1-2, Line 2 = Cats 3-4 + [+N หมวด])
@@ -252,7 +266,8 @@ export default function AdminReportsDashboard() {
     // -------------------------------------------------------------
     const fetchCategories = useCallback(async () => {
         try {
-            const res = await fetch(`${API_BASE_URL}/categories`);
+            // 🔗 เชื่อมต่อ GET /api/v1/categories: ดึงรายการหมวดหมู่ทั้งหมดในระบบสำหรับตัวกรอง
+            const res = await apiFetch(`${API_BASE_URL}/api/v1/categories`);
             if (res.ok) {
                 const data = await res.json();
                 const list = Array.isArray(data) ? data : (data?.data ?? []);
@@ -279,7 +294,8 @@ export default function AdminReportsDashboard() {
                 limit: String(storyPageSize),
             });
             if (storyCategoryFilter !== "all") params.set("category_id", storyCategoryFilter);
-            const res = await fetch(`${API_BASE_URL}/api/admin/novels?${params}`, { headers });
+            // 🔗 เชื่อมต่อ GET /api/admin/novels: ดึงรายการนิยายทั้งหมดในระบบสำหรับหน้าจัดการของแอดมิน
+            const res = await apiFetch(`${API_BASE_URL}/api/admin/novels?${params}`, { headers });
             if (!res.ok) {
                 if (res.status === 401) throw new Error("เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่");
                 if (res.status === 403) throw new Error("คุณไม่มีสิทธิ์เข้าถึงข้อมูลนี้");
@@ -311,9 +327,10 @@ export default function AdminReportsDashboard() {
                 page: String(reportPage),
                 limit: String(reportPageSize),
             });
-            const res = await fetch(`${API_BASE_URL}/api/admin/reports?${params}`, {
+            // 🔗 เชื่อมต่อ GET /api/admin/reports: ดึงรายการรายงานปัญหาทั้งหมดสำหรับแอดมิน
+            const res = await apiFetch(`${API_BASE_URL}/api/admin/reports?${params}`, {
                 headers: {
-                    Authorization: `Bearer ${token}`,
+                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
                 },
             });
 
@@ -337,23 +354,25 @@ export default function AdminReportsDashboard() {
 
     const fetchReportStats = useCallback(async () => {
         const token = localStorage.getItem("token");
-        const headers = { Authorization: `Bearer ${token}` };
+        const headers = token ? { Authorization: `Bearer ${token}` } : {};
         const getCount = async (status) => {
             const params = new URLSearchParams({ status, type: "all", page: "1", limit: "1" });
-            const res = await fetch(`${API_BASE_URL}/api/admin/reports?${params}`, { headers });
+            // 🔗 เชื่อมต่อ GET /api/admin/reports: ดึงสถิติจำนวนรายงานแยกตามสถานะ
+            const res = await apiFetch(`${API_BASE_URL}/api/admin/reports?${params}`, { headers });
             if (!res.ok) throw new Error(await getApiErrorMessage(res, "ไม่สามารถดึงสรุปจำนวนรายงานได้"));
             const data = await res.json();
             return Number(data?.total ?? 0);
         };
 
         try {
-            const [pending, resolved, rejected] = await Promise.all([
+            const [pending, appealPending, resolved, rejected] = await Promise.all([
                 getCount("pending"),
+                getCount("appeal_pending").catch(() => 0),
                 getCount("resolved"),
                 getCount("rejected"),
             ]);
             setReportStats({
-                pending,
+                pending: Number(pending || 0) + Number(appealPending || 0),
                 resolved,
                 rejected,
             });
@@ -546,7 +565,11 @@ export default function AdminReportsDashboard() {
     // Execute Story Action
     const handleExecuteStoryAction = async () => {
         if (!selectedStory) return;
-        const novelId = selectedStory.novel_id || selectedStory.id || selectedStory.NovelID;
+        const novelId = selectedStory.novel_id ?? selectedStory.id ?? selectedStory.NovelID;
+        if (!novelId) {
+            setActionError("ไม่พบรหัสประจำเรื่อง กรุณาลองใหม่อีกครั้ง");
+            return;
+        }
         const token = localStorage.getItem("token");
 
         setActionSubmitting(true);
@@ -562,22 +585,24 @@ export default function AdminReportsDashboard() {
                     throw new Error("กรุณายืนยันว่าคุณต้องการลบเรื่องนี้จริงเพื่อดำเนินการต่อ");
                 }
                 const action = storyModalType === "suspend" ? "suspend" : "delete";
-                const res = await fetch(`${API_BASE_URL}/api/admin/novels/${novelId}/moderation`, {
+                // 🔗 เชื่อมต่อ PATCH /api/admin/novels/:id/moderation: ดำเนินการระงับหรือลบนิยายโดยแอดมิน
+                const res = await apiFetch(`${API_BASE_URL}/api/admin/novels/${novelId}/moderation`, {
                     method: "PATCH",
                     headers: {
                         "Content-Type": "application/json",
-                        Authorization: `Bearer ${token}`,
+                        ...(token ? { Authorization: `Bearer ${token}` } : {}),
                     },
                     body: JSON.stringify({
                         action,
-                        reason: actionReason.trim() || undefined,
+                        reason,
                     }),
                 });
 
                 if (!res.ok) {
+                    if (res.status === 401) throw new Error("เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่");
                     if (res.status === 403) throw new Error("คุณไม่มีสิทธิ์ดำเนินการนี้");
                     if (res.status === 409) throw new Error(await getApiErrorMessage(res, "สถานะนิยายไม่รองรับการดำเนินการนี้"));
-                    if (res.status === 404) throw new Error("ไม่พบเรื่องที่ต้องการระงับ");
+                    if (res.status === 404) throw new Error("ไม่พบเรื่องที่ต้องการดำเนินการ");
                     throw new Error(await getApiErrorMessage(res, "ไม่สามารถดำเนินการกับเรื่องได้ กรุณาลองใหม่อีกครั้ง"));
                 }
 
@@ -585,21 +610,25 @@ export default function AdminReportsDashboard() {
                 showToast(`${storyModalType === "suspend" ? "ระงับ" : "ลบ"}เรื่อง “${selectedStory.title || selectedStory.Title}” สำเร็จ`, "success");
                 setStoryModalType(null);
                 setSelectedStory(null);
+                setActionReason("");
             } else if (storyModalType === "unsuspend") {
-                const res = await fetch(`${API_BASE_URL}/api/admin/novels/${novelId}/unban`, {
+                // 🔗 เชื่อมต่อ PATCH /api/admin/novels/:id/unban: ปลดแบนหรือยกเลิกการระงับนิยายโดยแอดมิน
+                const res = await apiFetch(`${API_BASE_URL}/api/admin/novels/${novelId}/unban`, {
                     method: "PATCH",
                     headers: {
-                        Authorization: `Bearer ${token}`,
+                        ...(token ? { Authorization: `Bearer ${token}` } : {}),
                     },
                 });
 
                 if (!res.ok) {
+                    if (res.status === 401) throw new Error("เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่");
                     if (res.status === 403) throw new Error("คุณไม่มีสิทธิ์ดำเนินการนี้");
                     if (res.status === 409) throw new Error(await getApiErrorMessage(res, "สถานะนิยายไม่รองรับการยกเลิกการระงับ"));
                     if (res.status === 404) throw new Error("ไม่พบเรื่องที่ต้องการยกเลิกการระงับ");
                     throw new Error(await getApiErrorMessage(res, "ไม่สามารถยกเลิกการระงับเรื่องได้ กรุณาลองใหม่อีกครั้ง"));
                 }
 
+                unregisterBannedNovel(novelId);
                 await fetchStories(true);
                 showToast(`ยกเลิกการระงับเรื่อง “${selectedStory.title || selectedStory.Title}” สำเร็จ`, "success");
                 setStoryModalType(null);
@@ -618,39 +647,163 @@ export default function AdminReportsDashboard() {
     // -------------------------------------------------------------
     const handleUpdateReportStatus = async (report, newStatus) => {
         if (!report) return;
-        if (report.report_type === "appeal" && report.status !== "appeal_pending") return;
+        const isAppeal = isAppealReport(report);
+        const reportStatus = (report.status || "").toLowerCase();
+
+        // หากดำเนินการเสร็จสิ้นไปแล้ว (ไม่ใช่ pending หรือ appeal_pending) ไม่ต้องทำซ้ำ
+        if (reportStatus !== "pending" && reportStatus !== "appeal_pending") return;
+
         setReportActionSubmitting(true);
         setReportActionError("");
         const token = localStorage.getItem("token");
 
+        const reportId = report.report_id ?? report.id ?? report.ReportID;
+        const novelId = report.novel_id ?? report.novelId ?? report.NovelID;
+
+        if (!reportId) {
+            setReportActionError("ไม่พบรหัสรายงาน กรุณาลองใหม่อีกครั้ง");
+            setReportActionSubmitting(false);
+            return;
+        }
+
+        const trimmedReason = reportDecisionReason.trim();
+        const finalReason = trimmedReason || (
+            newStatus === "resolved"
+                ? (isAppeal ? "อนุมัติคำขอปลดแบน" : "ระงับเรื่องตามการรายงาน")
+                : (isAppeal ? "ปฏิเสธคำขอปลดแบน" : "ไม่พบการกระทำผิดตามที่รายงาน")
+        );
+
         try {
-            const res = await fetch(`${API_BASE_URL}/api/admin/reports/${report.report_id}/status`, {
+            // 🟢 กรณีที่ 1: เป็นคำขอปลดแบน และแอดมินกด "อนุมัติการปลดแบน"
+            if (isAppeal && newStatus === "resolved") {
+                if (reportStatus === "appeal_pending") {
+                    // Backend UpdateReportStatus จะ unban novel (status = 'draft', is_published = false)
+                    // และเปลี่ยน status report เป็น resolved ให้อัตโนมัติ
+                    const res = await apiFetch(`${API_BASE_URL}/api/admin/reports/${reportId}/status`, {
+                        method: "PATCH",
+                        headers: {
+                            "Content-Type": "application/json",
+                            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                        },
+                        body: JSON.stringify({ status: "resolved", reason: finalReason }),
+                    });
+
+                    if (!res.ok) {
+                        // หาก Backend ฟ้องข้อผิดพลาด ให้ลอง unban novel โดยตรง
+                        if (novelId) {
+                            await apiFetch(`${API_BASE_URL}/api/admin/novels/${novelId}/unban`, {
+                                method: "PATCH",
+                                headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+                            }).catch(() => {});
+                        }
+                        if (res.status === 401) throw new Error("เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่");
+                        if (res.status === 403) throw new Error("คุณไม่มีสิทธิ์ดำเนินการนี้");
+                        throw new Error(await getApiErrorMessage(res, "ไม่สามารถอนุมัติคำขอปลดแบนได้ กรุณาลองใหม่อีกครั้ง"));
+                    }
+                } else {
+                    // สำหรับคำขอที่ถูกส่งมาทาง fallback reports (status === 'pending')
+                    // 1. อัปเดตสถานะรายงานใน Backend ก่อน
+                    const statusRes = await apiFetch(`${API_BASE_URL}/api/admin/reports/${reportId}/status`, {
+                        method: "PATCH",
+                        headers: {
+                            "Content-Type": "application/json",
+                            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                        },
+                        body: JSON.stringify({ status: "resolved", reason: finalReason }),
+                    });
+
+                    // 2. ปลดแบนนิยายผ่าน /api/admin/novels/:id/unban
+                    if (novelId) {
+                        const unbanRes = await apiFetch(`${API_BASE_URL}/api/admin/novels/${novelId}/unban`, {
+                            method: "PATCH",
+                            headers: {
+                                ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                            },
+                        });
+                        if (!unbanRes.ok && unbanRes.status !== 409 && unbanRes.status !== 404) {
+                            console.warn("Unban novel response:", await unbanRes.text().catch(() => ""));
+                        }
+                    }
+
+                    if (!statusRes.ok) {
+                        await apiFetch(`${API_BASE_URL}/api/admin/reports/${reportId}/status`, {
+                            method: "PATCH",
+                            headers: {
+                                "Content-Type": "application/json",
+                                ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                            },
+                            body: JSON.stringify({ status: "rejected", reason: finalReason }),
+                        }).catch(() => {});
+                    }
+                }
+
+                if (novelId) {
+                    unregisterBannedNovel(novelId);
+                }
+
+                await Promise.all([fetchReports(true), fetchReportStats(), fetchStories(true)]);
+                showToast("อนุมัติคำขอปลดแบนเรียบร้อยแล้ว", "success");
+                setSelectedReport(null);
+                setReportDecisionReason("");
+                return;
+            }
+
+            // 🔴 กรณีที่ 2: เป็นคำขอปลดแบน และแอดมินกด "ปฏิเสธคำขอปลดแบน"
+            if (isAppeal && newStatus === "rejected") {
+                const res = await apiFetch(`${API_BASE_URL}/api/admin/reports/${reportId}/status`, {
+                    method: "PATCH",
+                    headers: {
+                        "Content-Type": "application/json",
+                        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                    },
+                    body: JSON.stringify({ status: "rejected", reason: finalReason }),
+                });
+
+                if (!res.ok) {
+                    if (res.status === 401) throw new Error("เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่");
+                    if (res.status === 403) throw new Error("คุณไม่มีสิทธิ์ดำเนินการนี้");
+                    throw new Error(await getApiErrorMessage(res, "ไม่สามารถปฏิเสธคำขอปลดแบนได้ กรุณาลองใหม่อีกครั้ง"));
+                }
+
+                await Promise.all([fetchReports(true), fetchReportStats()]);
+                showToast("ปฏิเสธคำขอปลดแบนเรียบร้อยแล้ว", "success");
+                setSelectedReport(null);
+                setReportDecisionReason("");
+                return;
+            }
+
+            // ⚪ กรณีที่ 3: รายงานเนื้อหาทั่วไป
+            const res = await apiFetch(`${API_BASE_URL}/api/admin/reports/${reportId}/status`, {
                 method: "PATCH",
                 headers: {
                     "Content-Type": "application/json",
-                    Authorization: `Bearer ${token}`,
+                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
                 },
-                body: JSON.stringify({ status: newStatus, reason: reportDecisionReason.trim() }),
+                body: JSON.stringify({ status: newStatus, reason: finalReason }),
             });
 
             if (!res.ok) {
+                if (res.status === 401) throw new Error("เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่");
                 if (res.status === 403) throw new Error("คุณไม่มีสิทธิ์ดำเนินการนี้");
                 if (res.status === 409) throw new Error(await getApiErrorMessage(res, "สถานะรายงานไม่รองรับการดำเนินการนี้"));
                 if (res.status === 404) throw new Error("ไม่พบรายงานนี้ในระบบ");
                 throw new Error(await getApiErrorMessage(res, "ไม่สามารถอัปเดตสถานะรายงานได้ กรุณาลองใหม่อีกครั้ง"));
             }
 
+            if (newStatus === "resolved" && novelId) {
+                unregisterBannedNovel(novelId);
+            }
+
             await Promise.all([fetchReports(true), fetchReportStats(), fetchStories(true)]);
 
             const successText =
                 newStatus === "resolved"
-                    ? report.report_type === "appeal"
-                        ? "อนุมัติคำขอปลดแบนเรียบร้อยแล้ว"
-                        : "ดำเนินการระงับเรื่องตามรายงานเรียบร้อยแล้ว"
+                    ? "ดำเนินการระงับเรื่องตามรายงานเรียบร้อยแล้ว"
                     : "บันทึกผลพิจารณาเรียบร้อยแล้ว";
 
             showToast(successText, "success");
             setSelectedReport(null);
+            setReportDecisionReason("");
         } catch (err) {
             console.error("Update report status error:", err);
             setReportActionError(err.message || "เกิดข้อผิดพลาดในการอัปเดตสถานะ");
@@ -660,19 +813,20 @@ export default function AdminReportsDashboard() {
     };
 
     // Helper for Report Status info
-    const getReportStatusInfo = (status) => {
+    const getReportStatusInfo = (status, report = null) => {
         const s = (status || "").toLowerCase();
+        const isAppeal = report ? isAppealReport(report) : false;
+        if (s === "appeal_pending" || (s === "pending" && isAppeal)) {
+            return { label: "คำขอปลดแบน", className: "report-badge report-badge--appeal" };
+        }
         if (s === "pending") {
             return { label: "รอตรวจสอบ", className: "report-badge report-badge--pending" };
         }
-        if (s === "appeal_pending") {
-            return { label: "คำขอปลดแบน", className: "report-badge report-badge--appeal" };
-        }
         if (s === "resolved") {
-            return { label: "ดำเนินการแล้ว", className: "report-badge report-badge--resolved" };
+            return { label: isAppeal ? "อนุมัติปลดแบนแล้ว" : "ดำเนินการแล้ว", className: "report-badge report-badge--resolved" };
         }
         if (s === "rejected") {
-            return { label: "ปฏิเสธ / ยังมีปัญหา", className: "report-badge report-badge--rejected" };
+            return { label: isAppeal ? "ปฏิเสธคำขอปลดแบน" : "ปฏิเสธ / ยังมีปัญหา", className: "report-badge report-badge--rejected" };
         }
         return { label: status || "-", className: "report-badge report-badge--neutral" };
     };
@@ -1443,8 +1597,8 @@ export default function AdminReportsDashboard() {
                                             </thead>
                                             <tbody>
                                                 {paginatedReports.map((report) => {
-                                                    const statusInfo = getReportStatusInfo(report.status);
-                                                    const isAppeal = report.report_type === "appeal";
+                                                    const isAppeal = isAppealReport(report);
+                                                    const statusInfo = getReportStatusInfo(report.status, report);
                                                     const cleanReason = stripHtml(report.reason);
 
                                                     return (
@@ -1477,7 +1631,9 @@ export default function AdminReportsDashboard() {
                                                             {/* Reporter */}
                                                             <td>
                                                                 <span className="admin-text-medium">
-                                                                    {isAppeal ? "นักเขียนเจ้าของเรื่อง" : report.username || `User #${report.user_id}`}
+                                                                    {isAppeal
+                                                                        ? (report.author_pen_name ? `${report.author_pen_name} (นักเขียน)` : "นักเขียนเจ้าของเรื่อง")
+                                                                        : (report.username || `User #${report.user_id}`)}
                                                                 </span>
                                                             </td>
 
@@ -1515,10 +1671,10 @@ export default function AdminReportsDashboard() {
                                                                             setSelectedReport(report);
                                                                             setReportDecisionReason("");
                                                                         }}
-                                                                        title="ตรวจสอบรายละเอียดรายงาน"
+                                                                        title={isAppeal ? "ตรวจสอบคำขอปลดแบน" : "ตรวจสอบรายละเอียดรายงาน"}
                                                                     >
                                                                         <FileText size={14} />
-                                                                        <span>ตรวจสอบ</span>
+                                                                        <span>{isAppeal ? "ตรวจสอบคำขอ" : "ตรวจสอบ"}</span>
                                                                     </button>
                                                                 </div>
                                                             </td>
@@ -1532,8 +1688,8 @@ export default function AdminReportsDashboard() {
                                     {/* Mobile Cards View */}
                                     <div className="admin-cards-mobile">
                                         {paginatedReports.map((report) => {
-                                            const statusInfo = getReportStatusInfo(report.status);
-                                            const isAppeal = report.report_type === "appeal";
+                                            const isAppeal = isAppealReport(report);
+                                            const statusInfo = getReportStatusInfo(report.status, report);
                                             const cleanReason = stripHtml(report.reason);
 
                                             return (
@@ -1549,7 +1705,7 @@ export default function AdminReportsDashboard() {
 
                                                     <div className="admin-report-card-mobile__detail">
                                                         <div>
-                                                            ผู้รายงาน: <strong>{isAppeal ? "นักเขียนเจ้าของเรื่อง" : report.username || `User #${report.user_id}`}</strong>
+                                                            ผู้รายงาน: <strong>{isAppeal ? (report.author_pen_name ? `${report.author_pen_name} (นักเขียน)` : "นักเขียนเจ้าของเรื่อง") : (report.username || `User #${report.user_id}`)}</strong>
                                                         </div>
                                                         <div>
                                                             วันที่: {formatThaiDate(report.created_at)}
@@ -1557,7 +1713,7 @@ export default function AdminReportsDashboard() {
                                                     </div>
 
                                                     <div className="admin-report-card-mobile__reason">
-                                                        <strong>เหตุผล:</strong> {cleanReason || "-"}
+                                                        <strong>{isAppeal ? "เหตุผลขอปลดแบน:" : "เหตุผล:"}</strong> {cleanReason || "-"}
                                                     </div>
 
                                                     <button
@@ -1569,7 +1725,7 @@ export default function AdminReportsDashboard() {
                                                         }}
                                                     >
                                                         <FileText size={14} />
-                                                        <span>ตรวจสอบรายงาน</span>
+                                                        <span>{isAppeal ? "ตรวจสอบคำขอปลดแบน" : "ตรวจสอบรายงาน"}</span>
                                                     </button>
                                                 </div>
                                             );
@@ -1794,7 +1950,9 @@ export default function AdminReportsDashboard() {
             {/* -------------------------------------------------------------
                6. Report Review Modal / Drawer (ตรวจสอบรายงาน)
                ------------------------------------------------------------- */}
-            {selectedReport && (
+            {selectedReport && (() => {
+                const isCurrentAppeal = isAppealReport(selectedReport);
+                return (
                 <div
                     className="admin-modal-overlay"
                     onClick={() => {
@@ -1810,11 +1968,11 @@ export default function AdminReportsDashboard() {
                         {/* Header */}
                         <div className="admin-modal-header">
                             <div className="admin-modal-header__title-group">
-                                <div className="admin-modal-icon admin-modal-icon--info">
-                                    <FileText size={20} />
+                                <div className={`admin-modal-icon ${isCurrentAppeal ? "admin-modal-icon--success" : "admin-modal-icon--info"}`}>
+                                    {isCurrentAppeal ? <ShieldCheck size={20} /> : <FileText size={20} />}
                                 </div>
                                 <h3 className="admin-modal-title">
-                                    {selectedReport.report_type === "appeal"
+                                    {isCurrentAppeal
                                         ? "ตรวจสอบคำขอปลดแบน"
                                         : "ตรวจสอบรายงานเนื้อหา"}
                                 </h3>
@@ -1847,7 +2005,7 @@ export default function AdminReportsDashboard() {
                                     <button
                                         type="button"
                                         className="admin-btn admin-btn--view-novel"
-                                        onClick={() => handleViewStory(selectedReport.novel_id)}
+                                        onClick={() => handleViewStory(selectedReport.novel_id ?? selectedReport.novelId ?? selectedReport.NovelID)}
                                         title="เปิดอ่านเรื่องนี้ในมุมมองผู้ดูแลระบบ"
                                     >
                                         <ExternalLink size={14} />
@@ -1873,12 +2031,16 @@ export default function AdminReportsDashboard() {
 
                                         <div className="admin-review-field">
                                             <label className="admin-review-label">
-                                                {selectedReport.report_type === "appeal"
+                                                {isCurrentAppeal
                                                     ? "ผู้ยื่นคำขอ:"
                                                     : "ผู้รายงาน:"}
                                             </label>
                                             <div className="admin-review-value">
-                                                {selectedReport.username || `User #${selectedReport.user_id}`}
+                                                {isCurrentAppeal
+                                                    ? (selectedReport.author_pen_name
+                                                        ? `${selectedReport.author_pen_name} (${selectedReport.username || "นักเขียนเจ้าของเรื่อง"})`
+                                                        : selectedReport.username || "นักเขียนเจ้าของเรื่อง")
+                                                    : selectedReport.username || `User #${selectedReport.user_id}`}
                                             </div>
                                         </div>
                                     </div>
@@ -1896,10 +2058,10 @@ export default function AdminReportsDashboard() {
                                             <div>
                                                 <span
                                                     className={
-                                                        getReportStatusInfo(selectedReport.status).className
+                                                        getReportStatusInfo(selectedReport.status, selectedReport).className
                                                     }
                                                 >
-                                                    {getReportStatusInfo(selectedReport.status).label}
+                                                    {getReportStatusInfo(selectedReport.status, selectedReport).label}
                                                 </span>
                                             </div>
                                         </div>
@@ -1907,7 +2069,7 @@ export default function AdminReportsDashboard() {
 
                                     <div className="admin-review-field">
                                         <label className="admin-review-label">
-                                            {selectedReport.report_type === "appeal"
+                                            {isCurrentAppeal
                                                 ? "เหตุผลในการขอปลดแบน:"
                                                 : "เหตุผลที่รายงาน:"}
                                         </label>
@@ -1925,9 +2087,9 @@ export default function AdminReportsDashboard() {
                                     <span>{reportActionError}</span>
                                 </div>
                             )}
-                            {((selectedReport.report_type === "appeal" &&
-                                selectedReport.status === "appeal_pending") ||
-                                (selectedReport.report_type === "report" &&
+                            {((isCurrentAppeal &&
+                                (selectedReport.status === "appeal_pending" || selectedReport.status === "pending")) ||
+                                (!isCurrentAppeal &&
                                     selectedReport.status === "pending")) && (
                                 <div className="admin-modal-form-group">
                                     <label htmlFor="report-decision-reason" className="admin-form-label">
@@ -1937,6 +2099,7 @@ export default function AdminReportsDashboard() {
                                         id="report-decision-reason"
                                         className="admin-form-textarea"
                                         rows={3}
+                                        placeholder={isCurrentAppeal ? "ระบุเหตุผลในการพิจารณาคำขอปลดแบน (ถ้ามี)..." : "ระบุเหตุผลในการพิจารณารายงาน (ถ้ามี)..."}
                                         value={reportDecisionReason}
                                         onChange={(e) => setReportDecisionReason(e.target.value)}
                                         disabled={reportActionSubmitting}
@@ -1957,8 +2120,8 @@ export default function AdminReportsDashboard() {
                             </button>
 
                             {/* แสดงปุ่ม Action เฉพาะเมื่อสถานะยังรอการตรวจสอบ (pending หรือ appeal_pending) */}
-                            {selectedReport.report_type === "appeal" &&
-                            selectedReport.status === "appeal_pending" ? (
+                            {isCurrentAppeal &&
+                            (selectedReport.status === "appeal_pending" || selectedReport.status === "pending") ? (
                                 /* Appeal Actions (รอพิจารณาคำขอปลดแบน) */
                                 <div className="admin-review-action-btns">
                                     <button
@@ -1966,6 +2129,7 @@ export default function AdminReportsDashboard() {
                                         className="admin-btn admin-btn--modal-secondary"
                                         onClick={() => handleUpdateReportStatus(selectedReport, "rejected")}
                                         disabled={reportActionSubmitting}
+                                        title="ปฏิเสธคำขอปลดแบนของนักเขียน"
                                     >
                                         {reportActionSubmitting ? (
                                             <Loader2 size={16} className="admin-icon-spin" />
@@ -1980,6 +2144,7 @@ export default function AdminReportsDashboard() {
                                         className="admin-btn admin-btn--modal-success"
                                         onClick={() => handleUpdateReportStatus(selectedReport, "resolved")}
                                         disabled={reportActionSubmitting}
+                                        title="อนุมัติคำขอและปลดแบนนิยายเรื่องนี้"
                                     >
                                         {reportActionSubmitting ? (
                                             <Loader2 size={16} className="admin-icon-spin" />
@@ -2027,11 +2192,11 @@ export default function AdminReportsDashboard() {
                                 <div className="admin-review-status-notice">
                                     {selectedReport.status === "resolved" ? (
                                         <span className="notice-badge notice-badge--resolved">
-                                            <CheckCircle2 size={15} /> ดำเนินการอนุมัติแล้ว
+                                            <CheckCircle2 size={15} /> {isCurrentAppeal ? "อนุมัติการปลดแบนแล้ว" : "ดำเนินการอนุมัติแล้ว"}
                                         </span>
                                     ) : (
                                         <span className="notice-badge notice-badge--rejected">
-                                            <X size={15} /> ดำเนินการปฏิเสธ / ยังมีปัญหาอยู่
+                                            <X size={15} /> {isCurrentAppeal ? "ปฏิเสธคำขอปลดแบนแล้ว" : "ดำเนินการปฏิเสธ / ยังมีปัญหาอยู่"}
                                         </span>
                                     )}
                                 </div>
@@ -2039,7 +2204,8 @@ export default function AdminReportsDashboard() {
                         </div>
                     </div>
                 </div>
-            )}
+                );
+            })()}
         </div>
     );
 }

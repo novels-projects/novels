@@ -1,23 +1,5 @@
-@import url('https://fonts.googleapis.com/css?family=Poppins:100,100i,200,200i,300,300i,400,400i,500,500i,600,600i,700,700i,800,800i,900,900i&subset=devanagari,latin-ext');
-
-@import url('https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300..800;1,300..800&display=swap');
-:root {
-  --background-pink: #FCF5F7;
-}
-
 * {
   box-sizing: border-box;
-}
-Open Sans
-/* แก้ไขจุดนี้: ห้ามล็อค overflow hidden ที่ body */
-html, body {
-  margin: 0;
-  padding: 0;
-  width: 100%;
-  min-height: 100vh;
-  background-color: var(--background-pink);
-  color: #000000; 
-  font-family: 'Poppins', sans-serif;
 }
 
 #root {

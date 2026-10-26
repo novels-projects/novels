@@ -1,20 +1,20 @@
 /* Theme / layout align with site (pink - white) */
 :root {
-  --fw-bg-0: #fffbfd;
+  --fw-bg-0: #FFFAFC;
   --fw-header-bg: rgba(255, 255, 255, 0.96);
-  --fw-accent: #f526a2;
-  --fw-accent-dark: #c81e86;
-  --fw-muted: #8a7683;
-  --fw-neutral-border: #f6dcec;
-  --fw-neutral-border-soft: #fdeaf5;
-  --fw-text-soft: #8a7683;
-  --fw-text-strong: #2b1c27;
+  --fw-accent: #E83E8C;
+  --fw-accent-dark: #C92770;
+  --fw-muted: #766B76;
+  --fw-neutral-border: #F3BCD5;
+  --fw-neutral-border-soft: #FFF1F7;
+  --fw-text-soft: #766B76;
+  --fw-text-strong: #302431;
 }
 
 .following-page {
   min-height: 100vh;
   background: var(--fw-bg-0);
-  font-family: "Sarabun", sans-serif;
+  font-family: "Anuphan", sans-serif;
   color: var(--fw-text-strong);
   padding-bottom: 48px;
 }
@@ -237,6 +237,44 @@
   align-items: stretch;
   gap: 16px;
   margin-top: 6px;
+}
+
+.following-page .searchBar,
+.following-page .sortTrigger,
+.following-page .clearBtn,
+.following-page .dropdownMenu {
+  border-color: rgba(88, 42, 65, 0.12);
+  box-shadow: 0 2px 8px rgba(62, 34, 52, 0.045);
+}
+
+.following-page .searchBar:focus-within {
+  border-color: var(--fw-accent);
+  box-shadow: 0 0 0 3px rgba(232, 62, 140, 0.12);
+}
+
+.following-page .backBtn {
+  border-radius: 10px;
+}
+
+.following-page .backBtn:hover {
+  box-shadow: 0 6px 18px rgba(232, 62, 140, 0.12);
+}
+
+.following-page .emptyState {
+  border-radius: 16px;
+  border-color: rgba(88, 42, 65, 0.1);
+  box-shadow: 0 2px 10px rgba(62, 34, 52, 0.045);
+}
+
+.following-page .listGrid > .card {
+  border-color: rgba(88, 42, 65, 0.1);
+  border-radius: 16px;
+  box-shadow: 0 2px 10px rgba(62, 34, 52, 0.045);
+}
+
+.following-page .listGrid > .card:hover {
+  border-color: var(--fw-neutral-border);
+  box-shadow: 0 10px 24px rgba(62, 34, 52, 0.09);
 }
 
 @media (max-width: 880px) {

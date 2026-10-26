@@ -331,7 +331,8 @@ const HistoryPage = () => {
         const headers = { "Content-Type": "application/json" };
         if (token) headers.Authorization = `Bearer ${token}`;
 
-        const historyRes = await axios.get(`${API_BASE_URL}/history`, { headers });
+        // 🔗 เชื่อมต่อ GET /api/v1/reading/histories: เพื่อดึงประวัติการอ่านนิยายทั้งหมดของผู้ใช้
+        const historyRes = await axios.get(`${API_BASE_URL}/api/v1/reading/histories`, { headers });
         const historyPayload =
           historyRes.data?.data?.history || historyRes.data?.history || historyRes.data?.novels || historyRes.data || [];
         let bookList = Array.isArray(historyPayload) ? historyPayload : [];
@@ -355,7 +356,8 @@ const HistoryPage = () => {
               const token = localStorage.getItem("token");
               const headers = {};
               if (token) headers["Authorization"] = `Bearer ${token}`;
-              const sceneRes = await axios.get(`${API_BASE_URL}/scenes/${book.currentSceneId}`, { headers });
+              // 🔗 เชื่อมต่อ GET /api/v1/scenes/:id: เพื่อดึงรายละเอียดชื่อตอนและชื่อฉากที่ผู้ใช้กำลังยืนอยู่ปัจจุบัน
+              const sceneRes = await axios.get(`${API_BASE_URL}/api/v1/scenes/${book.currentSceneId}`, { headers });
               const sceneData = sceneRes.data?.data || sceneRes.data;
               if (!sceneData) return book;
 
@@ -450,12 +452,14 @@ const HistoryPage = () => {
       if (token) headers.Authorization = `Bearer ${token}`;
 
       if (deleteTarget.type === "bulk") {
-        await axios.delete(`${API_BASE_URL}/history`, { headers });
+        // 🔗 เชื่อมต่อ DELETE /api/v1/reading/histories: เพื่อลบประวัติการอ่านทั้งหมดของผู้ใช้
+        await axios.delete(`${API_BASE_URL}/api/v1/reading/histories`, { headers });
         setBooks([]);
       } else {
         const bookId = deleteTarget.book.id;
         try {
-          await axios.delete(`${API_BASE_URL}/history/${bookId}`, { headers });
+          // 🔗 เชื่อมต่อ DELETE /api/v1/reading/histories/:id: เพื่อลบประวัติการอ่านของนิยายเรื่องนี้
+          await axios.delete(`${API_BASE_URL}/api/v1/reading/histories/${bookId}`, { headers });
         } catch (err) {
           if (err?.response?.status !== 404) throw err;
           // 404 = record หายไปแล้วจริง ๆ ถือว่าลบสำเร็จ ไม่ต้อง throw ต่อ

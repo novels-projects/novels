@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { saveUserAvatar, syncAdminUsersIfAvailable } from "../utils/avatarService";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
 
@@ -17,7 +18,8 @@ export function useAuthUser() {
     const fetchUserData = useCallback(async (token) => {
         setIsLoadingUser(true);
         try {
-            const res = await fetch(`${API_BASE_URL}/api/users`, {
+            // 🔗 เชื่อมต่อ GET /api/v1/users/me: เพื่อดึงข้อมูลโปรไฟล์ของผู้ใช้ปัจจุบัน (Username, Email, รูปโปรไฟล์, Role)
+            const res = await fetch(`${API_BASE_URL}/api/v1/users/me`, {
                 headers: { Authorization: `Bearer ${token}` },
             });
             if (!res.ok) throw new Error(String(res.status));
@@ -32,6 +34,10 @@ export function useAuthUser() {
                 setUserData(next);
                 localStorage.setItem("user", JSON.stringify(data.user));
                 localStorage.setItem("user_email", data.user.email);
+                saveUserAvatar(data.user);
+                if (data.user.role === "admin") {
+                    syncAdminUsersIfAvailable();
+                }
             }
         } catch (err) {
             console.error("useAuthUser: fetchUserData error:", err);
@@ -79,13 +85,14 @@ export function useAuthUser() {
         try {
             const token = localStorage.getItem("token");
             if (token) {
-                await fetch(`${API_BASE_URL}/api/logout`, {
+                // 🔗 เชื่อมต่อ POST /api/v1/auth/logout: เพื่อส่งคำสั่งออกจากระบบและเคลียร์ Session ของผู้ใช้บนเซิร์ฟเวอร์
+                await fetch(`${API_BASE_URL}/api/v1/auth/logout`, {
                     method: "POST",
                     headers: { Authorization: `Bearer ${token}` },
                 }).catch(() => {});
             }
         } finally {
-            ["token", "refresh_token", "user", "user_email", "selectedNovel"].forEach((k) =>
+            ["token", "refresh_token", "user", "user_id", "user_email", "selectedNovel", "local_following_writers"].forEach((k) =>
                 localStorage.removeItem(k)
             );
             setIsLoggedIn(false);
@@ -114,7 +121,8 @@ export function useNotifications(isLoggedIn) {
             const headers = { Authorization: `Bearer ${token}` };
 
             // 1. Fetch settings
-            const settingsRes = await fetch(`${API_BASE_URL}/api/me/notification-settings`, { headers });
+            // 🔗 เชื่อมต่อ GET /api/v1/users/me/notification-settings: เพื่อดึงการตั้งค่าการแจ้งเตือนของผู้ใช้
+            const settingsRes = await fetch(`${API_BASE_URL}/api/v1/users/me/notification-settings`, { headers });
             let settings = {
                 in_app_notifications: true,
                 novel_updates: true,
@@ -128,7 +136,8 @@ export function useNotifications(isLoggedIn) {
             }
 
             // 2. Fetch notifications to calculate setting-filtered count
-            const res = await fetch(`${API_BASE_URL}/notifications?limit=100`, {
+            // 🔗 เชื่อมต่อ GET /api/v1/notifications?limit=100: เพื่อดึงรายการแจ้งเตือนมาคำนวณจำนวนที่ยังไม่ได้อ่าน
+            const res = await fetch(`${API_BASE_URL}/api/v1/notifications?limit=100`, {
                 headers,
                 credentials: "include",
             });
@@ -176,8 +185,9 @@ export function useNotifications(isLoggedIn) {
         let eventSource = null;
         if (token) {
             try {
+                // 🔗 เชื่อมต่อ SSE GET /api/v1/notifications/stream: เพื่อเปิด Stream รับการแจ้งเตือนแบบเรียลไทม์
                 eventSource = new EventSource(
-                    `${API_BASE_URL}/notifications/stream?token=${encodeURIComponent(token)}`
+                    `${API_BASE_URL}/api/v1/notifications/stream?token=${encodeURIComponent(token)}`
                 );
                 eventSource.onmessage = refresh;
             } catch (e) {
@@ -218,9 +228,10 @@ export function useNavSearch() {
     useEffect(() => {
         const run = async () => {
             try {
+                // 🔗 เชื่อมต่อ GET /api/v1/novels และ GET /api/v1/categories: เพื่อดึงรายชื่อนิยายและหมวดหมู่สำหรับแสดงในกล่องค้นหา (Search Overlay)
                 const [novelRes, catRes] = await Promise.all([
-                    fetch(`${API_BASE_URL}/novels`),
-                    fetch(`${API_BASE_URL}/categories`),
+                    fetch(`${API_BASE_URL}/api/v1/novels`),
+                    fetch(`${API_BASE_URL}/api/v1/categories`),
                 ]);
                 if (novelRes.ok) {
                     const d = await novelRes.json();

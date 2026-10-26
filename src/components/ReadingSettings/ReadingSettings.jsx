@@ -3,6 +3,7 @@ import { SlidersHorizontal } from "lucide-react";
 import "./ReadingSettings.css";
 
 const fontOptions = [
+  { value: "Anuphan", label: "Anuphan", family: "'Anuphan', sans-serif" },
   { value: "Sarabun", label: "Sarabun", family: "'Sarabun', sans-serif" },
   { value: "Open Sans", label: "Open Sans", family: "'Open Sans', sans-serif" },
   { value: "Prompt", label: "Prompt", family: "'Prompt', sans-serif" },

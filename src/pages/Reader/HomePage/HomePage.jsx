@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import axios from "axios";
-import { Pencil, Bookmark, Eye, Heart } from "lucide-react";
+import { Pencil, Bookmark, Eye, Heart, BookOpen } from "lucide-react";
 import "./HomePage.css";
 import { getNovelStatusInfo } from "../../../utils/novelStatus";
 import { NovelCardSkeleton, NovelCardGridSkeleton, DataLoadError, Skeleton } from "../../../components/Skeleton";
@@ -117,9 +117,10 @@ const HomePage = ({ onNavigate }) => {
     try {
       setLoading(true);
       setError(null);
+      // 🔗 เชื่อมต่อ GET /api/v1/novels และ GET /api/v1/categories: เพื่อดึงรายชื่อนิยายและหมวดหมู่ทั้งหมดสำหรับแสดงบนหน้าแรก (Home Feed)
       const [response, responseCats] = await Promise.all([
-        fetch(`${API_BASE_URL}/novels`),
-        fetch(`${API_BASE_URL}/categories`)
+        fetch(`${API_BASE_URL}/api/v1/novels`),
+        fetch(`${API_BASE_URL}/api/v1/categories`)
       ]);
       const payload = await response.json().catch(() => null);
       const payloadCats = await responseCats.json().catch(() => null);
@@ -257,14 +258,16 @@ const HomePage = ({ onNavigate }) => {
     }
   }, [categories, activeGenre]);
 
+  // แสดงนิยายตามหมวดหมู่ที่เลือก (สูงสุด 4 เรื่อง)
+  // หากไม่มีนิยายในหมวดหมู่นี้ ให้ส่งคืนอาร์เรย์ว่างเพื่อแสดงข้อความแจ้งเตือน "ยังไม่มีนิยายในหมวดหมู่นี้"
   const spotlightNovels = useMemo(() => {
-    if (!activeGenre) return novels.slice(0, 4);
+    if (!activeGenre) return [];
     const filtered = novels.filter(n =>
       n.categories.some(cat =>
         cat.toLowerCase().includes(activeGenre.toLowerCase())
       )
     );
-    return filtered.length > 0 ? filtered.slice(0, 4) : novels.slice(0, 4);
+    return filtered.slice(0, 4);
   }, [novels, activeGenre]);
 
   const statsSummary = useMemo(() => {
@@ -323,7 +326,8 @@ const HomePage = ({ onNavigate }) => {
       if (!token) return;
 
       try {
-        const response = await axios.get(`${API_BASE_URL}/history`, {
+        // 🔗 เชื่อมต่อ GET /api/v1/reading/histories: เพื่อดึงประวัติการอ่านล่าสุด 4 เรื่องมาแสดงบนหน้าแรก
+        const response = await axios.get(`${API_BASE_URL}/api/v1/reading/histories`, {
           headers: { Authorization: `Bearer ${token}` }
         });
 
@@ -379,6 +383,12 @@ const HomePage = ({ onNavigate }) => {
 
   useEffect(() => {
     if (!featuredWriter?.id) return;
+    const token = localStorage.getItem("token");
+    if (!token) {
+      setIsFollowed(false);
+      setFollowerOffset(0);
+      return;
+    }
     try {
       const saved = localStorage.getItem("local_following_writers");
       const list = saved ? JSON.parse(saved) : [];
@@ -720,11 +730,16 @@ const HomePage = ({ onNavigate }) => {
             })}
           </div>
 
-          {loading && spotlightNovels.length === 0 ? (
+          {loading && novels.length === 0 ? (
             <div className="dark-cards">
               {Array.from({ length: 4 }).map((_, idx) => (
                 <NovelCardSkeleton key={idx} dark={true} />
               ))}
+            </div>
+          ) : spotlightNovels.length === 0 ? (
+            <div className="empty-genre-state">
+              <BookOpen size={44} className="empty-genre-icon" />
+              <p className="empty-genre-text">ยังไม่มีนิยายในหมวดหมู่นี้</p>
             </div>
           ) : (
             <div className="dark-cards">
@@ -949,12 +964,22 @@ const HomePage = ({ onNavigate }) => {
 
                     try {
                       if (token) {
+                        // 🔗 เชื่อมต่อ POST /api/writers/:id/follow หรือ unfollow: เพื่อติดตาม/เลิกติดตามนักเขียนยอดนิยมบนหน้าแรก
                         const endpoint = nextState
                           ? `${API_BASE_URL}/api/writers/${featuredWriter.id}/follow`
                           : `${API_BASE_URL}/api/writers/${featuredWriter.id}/unfollow`;
-                        await axios.post(endpoint, {}, {
-                          headers: { Authorization: `Bearer ${token}` }
-                        });
+                        try {
+                          await axios.post(endpoint, {}, {
+                            headers: { Authorization: `Bearer ${token}` }
+                          });
+                        } catch (primaryErr) {
+                          const fbEndpoint = nextState
+                            ? `${API_BASE_URL}/api/v1/writers/${featuredWriter.id}/follow`
+                            : `${API_BASE_URL}/api/v1/writers/${featuredWriter.id}/unfollow`;
+                          await axios.post(fbEndpoint, {}, {
+                            headers: { Authorization: `Bearer ${token}` }
+                          });
+                        }
                       }
                     } catch (err) {
                       console.warn("API follow/unfollow request failed:", err.message);
@@ -1001,12 +1026,12 @@ const HomePage = ({ onNavigate }) => {
                     </div>
 
                     <div className="ww-body">
-                      <div className="ww-title">{work.title}</div>
-                      <div className="ww-excerpt" style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
-                        {work.synopsis}
+                      <div className="ww-title" title={work.title}>{work.title}</div>
+                      <div className="ww-excerpt" title={work.synopsis || "ไม่มีคำโปรย"}>
+                        {work.synopsis || "ไม่มีคำโปรย"}
                       </div>
 
-                      <div className="ww-stats" style={{ display: 'flex', gap: '12px' }}>
+                      <div className="ww-stats">
                         <div className="ww-stat" title="เพิ่มเข้าชั้น"><Bookmark size={13} /><span>{formatNumber(work.bookshelf_count)}</span></div>
                         <div className="ww-stat" title="ยอดวิว"><Eye size={13} /><span>{formatNumber(work.views)}</span></div>
                         <div className="ww-stat" title="ยอดถูกใจ"><Heart size={13} /><span>{formatNumber(work.like_count)}</span></div>

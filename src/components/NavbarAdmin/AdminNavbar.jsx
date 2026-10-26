@@ -101,7 +101,8 @@ const AdminNavbar = () => {
         try {
             const token = localStorage.getItem("token");
             if (token) {
-                await fetch(`${API_BASE_URL}/api/logout`, {
+                // 🔗 เชื่อมต่อ POST /api/v1/auth/logout: เพื่อส่งคำสั่งออกจากระบบและเคลียร์ Session ของแอดมินบนเซิร์ฟเวอร์
+                await fetch(`${API_BASE_URL}/api/v1/auth/logout`, {
                     method: "POST",
                     headers: {
                         Authorization: `Bearer ${token}`,
@@ -112,11 +113,9 @@ const AdminNavbar = () => {
         } catch (err) {
             console.error("Logout error:", err);
         } finally {
-            localStorage.removeItem("token");
-            localStorage.removeItem("refresh_token");
-            localStorage.removeItem("user");
-            localStorage.removeItem("user_email");
-            localStorage.removeItem("selectedNovel");
+            ["token", "refresh_token", "user", "user_id", "user_email", "selectedNovel", "local_following_writers"].forEach(k =>
+                localStorage.removeItem(k)
+            );
             setIsDropdownOpen(false);
             navigate("/", { replace: true });
             window.location.replace("/");

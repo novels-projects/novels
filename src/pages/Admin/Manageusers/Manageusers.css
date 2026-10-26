@@ -2,11 +2,9 @@
    Admin Manage Users Panel CSS (Manageusers.css)
    ══════════════════════════════════════════════════ */
 
-@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+Thai:wght@600;700&family=Prompt:wght@400;500;600;700;800&display=swap');
-
 .admin-manage-users-panel {
   padding: 30px 24px;
-  background-color: #fdf9f8;
+  background-color: #FFFAFC;
   background-image: radial-gradient(circle at 100% 0%, rgba(219, 39, 119, 0.04), transparent 45%);
   min-height: 100vh;
   font-family: 'Prompt', 'Sarabun', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -342,7 +340,7 @@
 }
 
 .admin-table-scroll-wrapper::-webkit-scrollbar-thumb:hover {
-  background: #E91E8C;
+  background: #E83E8C;
 }
 
 /* 📊 Table Layout & Colors (ตรงตาม Reference Image) */
@@ -366,7 +364,7 @@
   padding: 14px 12px;
   font-size: 0.88rem;
   font-weight: 700;
-  color: #db2777 !important;
+  color: #C92770 !important;
   white-space: nowrap;
   letter-spacing: -0.01em;
   box-sizing: border-box;
@@ -448,7 +446,7 @@
 
 .user-initial-avatar {
   background: #fce7f3;
-  color: #db2777;
+  color: #C92770;
   font-weight: 700;
   display: flex;
   align-items: center;
@@ -481,7 +479,7 @@
 .self-tag {
   font-size: 0.68rem;
   font-weight: 700;
-  color: #db2777;
+  color: #C92770;
   background: #fce7f3;
   padding: 2px 8px;
   border-radius: 999px;
@@ -593,7 +591,7 @@
   background: #ffffff;
   border: 1px solid #fbcfe8;
   border-radius: 6px;
-  color: #db2777;
+  color: #C92770;
   font-size: 0.72rem;
   font-weight: 600;
   cursor: pointer;
@@ -727,7 +725,7 @@
 
 .retry-btn:hover {
   background: var(--pink-50, #fdf2f8);
-  color: var(--pink-600, #db2777);
+  color: var(--pink-600, #C92770);
   border-color: var(--pink-100, #fce7f3);
 }
 
@@ -821,7 +819,7 @@
 
 .page-btn-box:hover:not(:disabled) {
   background: #fdf2f8;
-  color: #db2777;
+  color: #C92770;
   border-color: #fbcfe8;
 }
 
@@ -862,7 +860,7 @@
 }
 
 .page-nav-arrow:hover:not(:disabled) {
-  color: #db2777;
+  color: #C92770;
 }
 
 .page-nav-arrow:disabled {
@@ -895,11 +893,11 @@
 
 .page-num-btn:hover:not(.active) {
   background: #fdf2f8;
-  color: #db2777;
+  color: #C92770;
 }
 
 .page-num-btn.active {
-  background: #db2777 !important;
+  background: #C92770 !important;
   color: #ffffff !important;
   font-weight: 700;
   box-shadow: 0 3px 10px rgba(219, 39, 119, 0.3);
@@ -1093,7 +1091,7 @@
   gap: 8px;
   font-size: 0.88rem;
   font-weight: 700;
-  color: #db2777;
+  color: #C92770;
 }
 
 .view-app-btn-trigger {
@@ -1122,7 +1120,7 @@
 .details-group-box h4 {
   margin: 0 0 8px 0;
   font-size: 0.85rem;
-  color: #db2777;
+  color: #C92770;
   font-weight: 800;
   text-transform: uppercase;
 }
@@ -1178,7 +1176,7 @@
 }
 
 .highlight-link a {
-  color: #db2777;
+  color: #C92770;
   text-decoration: none;
 }
 
@@ -1263,7 +1261,7 @@
 
 .delete-warning-username {
   font-weight: 700;
-  color: #db2777;
+  color: #C92770;
 }
 
 .delete-critical-warning {
@@ -1339,7 +1337,7 @@
 
 .view-writer-profile-btn {
   background: #fdf2f8;
-  color: #db2777;
+  color: #C92770;
   border-color: #fbcfe8;
   display: inline-flex;
   align-items: center;
@@ -1354,9 +1352,9 @@
 }
 
 .save-btn {
-  background: #db2777;
+  background: #C92770;
   color: white;
-  border-color: #db2777;
+  border-color: #C92770;
   min-width: 110px;
   padding: 8px 24px;
   width: auto;
@@ -1564,4 +1562,67 @@
   .modal-body-content {
     padding: 14px 12px;
   }
+}
+
+.admin-manage-users-panel {
+  background-color: var(--gray-50, #FFFAFC);
+  background-image: radial-gradient(circle at 100% 0%, rgba(232, 62, 140, 0.055), transparent 45%);
+  color: var(--ink, #302431);
+  font-family: var(--font-ui, 'Anuphan', sans-serif);
+}
+
+.admin-manage-users-panel .admin-title {
+  color: var(--ink, #302431);
+}
+
+.admin-manage-users-panel .admin-subtitle {
+  color: var(--gray-600, #766873);
+}
+
+.admin-manage-users-panel .admin-stat-card,
+.admin-manage-users-panel .admin-table-container,
+.admin-manage-users-panel .admin-modal-content {
+  border-color: var(--gray-100, #F5EEF2);
+  border-radius: var(--r-lg, 16px);
+  box-shadow: var(--shadow-sm);
+}
+
+.admin-manage-users-panel .admin-stat-card:hover {
+  border-color: var(--pink-100, #FFD9EA);
+  box-shadow: var(--shadow-md);
+}
+
+.admin-manage-users-panel .admin-search-input,
+.admin-manage-users-panel .admin-filter-select,
+.admin-manage-users-panel .admin-table-per-page {
+  border-color: var(--gray-100, #F5EEF2);
+  border-radius: 10px;
+}
+
+.admin-manage-users-panel .admin-search-input:focus,
+.admin-manage-users-panel .admin-filter-select:focus {
+  border-color: var(--pink-300, #F47FB3);
+  box-shadow: 0 0 0 3px rgba(232, 62, 140, 0.12);
+  outline: none;
+}
+
+.admin-manage-users-panel .admin-table-scroll-wrapper {
+  border-color: var(--gray-100, #F5EEF2);
+  border-radius: 12px;
+}
+
+.admin-manage-users-panel table thead {
+  background: #FFF7FA;
+}
+
+.admin-manage-users-panel table th {
+  color: #514553;
+}
+
+.admin-manage-users-panel table tbody tr:hover {
+  background: #FFFAFC;
+}
+
+.admin-manage-users-panel .admin-modal-content {
+  background: #FFFFFF;
 }

@@ -4,6 +4,7 @@ import { Link, useNavigate, useLocation } from "react-router-dom";
 import { Bell, Menu, X, LogOut, User } from "lucide-react";
 import "./Navbarwriter.css";
 import { getNovelStatusInfo } from "../../utils/novelStatus";
+import { apiFetch } from "../../utils/apiFetch";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
 
@@ -13,6 +14,7 @@ const Navbarwriter = () => {
 
     // ── Refs ──────────────────────────────────────────────────────
     const searchRef = useRef(null);
+    const searchInputRef = useRef(null);
     const dropdownRef = useRef(null);
 
     // ── UI & Auth States ──────────────────────────────────────────
@@ -62,13 +64,32 @@ const Navbarwriter = () => {
         return saved ? JSON.parse(saved) : null;
     });
 
+    const urlNovelMatch = location.pathname.match(/\/writer\/([^/]+)/);
+    const nonNovelSubpaths = ["dashboard", "profile", "create", "settings", "registerwriter"];
+    const rawMatch = urlNovelMatch ? urlNovelMatch[1] : null;
+    const urlNovelId = rawMatch && !nonNovelSubpaths.includes(rawMatch) ? rawMatch : null;
+
+    const [pageNovel, setPageNovel] = useState(null);
+
+    const novelFromList = urlNovelId
+        ? novels.find((n) => String(n.id || n.novel_id) === String(urlNovelId))
+        : null;
+
+    const currentDisplayNovel = urlNovelId
+        ? (novelFromList || (pageNovel && String(pageNovel.id || pageNovel.novel_id) === String(urlNovelId) ? pageNovel : null) || (selectedNovel && String(selectedNovel.id || selectedNovel.novel_id) === String(urlNovelId) ? selectedNovel : null))
+        : null;
+
+    const activeNovelId = urlNovelId || (currentDisplayNovel ? String(currentDisplayNovel.id || currentDisplayNovel.novel_id) : null);
+    const hasActiveNovel = Boolean(activeNovelId);
+
     // ── Fetch Search Overlay Data ─────────────────────────────────
     useEffect(() => {
         const fetchSearchOverlayData = async () => {
             try {
+                // 🔗 เชื่อมต่อ GET /api/v1/novels และ GET /api/v1/categories: เพื่อดึงรายชื่อนิยายและหมวดหมู่สำหรับแสดงในหน้าต่างค้นหา (Search Overlay)
                 const [novelRes, catRes] = await Promise.all([
-                    fetch(`${API_BASE_URL}/novels`),
-                    fetch(`${API_BASE_URL}/categories`)
+                    apiFetch(`${API_BASE_URL}/api/v1/novels`),
+                    apiFetch(`${API_BASE_URL}/api/v1/categories`)
                 ]);
                 if (novelRes.ok) {
                     const novelData = await novelRes.json();
@@ -96,7 +117,8 @@ const Navbarwriter = () => {
         const t = token || localStorage.getItem("token");
         if (!t) { setUnreadCount(0); return; }
         try {
-            const res = await fetch(`${API_BASE_URL}/notifications/unread-count`, {
+            // 🔗 เชื่อมต่อ GET /api/v1/notifications/unread-count: เพื่อดึงจำนวนการแจ้งเตือนที่ยังไม่ได้อ่านมาแสดงบน Badge ของกระดิ่ง
+            const res = await apiFetch(`${API_BASE_URL}/api/v1/notifications/unread-count`, {
                 headers: { Authorization: `Bearer ${t}` },
                 credentials: "include",
             });
@@ -163,8 +185,9 @@ const Navbarwriter = () => {
         let eventSource = null;
         if (token) {
             try {
+                // 🔗 เชื่อมต่อ SSE GET /api/v1/notifications/stream: เพื่อเปิดการเชื่อมต่อ Stream รับแจ้งเตือนแบบเรียลไทม์
                 eventSource = new EventSource(
-                    `${API_BASE_URL}/notifications/stream?token=${encodeURIComponent(token)}`
+                    `${API_BASE_URL}/api/v1/notifications/stream?token=${encodeURIComponent(token)}`
                 );
                 eventSource.onmessage = refreshNotifications;
             } catch (e) {
@@ -224,17 +247,62 @@ const Navbarwriter = () => {
     // ── Sync Selected Novel ───────────────────────────────────────
     useEffect(() => {
         const syncSelectedNovel = () => {
+            if (urlNovelId) return;
             const saved = localStorage.getItem("selectedNovel");
             setSelectedNovel(saved ? JSON.parse(saved) : null);
         };
         window.addEventListener("storage", syncSelectedNovel);
         window.addEventListener("novel-selected", syncSelectedNovel);
-        syncSelectedNovel();
         return () => {
             window.removeEventListener("storage", syncSelectedNovel);
             window.removeEventListener("novel-selected", syncSelectedNovel);
         };
-    }, []);
+    }, [urlNovelId]);
+
+    // Auto-sync pageNovel with URL novelId without triggering cross-tab loops
+    useEffect(() => {
+        if (!urlNovelId) {
+            setPageNovel(null);
+            return;
+        }
+
+        const found = novels.find((n) => String(n.id || n.novel_id) === String(urlNovelId));
+        if (found) {
+            setPageNovel(found);
+            setSelectedNovel(found);
+            try {
+                localStorage.setItem("selectedNovel", JSON.stringify(found));
+            } catch (e) {}
+            return;
+        }
+
+        let isCancelled = false;
+        const token = localStorage.getItem("token");
+        const headers = token ? { Authorization: `Bearer ${token}` } : {};
+        // 🔗 เชื่อมต่อ GET /api/v1/novels/:id: เพื่อดึงข้อมูลชื่อเรื่องและภาพปกของนิยายที่กำลังเปิดอยู่มาแสดงบน Workspace Navbar
+        apiFetch(`${API_BASE_URL}/api/v1/novels/${urlNovelId}`, { headers })
+            .then((res) => (res.ok ? res.json() : null))
+            .then((data) => {
+                if (isCancelled || !data) return;
+                const nData = data.novel || data.data?.novel || data.data || data;
+                const novelObj = {
+                    id: nData.novel_id || nData.id || urlNovelId,
+                    novel_id: nData.novel_id || nData.id || urlNovelId,
+                    title: nData.title || nData.Title || "ไม่ทราบชื่อเรื่อง",
+                    cover_image: nData.cover_image || nData.coverImage || null,
+                };
+                setPageNovel(novelObj);
+                setSelectedNovel(novelObj);
+                try {
+                    localStorage.setItem("selectedNovel", JSON.stringify(novelObj));
+                } catch (e) {}
+            })
+            .catch((err) => console.warn("Auto-sync novel failed:", err));
+
+        return () => {
+            isCancelled = true;
+        };
+    }, [urlNovelId, novels]);
 
     // ── Guard: ไม่ใช่นักเขียน ห้ามอยู่ต่อในโหมดนักเขียน ─────────────
     useEffect(() => {
@@ -252,7 +320,8 @@ const Navbarwriter = () => {
     const fetchUserData = async (token) => {
         setIsLoadingUser(true);
         try {
-            const response = await fetch(`${API_BASE_URL}/api/users`, {
+            // 🔗 เชื่อมต่อ GET /api/v1/users/me: เพื่อดึงข้อมูลโปรไฟล์ของผู้ใช้ปัจจุบัน (Username, Email, รูปโปรไฟล์, Role)
+            const response = await apiFetch(`${API_BASE_URL}/api/v1/users/me`, {
                 headers: { Authorization: `Bearer ${token}` },
             });
             if (!response.ok) return;
@@ -277,7 +346,8 @@ const Navbarwriter = () => {
 
     const fetchNovels = async (token) => {
         try {
-            const response = await fetch(`${API_BASE_URL}/api/me/novels`, {
+            // 🔗 เชื่อมต่อ GET /api/v1/writers/me/novels: เพื่อดึงรายการนิยายทั้งหมดของนักเขียน สำหรับแสดงในเมนูสลับนิยายบนแถบ Navbar
+            const response = await apiFetch(`${API_BASE_URL}/api/v1/writers/me/novels`, {
                 headers: { Authorization: `Bearer ${token}` },
             });
             if (!response.ok) throw new Error("โหลดนิยายไม่สำเร็จ");
@@ -363,7 +433,8 @@ const Navbarwriter = () => {
                 const token = localStorage.getItem("token");
                 const headers = { Authorization: `Bearer ${token}` };
 
-                const chapterRes = await fetch(`${API_BASE_URL}/novels/${novelId}/chapters`, { headers });
+                // 🔗 เชื่อมต่อ GET /api/v1/novels/:id/chapters: เพื่อดึงรายชื่อตอนทั้งหมด และหาฉากแรกสำหรับเปิดหน้าเขียนเนื้อหา
+                const chapterRes = await apiFetch(`${API_BASE_URL}/api/v1/novels/${novelId}/chapters`, { headers });
                 const chapterData = await chapterRes.json();
                 const chapters = chapterData?.data?.chapters || chapterData?.chapters || chapterData?.data || [];
 
@@ -377,7 +448,8 @@ const Navbarwriter = () => {
                     const chId = ch.id || ch.chapter_id || ch.ChapterID;
                     if (!chId) continue;
 
-                    const sceneRes = await fetch(`${API_BASE_URL}/chapters/${chId}/scenes`, { headers });
+                    // 🔗 เชื่อมต่อ GET /api/v1/chapters/:id/scenes: เพื่อดึงฉากในตอนแรกมาเปิดเขียน
+                    const sceneRes = await apiFetch(`${API_BASE_URL}/api/v1/chapters/${chId}/scenes`, { headers });
                     const sceneData = await sceneRes.json();
                     const scenes = sceneData?.data?.scenes || sceneData?.scenes || sceneData?.data || [];
 
@@ -406,10 +478,12 @@ const Navbarwriter = () => {
     };
 
     const handleSelectNovel = async (novel) => {
+        setPageNovel(novel);
         setSelectedNovel(novel);
-        localStorage.setItem("selectedNovel", JSON.stringify(novel));
+        try {
+            localStorage.setItem("selectedNovel", JSON.stringify(novel));
+        } catch (e) {}
 
-        window.dispatchEvent(new Event("storage"));
         window.dispatchEvent(new Event("novel-selected"));
         setShowNovelPopup(false);
 
@@ -418,7 +492,8 @@ const Navbarwriter = () => {
         const headers = { Authorization: `Bearer ${token}` };
 
         try {
-            const chapterRes = await fetch(`${API_BASE_URL}/novels/${novelId}/chapters`, { headers });
+            // 🔗 เชื่อมต่อ GET /api/v1/novels/:id/chapters: เพื่อดึงรายชื่อตอนทั้งหมดเมื่อสลับเรื่องนิยาย
+            const chapterRes = await apiFetch(`${API_BASE_URL}/api/v1/novels/${novelId}/chapters`, { headers });
             const chapterData = await chapterRes.json();
             const chapters = chapterData?.data?.chapters || chapterData?.chapters || chapterData?.data || [];
 
@@ -430,7 +505,8 @@ const Navbarwriter = () => {
             const firstChapter = chapters[0];
             const firstChapterId = firstChapter.id || firstChapter.chapter_id || firstChapter.ChapterID;
 
-            const sceneRes = await fetch(`${API_BASE_URL}/chapters/${firstChapterId}/scenes`, { headers });
+            // 🔗 เชื่อมต่อ GET /api/v1/chapters/:id/scenes: เพื่อดึงฉากแรกของเรื่องที่เพิ่งเลือก
+            const sceneRes = await apiFetch(`${API_BASE_URL}/api/v1/chapters/${firstChapterId}/scenes`, { headers });
             const sceneData = await sceneRes.json();
             const scenes = sceneData?.data?.scenes || sceneData?.scenes || sceneData?.data || [];
 
@@ -487,7 +563,8 @@ const Navbarwriter = () => {
         try {
             const token = localStorage.getItem("token");
             if (token) {
-                await fetch(`${API_BASE_URL}/api/logout`, {
+                // 🔗 เชื่อมต่อ POST /api/v1/auth/logout: เพื่อส่งคำสั่งออกจากระบบและเคลียร์ Session ของนักเขียนบนเซิร์ฟเวอร์
+                await apiFetch(`${API_BASE_URL}/api/v1/auth/logout`, {
                     method: 'POST',
                     headers: {
                         'Authorization': `Bearer ${token}`,
@@ -498,7 +575,7 @@ const Navbarwriter = () => {
         } catch (err) {
             console.error("Logout error:", err);
         } finally {
-            ["token", "refresh_token", "user", "user_email", "selectedNovel"].forEach(k =>
+            ["token", "refresh_token", "user", "user_id", "user_email", "selectedNovel", "local_following_writers"].forEach(k =>
                 localStorage.removeItem(k)
             );
 
@@ -700,7 +777,7 @@ const Navbarwriter = () => {
                     <div className="navbar__right">
 
                         {/* ชิปชื่อนิยายที่กำลังแก้อยู่ (โหมดนักเขียน) — ด้านหน้ากระดิ่ง/โปรไฟล์ */}
-                        {isWriterMode && selectedNovel && (
+                        {isWriterMode && currentDisplayNovel && (
                             <button
                                 type="button"
                                 className="selected-novel-btn"
@@ -712,7 +789,7 @@ const Navbarwriter = () => {
                             >
                                 <span className="selected-dot"></span>
                                 <span className="selected-title">
-                                    {selectedNovel.title || "ไม่ระบุชื่อนิยาย"}
+                                    {currentDisplayNovel.title || "ไม่ระบุชื่อนิยาย"}
                                 </span>
                             </button>
                         )}
@@ -720,12 +797,27 @@ const Navbarwriter = () => {
                         {/* Search Zone */}
                         {!isWriterMode && (
                             <div className="navbar__search-zone" ref={searchRef}>
-                                <div className={`navbar__search ${searchFocused ? "navbar__search--focused" : ""}`}>
-                                    <svg className="navbar__search-icon" width="16" height="16" viewBox="0 0 16 16" fill="none">
-                                        <circle cx="7" cy="7" r="5" stroke="currentColor" strokeWidth="1.5" />
-                                        <path d="M11 11L14 14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                                    </svg>
+                                <div className={`navbar__search ${searchFocused ? "navbar__search--focused" : ""} ${searchValue ? "navbar__search--has-value" : ""}`}>
+                                    <button
+                                        type="button"
+                                        className="navbar__search-icon-btn"
+                                        onClick={() => {
+                                            if (searchValue && searchValue.trim()) {
+                                                handleSearchSubmit(searchValue);
+                                            } else {
+                                                searchInputRef.current?.focus();
+                                            }
+                                        }}
+                                        tabIndex={-1}
+                                        aria-label="ค้นหา"
+                                    >
+                                        <svg className="navbar__search-icon" width="16" height="16" viewBox="0 0 16 16" fill="none">
+                                            <circle cx="7" cy="7" r="5" stroke="currentColor" strokeWidth="1.5" />
+                                            <path d="M11 11L14 14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                                        </svg>
+                                    </button>
                                     <input
+                                        ref={searchInputRef}
                                         className="navbar__search-input"
                                         type="search"
                                         placeholder="ค้นหานิยาย"
@@ -734,6 +826,48 @@ const Navbarwriter = () => {
                                         onFocus={() => setSearchFocused(true)}
                                         onKeyDown={(e) => { if (e.key === "Enter") handleSearchSubmit(searchValue); }}
                                     />
+                                    {searchValue && searchValue.length > 0 && (
+                                        <div className="navbar__search-actions">
+                                            <button
+                                                type="button"
+                                                className="navbar__search-action-btn navbar__search-clear-btn"
+                                                onClick={(e) => {
+                                                    e.preventDefault();
+                                                    e.stopPropagation();
+                                                    setSearchValue("");
+                                                    searchInputRef.current?.focus();
+                                                }}
+                                                onMouseDown={(e) => e.preventDefault()}
+                                                title="ยกเลิกการค้นหา"
+                                                aria-label="ยกเลิกการค้นหา"
+                                            >
+                                                <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
+                                                    <path d="M3 3L13 13M13 3L3 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                                                </svg>
+                                            </button>
+                                            <span className="navbar__search-divider" aria-hidden="true" />
+                                            <button
+                                                type="button"
+                                                className="navbar__search-action-btn navbar__search-submit-btn"
+                                                onClick={(e) => {
+                                                    e.preventDefault();
+                                                    e.stopPropagation();
+                                                    if (searchValue.trim()) {
+                                                        handleSearchSubmit(searchValue);
+                                                    } else {
+                                                        searchInputRef.current?.focus();
+                                                    }
+                                                }}
+                                                title="ค้นหา"
+                                                aria-label="ค้นหา"
+                                            >
+                                                <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                                                    <circle cx="7" cy="7" r="5" stroke="currentColor" strokeWidth="1.6" />
+                                                    <path d="M11 11L14 14" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                                                </svg>
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
 
                                 {searchFocused && (

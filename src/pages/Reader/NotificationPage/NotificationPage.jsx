@@ -14,6 +14,8 @@ import {
 import "./NotificationPage.css";
 import NotificationItem from "../../../components/Notification/NotificationItem";
 import { NotificationListSkeleton, ButtonSpinner } from "../../../components/Skeleton";
+import { formatMinioUrl, getAvatar, resolveAvatarAsync } from "../../../utils/avatarService";
+import { apiFetch } from "../../../utils/apiFetch";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
 
@@ -25,20 +27,6 @@ const resolveNotificationType = (rawType) => {
   if (["novel_update", "novel", "chapter", "new_chapter", "chapter_update"].includes(t)) return "novel_update";
   if (["system", "report", "ban", "notice"].includes(t)) return "system";
   return t;
-};
-
-const formatMinioUrl = (url) => {
-  if (!url || typeof url !== "string") return null;
-  const trimmed = url.trim();
-  if (!trimmed) return null;
-  let formatted = trimmed;
-  if (formatted.includes("http://minio:9000")) {
-    formatted = formatted.replace("http://minio:9000", "http://localhost:9000");
-  }
-  if (formatted.startsWith("/")) {
-    formatted = `http://localhost:9000${formatted}`;
-  }
-  return formatted;
 };
 
 const normalizeNotification = (item = {}) => {
@@ -67,6 +55,16 @@ const normalizeNotification = (item = {}) => {
     ) {
       actorAvatar = currentUser.pic_profile || "";
     }
+  }
+
+  // ดึงจาก Avatar Registry (ครอบคลุมทั้งนักเขียน, ผู้ใช้อื่น, และ Seed Data)
+  if (!actorAvatar && type !== "system") {
+    const novelId = (item.reference_type === "novel" || type === "novel_update") ? (item.reference_id ?? item.referenceId) : null;
+    actorAvatar = getAvatar({
+      userId: item.actor_id ?? item.actor?.id,
+      username: actorName,
+      novelId,
+    }) || "";
   }
 
   // แยกข้อความคอมเมนต์กรณีเก็บในรูปแบบ "ชื่อ|ข้อความ"
@@ -107,7 +105,7 @@ const buildHeaders = (extra = {}) => {
 };
 
 const requestJson = async (path, options = {}) => {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
+  const response = await apiFetch(`${API_BASE_URL}${path}`, {
     credentials: "include",
     headers: buildHeaders(options.headers || {}),
     ...options,
@@ -222,8 +220,8 @@ export default function NotificationPage() {
       try {
         const headers = { Authorization: `Bearer ${token}` };
 
-        // ดึงการตั้งค่าการแจ้งเตือน
-        const settingsRes = await fetch(`${API_BASE_URL}/api/me/notification-settings`, { headers });
+        // 🔗 เชื่อมต่อ GET /api/v1/users/me/notification-settings: เพื่อดึงการตั้งค่าการเปิด/ปิดรับแจ้งเตือนของผู้ใช้
+        const settingsRes = await fetch(`${API_BASE_URL}/api/v1/users/me/notification-settings`, { headers });
         let settings = {
           in_app_notifications: true,
           novel_updates: true,
@@ -240,8 +238,8 @@ export default function NotificationPage() {
           settingsRef.current = settings;
         }
 
-        // ดึงรายการแจ้งเตือนจริงจาก Backend ตามสเปก
-        const payload = await requestJson(`/notifications?limit=50`);
+        // 🔗 เชื่อมต่อ GET /api/v1/notifications?limit=50: เพื่อดึงรายการแจ้งเตือนทั้งหมด 50 รายการล่าสุด
+        const payload = await requestJson(`/api/v1/notifications?limit=50`);
         const data = payload?.data ?? payload;
         const list = Array.isArray(data)
           ? data
@@ -266,16 +264,21 @@ export default function NotificationPage() {
             uniqueNovelIds.map(async (novelId) => {
               try {
                 if (authorAvatarCache.current.has(novelId)) return;
-                const res = await fetch(`${API_BASE_URL}/novels/${novelId}`);
+                // 🔗 เชื่อมต่อ GET /api/v1/novels/:id: เพื่อดึง author_id ของนิยายที่มีการอัปเดต
+                const res = await apiFetch(`${API_BASE_URL}/api/v1/novels/${novelId}`);
                 if (!res.ok) return;
                 const nData = await res.json();
                 const authorId = nData?.data?.novel?.author_id || nData?.novel?.author_id;
                 if (!authorId) return;
 
-                const writerRes = await fetch(`${API_BASE_URL}/writer/${authorId}`);
+                // 🔗 เชื่อมต่อ GET /api/v1/writers/:id หรือ /writer/:id: เพื่อดึงรูปโปรไฟล์ของนักเขียนมาแสดงในการแจ้งเตือน
+                let writerRes = await apiFetch(`${API_BASE_URL}/api/v1/writers/${authorId}`);
+                if (!writerRes.ok) {
+                  writerRes = await apiFetch(`${API_BASE_URL}/writer/${authorId}`);
+                }
                 if (!writerRes.ok) return;
                 const writerData = await writerRes.json();
-                const avatar = writerData?.data?.avatar_url || writerData?.avatar_url;
+                const avatar = formatMinioUrl(writerData?.data?.avatar_url || writerData?.avatar_url);
                 if (avatar) {
                   authorAvatarCache.current.set(novelId, avatar);
                 }
@@ -291,6 +294,23 @@ export default function NotificationPage() {
             }
           });
         }
+
+        // วนลูปดึงรูปโปรไฟล์สำหรับแจ้งเตือนทุกประเภท (คอมเมนต์, ถูกใจ, ผู้ติดตาม, อัปเดตนิยาย) ที่ยังไม่มีรูป
+        normalized.forEach(async (notif) => {
+          if (!notif.actor?.avatar && notif.type !== "system") {
+            const novelId = (notif.referenceType === "novel" || notif.type === "novel_update") ? notif.referenceId : null;
+            const av = await resolveAvatarAsync({
+              userId: notif.actor?.id,
+              username: notif.actor?.name,
+              novelId,
+            });
+            if (av) {
+              setItems((prev) =>
+                prev.map((i) => (i.id === notif.id ? { ...i, actor: { ...i.actor, avatar: av } } : i))
+              );
+            }
+          }
+        });
 
 
 
@@ -316,8 +336,9 @@ export default function NotificationPage() {
     const token = localStorage.getItem("token");
     if (!token) return undefined;
 
+    // 🔗 เชื่อมต่อ SSE GET /api/v1/notifications/stream: เพื่อเปิด Stream รับการแจ้งเตือนแบบเรียลไทม์
     const eventSource = new EventSource(
-      `${API_BASE_URL}/notifications/stream?token=${encodeURIComponent(token)}`
+      `${API_BASE_URL}/api/v1/notifications/stream?token=${encodeURIComponent(token)}`
     );
 
     eventSource.onmessage = async (event) => {
@@ -334,31 +355,18 @@ export default function NotificationPage() {
           if (incoming.type === "system" && currentSettings.in_app_notifications === false) return;
         }
 
-        // ดึงรูปโปรไฟล์นักเขียนถ้าเป็น novel_update และยังไม่มีรูป
-        if (incoming.type === "novel_update" && incoming.referenceId && !incoming.actor.avatar) {
-          if (authorAvatarCache.current.has(incoming.referenceId)) {
-            incoming.actor.avatar = authorAvatarCache.current.get(incoming.referenceId);
+        // ดึงรูปโปรไฟล์ถ้ายังไม่มีรูป
+        if (!incoming.actor.avatar && incoming.type !== "system") {
+          const novelId = (incoming.referenceType === "novel" || incoming.type === "novel_update") ? incoming.referenceId : null;
+          const av = getAvatar({ userId: incoming.actor.id, username: incoming.actor.name, novelId });
+          if (av) {
+            incoming.actor.avatar = av;
           } else {
-            try {
-              const res = await fetch(`${API_BASE_URL}/novels/${incoming.referenceId}`);
-              if (res.ok) {
-                const nData = await res.json();
-                const authorId = nData?.data?.novel?.author_id || nData?.novel?.author_id;
-                if (authorId) {
-                  const writerRes = await fetch(`${API_BASE_URL}/writer/${authorId}`);
-                  if (writerRes.ok) {
-                    const writerData = await writerRes.json();
-                    const avatar = writerData?.data?.avatar_url || writerData?.avatar_url;
-                    if (avatar) {
-                      authorAvatarCache.current.set(incoming.referenceId, avatar);
-                      incoming.actor.avatar = avatar;
-                    }
-                  }
-                }
+            resolveAvatarAsync({ userId: incoming.actor.id, username: incoming.actor.name, novelId }).then((resolved) => {
+              if (resolved) {
+                setItems((prev) => prev.map((i) => (i.id === incoming.id ? { ...i, actor: { ...i.actor, avatar: resolved } } : i)));
               }
-            } catch {
-              // ละเว้น
-            }
+            });
           }
         }
 
@@ -375,10 +383,12 @@ export default function NotificationPage() {
     };
 
     window.addEventListener("notifications-updated", handleNotificationsUpdate);
+    window.addEventListener("storyverse_avatar_updated", handleNotificationsUpdate);
     return () => {
       active = false;
       eventSource.close();
       window.removeEventListener("notifications-updated", handleNotificationsUpdate);
+      window.removeEventListener("storyverse_avatar_updated", handleNotificationsUpdate);
     };
   }, [reloadKey]);
 
@@ -408,7 +418,8 @@ export default function NotificationPage() {
   // ทำเครื่องหมายว่าอ่านแล้วสำหรับ 1 รายการ
   const markRead = async (id) => {
     try {
-      await requestJson(`/notifications/${id}/read`, { method: "PATCH" });
+      // 🔗 เชื่อมต่อ PATCH /api/v1/notifications/:id/read: เพื่อทำเครื่องหมายว่าอ่านแล้วสำหรับการแจ้งเตือนนี้
+      await requestJson(`/api/v1/notifications/${id}/read`, { method: "PATCH" });
       setItems((prev) => prev.map((item) => (item.id === id ? { ...item, read: true } : item)));
       window.dispatchEvent(new Event("notifications-updated"));
     } catch (err) {
@@ -478,7 +489,8 @@ export default function NotificationPage() {
     if (actionLoading || unreadCount === 0) return;
     setActionLoading("mark-all");
     try {
-      await requestJson(`/notifications/read-all`, { method: "PATCH" });
+      // 🔗 เชื่อมต่อ PATCH /api/v1/notifications/read-all: เพื่อทำเครื่องหมายว่าอ่านแล้วสำหรับการแจ้งเตือนทั้งหมด
+      await requestJson(`/api/v1/notifications/read-all`, { method: "PATCH" });
       setItems((prev) => prev.map((item) => ({ ...item, read: true })));
       window.dispatchEvent(new Event("notifications-updated"));
     } catch (err) {
@@ -493,7 +505,8 @@ export default function NotificationPage() {
     if (!id || deletingNotificationId) return;
     setDeletingNotificationId(id);
     try {
-      await requestJson(`/notifications/${id}`, { method: "DELETE" });
+      // 🔗 เชื่อมต่อ DELETE /api/v1/notifications/:id: เพื่อลบการแจ้งเตือนนี้
+      await requestJson(`/api/v1/notifications/${id}`, { method: "DELETE" });
       setItems((prev) => prev.filter((item) => item.id !== id));
       window.dispatchEvent(new Event("notifications-updated"));
     } catch (err) {
@@ -508,7 +521,8 @@ export default function NotificationPage() {
     if (actionLoading) return;
     setActionLoading("clear-all");
     try {
-      await requestJson(`/notifications`, { method: "DELETE" });
+      // 🔗 เชื่อมต่อ DELETE /api/v1/notifications: เพื่อล้างรายการแจ้งเตือนทั้งหมดของผู้ใช้
+      await requestJson(`/api/v1/notifications`, { method: "DELETE" });
       setItems([]);
       window.dispatchEvent(new Event("notifications-updated"));
     } catch (err) {

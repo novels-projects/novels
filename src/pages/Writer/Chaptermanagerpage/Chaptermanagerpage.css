@@ -88,13 +88,13 @@
 
 .cm-topbar__btn--preview {
   border: none;
-  background: linear-gradient(135deg, #ec4899 0%, #db2777 100%);
+  background: linear-gradient(135deg, #ec4899 0%, #C92770 100%);
   color: #ffffff !important;
   box-shadow: 0 4px 14px rgba(236, 72, 153, 0.25);
 }
 
 .cm-topbar__btn--preview:hover {
-  background: linear-gradient(135deg, #db2777 0%, #be185d 100%);
+  background: linear-gradient(135deg, #C92770 0%, #be185d 100%);
   transform: translateY(-1.5px);
   box-shadow: 0 6px 18px rgba(219, 39, 119, 0.35);
 }
@@ -108,7 +108,7 @@
 
 .cm-topbar__btn--storytree:hover {
   border-color: #f472b6;
-  color: #db2777 !important;
+  color: #C92770 !important;
   background: #fff5f9;
   transform: translateY(-1.5px);
   box-shadow: 0 4px 14px rgba(236, 72, 153, 0.12);
@@ -231,7 +231,7 @@
 
 .cm-banner__created {
   font-size: 12px;
-  color: var(--pink-500, #db2777);
+  color: var(--pink-500, #C92770);
   font-weight: 600;
   margin-bottom: 6px;
 }
@@ -676,7 +676,7 @@
 }
 
 .cm-choice-connection-mode.is-active {
-  border: 2px solid #db2777;
+  border: 2px solid #C92770;
   background: rgba(219, 39, 119, 0.04);
   box-shadow: 0 4px 12px rgba(219, 39, 119, 0.08);
 }
@@ -696,7 +696,7 @@
 
 .cm-choice-connection-mode.is-active .cm-choice-connection-icon {
   background: rgba(219, 39, 119, 0.1);
-  color: #db2777;
+  color: #C92770;
 }
 
 .cm-choice-connection-copy {
@@ -739,7 +739,7 @@
 @keyframes cmHighlightPulse {
   0% {
     box-shadow: 0 0 0 4px rgba(219, 39, 119, 0.4), 0 4px 18px rgba(219, 39, 119, 0.2);
-    border-color: #db2777;
+    border-color: #C92770;
   }
   50% {
     box-shadow: 0 0 0 6px rgba(219, 39, 119, 0.25), 0 4px 18px rgba(219, 39, 119, 0.15);
@@ -752,7 +752,7 @@
 }
 
 .cm-choice--newly-added {
-  border: 2px solid #db2777 !important;
+  border: 2px solid #C92770 !important;
   background-color: #fffdf9 !important;
   animation: cmHighlightPulse 2s ease-in-out infinite alternate;
   position: relative;
@@ -762,7 +762,7 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  background: linear-gradient(135deg, #db2777 0%, #be185d 100%);
+  background: linear-gradient(135deg, #C92770 0%, #be185d 100%);
   color: #ffffff;
   padding: 4px 12px;
   border-radius: 999px;
@@ -816,7 +816,7 @@
   padding: 10px 14px;
   border: none;
   border-radius: 8px;
-  background: #db2777;
+  background: #C92770;
   color: #ffffff;
   font-weight: 700;
   cursor: pointer;
@@ -1370,7 +1370,7 @@
 
 .cm-appeal-modal__textarea:focus,
 .cm-appeal-modal__textarea:focus-visible {
-  border-color: #db2777;
+  border-color: #C92770;
   outline: none !important;
   box-shadow: none !important;
 }
@@ -1668,6 +1668,73 @@
   to { transform: rotate(360deg); }
 }
 
+.cm-layout {
+  background: var(--gray-50, #FFFAFC);
+  color: var(--ink, #302431);
+  font-family: var(--font-ui, 'Anuphan', sans-serif);
+}
+
+.cm-topbar__title {
+  color: var(--ink, #302431);
+  font-family: var(--font-ui, 'Anuphan', sans-serif);
+}
+
+.cm-topbar__btn--preview,
+.cm-sidebar__add {
+  background: var(--pink-500, #E83E8C);
+  box-shadow: 0 4px 12px rgba(232, 62, 140, 0.18);
+}
+
+.cm-topbar__btn--preview:hover,
+.cm-sidebar__add:hover {
+  background: var(--pink-700, #C92770);
+}
+
+.cm-topbar__btn--storytree,
+.cm-sidebar-toggle-btn {
+  border-color: var(--gray-100, #F5EEF2);
+  color: #514553;
+}
+
+.cm-topbar__btn--storytree:hover,
+.cm-sidebar-toggle-btn:hover {
+  border-color: var(--pink-300, #F47FB3);
+  background: var(--pink-50, #FFF1F7);
+  color: var(--pink-700, #C92770);
+}
+
+.cm-sidebar,
+.cm-chapter__header-panel {
+  background: #FFFFFF;
+  border-color: var(--gray-100, #F5EEF2);
+  box-shadow: var(--shadow-sm);
+}
+
+.cm-sidebar__item--active {
+  border-color: var(--pink-100, #FFD9EA);
+  background: var(--pink-50, #FFF1F7);
+  color: var(--pink-700, #C92770);
+}
+
+.cm-sidebar__item:hover {
+  background: #FFF7FA;
+}
+
+.cm-layout input,
+.cm-layout select,
+.cm-layout textarea {
+  border-color: var(--gray-100, #F5EEF2);
+  border-radius: 10px;
+}
+
+.cm-layout input:focus,
+.cm-layout select:focus,
+.cm-layout textarea:focus {
+  border-color: var(--pink-300, #F47FB3);
+  box-shadow: 0 0 0 3px rgba(232, 62, 140, 0.12);
+  outline: none;
+}
+
 @keyframes cmDropdownFadeIn {
   from {
     opacity: 0;
@@ -1749,7 +1816,7 @@
 .cm-mobile-chapter-selector__ep {
   font-size: 14px;
   font-weight: 700;
-  color: #db2777;
+  color: #C92770;
   white-space: nowrap;
   line-height: 1.3;
 }
@@ -1854,4 +1921,8 @@
   .cm-mobile-chapter-selector__right span {
     display: none;
   }
+}
+@keyframes cm-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }

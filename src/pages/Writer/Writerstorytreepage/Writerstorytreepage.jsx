@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
+﻿import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import ReactFlow, {
   Handle,
   Position,
@@ -17,10 +17,55 @@ import ReactFlow, {
 } from "reactflow";
 import axios from "axios";
 import "./Writerstorytreepage.css";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, Trash2 } from "lucide-react";
 import { TreeCanvasSkeleton, ButtonSpinner } from "../../../components/Skeleton";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
+
+// Helper สำหรับเรียก API /api/v1/ พร้อม fallback อัตโนมัติหาก backend ยังไม่รองรับ /api/v1/ ใน path ที่มี ID
+const apiGet = async (url, config) => {
+  try {
+    return await axios.get(url, config);
+  } catch (err) {
+    if (url.includes("/api/v1/") && (err.response?.status === 400 || err.response?.status === 404)) {
+      return await axios.get(url.replace("/api/v1/", "/"), config);
+    }
+    throw err;
+  }
+};
+
+const apiPut = async (url, data, config) => {
+  try {
+    return await axios.put(url, data, config);
+  } catch (err) {
+    if (url.includes("/api/v1/") && (err.response?.status === 400 || err.response?.status === 404)) {
+      return await axios.put(url.replace("/api/v1/", "/"), data, config);
+    }
+    throw err;
+  }
+};
+
+const apiPost = async (url, data, config) => {
+  try {
+    return await axios.post(url, data, config);
+  } catch (err) {
+    if (url.includes("/api/v1/") && (err.response?.status === 400 || err.response?.status === 404)) {
+      return await axios.post(url.replace("/api/v1/", "/"), data, config);
+    }
+    throw err;
+  }
+};
+
+const apiDelete = async (url, config) => {
+  try {
+    return await axios.delete(url, config);
+  } catch (err) {
+    if (url.includes("/api/v1/") && (err.response?.status === 400 || err.response?.status === 404)) {
+      return await axios.delete(url.replace("/api/v1/", "/"), config);
+    }
+    throw err;
+  }
+};
 
 const NODE_WIDTH = 260;
 const NODE_HEIGHT = 118;
@@ -77,6 +122,79 @@ const WRITER_LEGEND = [
 const normalizeId = (value) => {
   if (value === undefined || value === null || value === "") return "";
   return String(value);
+};
+
+// ค้นหาตำแหน่งว่างบน Canvas ที่ไม่ทับซ้อนกับโหนดฉากที่มีอยู่แล้ว
+const findVacantCanvasPosition = (nodes) => {
+  if (!nodes || nodes.length === 0) {
+    return { x: CANVAS_MARGIN, y: CANVAS_MARGIN };
+  }
+
+  const isOccupied = (x, y) => {
+    return nodes.some((node) => {
+      if (node.id === "cursor-node") return false;
+      const nx = node.position?.x ?? node.x ?? 0;
+      const ny = node.position?.y ?? node.y ?? 0;
+      const nw = node.width || NODE_WIDTH;
+      const nh = node.height || NODE_HEIGHT;
+      const margin = 24;
+
+      return (
+        x < nx + nw + margin &&
+        x + NODE_WIDTH + margin > nx &&
+        y < ny + nh + margin &&
+        y + NODE_HEIGHT + margin > ny
+      );
+    });
+  };
+
+  let maxColX = CANVAS_MARGIN;
+  nodes.forEach((n) => {
+    const nx = n.position?.x ?? n.x ?? 0;
+    if (nx > maxColX) maxColX = nx;
+  });
+
+  const stepX = NODE_WIDTH + 80;
+  const stepY = NODE_HEIGHT + 80;
+
+  // ลองพิจารณาตำแหน่งถัดไปทางขวาของโหนดที่มีอยู่
+  const nextRightPos = { x: maxColX + stepX, y: CANVAS_MARGIN };
+  if (!isOccupied(nextRightPos.x, nextRightPos.y)) {
+    return nextRightPos;
+  }
+
+  // ค้นหาตำแหน่งว่างในกริด
+  for (let r = 0; r < 20; r++) {
+    for (let c = 0; c < 20; c++) {
+      const candidateX = CANVAS_MARGIN + c * stepX;
+      const candidateY = CANVAS_MARGIN + r * stepY;
+      if (!isOccupied(candidateX, candidateY)) {
+        return { x: candidateX, y: candidateY };
+      }
+    }
+  }
+
+  return { x: maxColX + stepX, y: CANVAS_MARGIN };
+};
+
+// ดึงข้อความ error จาก Backend API Response ป้องกันการส่ง object {code, message} ไปแสดงใน React
+const extractErrorMessage = (err, fallback = "เกิดข้อผิดพลาดในการดำเนินการ") => {
+  if (!err) return fallback;
+  if (typeof err === "string") return err;
+  
+  const resData = err.response?.data;
+  if (resData) {
+    if (typeof resData === "string") return resData;
+    if (resData.error) {
+      if (typeof resData.error === "string") return resData.error;
+      if (typeof resData.error.message === "string" && resData.error.message) return resData.error.message;
+      if (typeof resData.error.code === "string" && resData.error.code) return resData.error.code;
+    }
+    if (typeof resData.message === "string" && resData.message) return resData.message;
+  }
+
+  if (typeof err.message === "string" && err.message) return err.message;
+  return fallback;
 };
 
 const stripHtml = (value) => {
@@ -457,7 +575,7 @@ const CustomMultigraphEdge = ({
   });
 
   // คำนวณพิกัดตำแหน่ง Label Badge บนเส้นทาง Edge จริง 100% ด้วยการสุ่มตัวอย่างพิกัดบน SVG Path
-  const badgeWidth = 140;
+  const badgeWidth = 160;
   const badgeHeight = 24;
 
   // คำนวณสัดส่วนตำแหน่ง (ratio) บนเส้นทาง โดยกระจายทางเลือกหลายรายการตามความยาวเส้นทาง
@@ -625,7 +743,8 @@ const CustomMultigraphEdge = ({
                 fontSize: "11px",
                 fontWeight: "700",
                 color: effectiveBadgeColor,
-                textAlign: "center",
+                textAlign: "left",
+                direction: "ltr",
                 whiteSpace: "nowrap",
                 overflow: "hidden",
                 textOverflow: "ellipsis",
@@ -642,6 +761,11 @@ const CustomMultigraphEdge = ({
             >
               {label}
             </div>
+            {activeHover && !isHoverDisabled && label && (
+              <div className="wst-edge-choice-tooltip">
+                {label}
+              </div>
+            )}
           </div>
         </EdgeLabelRenderer>
       )}
@@ -768,10 +892,14 @@ const StoryTreeInner = ({ novelId, onNavigate }) => {
     connectSourceRef.current = connectSource;
   }, [connectSource]);
 
-  // Toast handler
+  // Toast handler - รับประกันว่า message เป็น string เสมอ ไม่ส่ง object หลุดเข้าไปเรนเดอร์ใน React
   const showToast = useCallback((message, type = "success") => {
-    setToast({ message, type });
-    const timer = setTimeout(() => setToast(null), 2500);
+    let cleanMessage = message;
+    if (typeof message === "object" && message !== null) {
+      cleanMessage = message.message || message.error?.message || message.error || message.code || JSON.stringify(message);
+    }
+    setToast({ message: String(cleanMessage ?? ""), type });
+    const timer = setTimeout(() => setToast(null), 3000);
     return () => clearTimeout(timer);
   }, []);
 
@@ -782,9 +910,11 @@ const StoryTreeInner = ({ novelId, onNavigate }) => {
     try {
       const token = localStorage.getItem("token");
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      // 🔗 เชื่อมต่อ GET /api/v1/novels/:id/story-tree: ดึงผังโครงสร้างเนื้อเรื่องของนิยายเรื่องนี้
+      // 🔗 เชื่อมต่อ GET /api/v1/novels/:id/chapters: ดึงรายชื่อตอน (Chapters) ทั้งหมดของนิยายเรื่องนี้
       const [treeRes, chaptersRes] = await Promise.all([
-        axios.get(`${API_BASE_URL}/novels/${novelId}/story-tree`, { headers, withCredentials: false }),
-        axios.get(`${API_BASE_URL}/novels/${novelId}/chapters`, { headers, withCredentials: false })
+        apiGet(`${API_BASE_URL}/api/v1/novels/${novelId}/story-tree`, { headers, withCredentials: false }),
+        apiGet(`${API_BASE_URL}/api/v1/novels/${novelId}/chapters`, { headers, withCredentials: false })
       ]);
       setTreeData(treeRes.data?.data || treeRes.data || null);
       
@@ -1024,16 +1154,17 @@ let orphanCounter = 0;
       const scene = localMap.get(sceneId);
       const position = positions[sceneId] || { x: CANVAS_MARGIN, y: CANVAS_MARGIN };
 
-      const apiX = scene.node_x ?? scene.NodeX;
-      const apiY = scene.node_y ?? scene.NodeY;
+      const apiX = scene.node_x ?? scene.NodeX ?? scene.x ?? scene.X;
+      const apiY = scene.node_y ?? scene.NodeY ?? scene.y ?? scene.Y;
       const hasSavedPosition = apiX !== null && apiX !== undefined && apiY !== null && apiY !== undefined;
 
       const isOrphan = nodeStatuses[sceneId] === WRITER_NODE_STATUS.ORPHAN;
       let fallbackX = position.x;
       let fallbackY = position.y;
       if (!hasSavedPosition && isOrphan) {
-        const col = orphanCounter % 5;
-        const row = Math.floor(orphanCounter / 5);
+        // จัดวางโหนดที่ยังไม่เชื่อมต่อให้อยู่ในคอลัมน์ถัดไป ไม่ใช้ col=0, row=0 ซึ่งเป็นตำแหน่งของจุดเริ่มต้น
+        const col = (orphanCounter + 1) % 5;
+        const row = Math.floor((orphanCounter + 1) / 5);
         fallbackX = CANVAS_MARGIN + col * NODE_HORIZONTAL_GAP;
         fallbackY = CANVAS_MARGIN + row * NODE_VERTICAL_GAP;
         orphanCounter += 1;
@@ -1330,20 +1461,65 @@ let orphanCounter = 0;
   const [rfNodes, setRfNodes, onNodesChangeRF] = useNodesState([]);
   const [rfEdges, setRfEdges, onEdgesChangeRF] = useEdgesState([]);
 
-  // รายการโหนดที่ยังไม่ได้เชื่อมต่อ (Orphan Nodes - ทั้งโหนดไร้เส้นเชื่อม และโหนดที่มีเฉพาะขาออกแต่ไม่มีขาเข้า)
+  // รายการโหนดที่ยังไม่ได้เชื่อมต่อหรือเข้าไม่ถึง (Orphan / Unreachable Nodes)
+  // ตรวจสอบตามมาตรฐาน Backend scene_publish_service.go (กฎ SCENE_UNREACHABLE ด้วย BFS):
+  // 1. หากมีฉากเริ่มต้น (Start Scene) -> ฉากใดที่ผู้อ่านเดินตามทางเลือกมาจากฉากเริ่มต้นไม่ได้ (Unreachable) ถือเป็นฉากเคว้ง
+  // 2. หากยังไม่มีฉากเริ่มต้น -> ฉากใดที่ไม่มีเส้นทางเชื่อมขาเข้า (In-degree == 0) ถือเป็นฉากเคว้ง
   const orphanNodes = useMemo(() => {
-    return rfNodes.filter((n) => {
-      if (n.id === "cursor-node") return false;
+    const validNodes = rfNodes.filter((n) => n.id && n.id !== "cursor-node");
+    if (validNodes.length === 0) return [];
+
+    const startNode = validNodes.find((n) => {
       const type = getNodeType(n.data);
-      const isStartNode = type === "start" || type === "starting";
-
-      // นับเส้นทางเชื่อมขาเข้า (Incoming Edges)
-      const hasIncoming = rfEdges.some(
-        (e) => String(e.target) === String(n.id) && e.id !== "cursor-edge"
+      return (
+        type === "start" ||
+        type === "starting" ||
+        n.data?.isStart ||
+        n.data?.type === "start" ||
+        n.data?.Type === "start" ||
+        n.data?.status === WRITER_NODE_STATUS.START
       );
+    });
 
-      // ถือว่ายังไม่เชื่อมต่อ ถ้าไม่ใช่จุดเริ่มต้น และ ไม่มีเส้นทางขาเข้า (hasIncoming === false)
-      return (!isStartNode && !hasIncoming) || n.data?.status === WRITER_NODE_STATUS.ORPHAN || n.data?.status === "orphan";
+    if (startNode) {
+      const adjacency = new Map();
+      (rfEdges || []).forEach((e) => {
+        if (!e || e.id === "cursor-edge") return;
+        const from = normalizeId(e.source ?? e.fromId ?? e.from_id);
+        const to = normalizeId(e.target ?? e.toId ?? e.to_id);
+        if (!from || !to) return;
+        if (!adjacency.has(from)) adjacency.set(from, []);
+        adjacency.get(from).push(to);
+      });
+
+      const reachable = new Set();
+      const startId = normalizeId(startNode.id);
+      reachable.add(startId);
+      const queue = [startId];
+
+      while (queue.length > 0) {
+        const curr = queue.shift();
+        const neighbors = adjacency.get(curr) || [];
+        for (const nextId of neighbors) {
+          if (!reachable.has(nextId)) {
+            reachable.add(nextId);
+            queue.push(nextId);
+          }
+        }
+      }
+
+      return validNodes.filter((n) => {
+        const id = normalizeId(n.id);
+        return !reachable.has(id);
+      });
+    }
+
+    // กรณีที่ยังไม่มีฉากเริ่มต้น ให้ฉากที่ไม่มีเส้นทางเชื่อมขาเข้า (In-degree == 0) เป็นฉากเคว้ง
+    return validNodes.filter((n) => {
+      const hasIncoming = (rfEdges || []).some(
+        (e) => normalizeId(e.target ?? e.toId ?? e.to_id) === normalizeId(n.id) && e.id !== "cursor-edge"
+      );
+      return !hasIncoming || n.data?.status === WRITER_NODE_STATUS.ORPHAN || n.data?.status === "orphan";
     });
   }, [rfNodes, rfEdges]);
 
@@ -1531,9 +1707,10 @@ let orphanCounter = 0;
     showToast("กำลังจัดเรียงและบันทึกตำแหน่งอัตโนมัติ...", "info");
 
     try {
+      // 🔗 เชื่อมต่อ PUT /api/v1/scenes/:id/position: บันทึกพิกัดตำแหน่ง Node อัตโนมัติลงฐานข้อมูล
       const savePromises = Object.entries(computedPositions).map(([sceneId, pos]) =>
-        axios.put(
-          `${API_BASE_URL}/scenes/${sceneId}/position`,
+        apiPut(
+          `${API_BASE_URL}/api/v1/scenes/${sceneId}/position`,
           {
             node_x: pos.x,
             node_y: pos.y,
@@ -1739,6 +1916,17 @@ let orphanCounter = 0;
       return "target_start";
     }
 
+    // 3. ตรวจสอบการเชื่อมย้อนกลับโดยตรง (Reverse Choice: ปลายทางชี้มายังต้นทางอยู่แล้ว)
+    const isDirectReverse = (rfEdges || []).some((e) => {
+      if (!e || e.id === "cursor-edge") return false;
+      const from = normalizeId(e.source ?? e.fromId ?? e.from_id);
+      const to = normalizeId(e.target ?? e.toId ?? e.to_id);
+      return from === target && to === source;
+    });
+    if (isDirectReverse) {
+      return "reverse";
+    }
+
     if (isTargetAncestorOfSource(source, target, rfEdges)) return "cycle";
     return null;
   }, [rfEdges, sceneMap]);
@@ -1761,6 +1949,8 @@ let orphanCounter = 0;
         return "ไม่สามารถเชื่อมต่อไปยังฉากปลายทางที่เป็น 'จุดเริ่มต้นเรื่อง' ได้ (จุดเริ่มต้นทำหน้าที่เริ่มเดินเรื่องเท่านั้น ห้ามมีเส้นทางอื่นชี้กลับมาปัก)";
       case "self":
         return "ไม่สามารถเชื่อมต่อฉากเข้าหาตัวเองได้ กรุณาเลือกฉากปลายทางอื่นที่เป็นคนละฉากกัน";
+      case "reverse":
+        return "ไม่สามารถสร้างทางเลือกย้อนกลับไปยังฉากต้นทางได้ เนื่องจากมีเส้นทางเชื่อมโยงสวนทางกันอยู่แล้ว";
       case "cycle":
         return "ไม่สามารถเชื่อมต่อได้เนื่องจากจะทำให้เกิด ' ลูป ' ในเนื้อเรื่อง กรุณาเลือกฉากปลายทางอื่นเพื่อดำเนินเรื่องไปข้างหน้า";
       default:
@@ -1847,6 +2037,30 @@ let orphanCounter = 0;
     setSelectedSceneId(tempId); // ตั้งค่าโฟกัสโหนดใหม่
   }, [novelId, onNavigate, showToast, changeMode, interactionMode, setRfNodes, novelChapters]);
 
+  // ตรวจสอบว่าพิกัดตำแหน่งบน Canvas ซ้อนทับกับโหนดฉากเดิมหรือไม่
+  const checkNodeCollision = useCallback((pos, margin = 16) => {
+    if (!pos || !rfNodes || rfNodes.length === 0) return false;
+    const testX = pos.x;
+    const testY = pos.y;
+    const testW = NODE_WIDTH;
+    const testH = NODE_HEIGHT;
+
+    return rfNodes.some((node) => {
+      if (node.id === "cursor-node") return false;
+      const nx = node.position?.x ?? 0;
+      const ny = node.position?.y ?? 0;
+      const nw = node.width || NODE_WIDTH;
+      const nh = node.height || NODE_HEIGHT;
+
+      return (
+        testX < nx + nw + margin &&
+        testX + testW + margin > nx &&
+        testY < ny + nh + margin &&
+        testY + testH + margin > ny
+      );
+    });
+  }, [rfNodes]);
+
   // ฟังก์ชันดักคลิกบน Canvas พื้นหลัง (แสดงโมดอลเลือกตอนสังกัด)
   const handlePaneClick = useCallback((e) => {
     if (interactionMode !== "add-node") {
@@ -1865,30 +2079,49 @@ let orphanCounter = 0;
       x: e.clientX,
       y: e.clientY
     });
+
+    // ป้องกันการสร้างฉากซ้อนทับ: ตรวจสอบตำแหน่งว่างบน Canvas
+    if (checkNodeCollision(flowPos)) {
+      showToast("ตำแหน่งนี้มีฉากอยู่แล้วหรือใกล้ฉากเดิมเกินไป กรุณาคลิกเลือกตำแหน่งว่างบน Canvas เพื่อวางฉากใหม่ค่ะ", "warn");
+      return;
+    }
     
-    setPendingScenePosition({ x: flowPos.x, y: flowPos.y });
+    setPendingScenePosition({ x: Math.round(flowPos.x), y: Math.round(flowPos.y) });
     if (novelChapters.length > 0) {
       const firstChId = novelChapters[0]?.id ?? novelChapters[0]?.chapter_id ?? novelChapters[0]?.ChapterID ?? novelChapters[0]?.chapterId;
       setSelectedMoveChapterId(String(firstChId));
+      setNewSceneTitle("");
     } else {
       setSelectedMoveChapterId("");
+      setNewSceneTitle("");
     }
     setShowAddScenePopup(true);
-  }, [interactionMode, screenToFlowPosition, novelChapters, connectSource, clearConnectionState]);
+  }, [interactionMode, screenToFlowPosition, novelChapters, rfNodes, connectSource, clearConnectionState, checkNodeCollision, showToast]);
 
   const edgeUpdateSuccessful = useRef(true);
 
   const handleAddSceneBackend = async () => {
-    if (!pendingScenePosition || !selectedMoveChapterId) return;
+    if (!selectedMoveChapterId) return;
+    const targetPos = pendingScenePosition || findVacantCanvasPosition(rfNodes);
     const token = localStorage.getItem("token");
     try {
+      const scenesInTargetChapter = rfNodes.filter(
+        (n) => String(n.data?.chapterId ?? n.data?.ChapterID ?? n.data?.chapter_id) === String(selectedMoveChapterId)
+      );
+      const defaultTitle = `ฉากที่ ${scenesInTargetChapter.length + 1}`;
+      const finalTitle = newSceneTitle.trim() || defaultTitle;
+
       const payload = {
         novel_id: parseInt(novelId, 10),
         chapter_id: parseInt(selectedMoveChapterId, 10),
-        title: newSceneTitle.trim() || "ฉากไม่มีชื่อ",
+        title: finalTitle,
         content: "",
-        x: Math.round(pendingScenePosition.x),
-        y: Math.round(pendingScenePosition.y),
+        x: Math.round(targetPos.x),
+        y: Math.round(targetPos.y),
+        node_x: Math.round(targetPos.x),
+        node_y: Math.round(targetPos.y),
+        NodeX: Math.round(targetPos.x),
+        NodeY: Math.round(targetPos.y),
         type: "normal",
         status: "draft",
         is_ending: false,
@@ -1899,16 +2132,38 @@ let orphanCounter = 0;
       if (token) headers["Authorization"] = `Bearer ${token}`;
 
       showToast("กำลังสร้างฉากใหม่...", "info");
-      const response = await axios.post(`${API_BASE_URL}/scenes`, payload, { headers });
+      // 🔗 เชื่อมต่อ POST /api/v1/scenes: สร้างฉากนิยายใหม่ในตอนที่เลือก
+      const response = await apiPost(`${API_BASE_URL}/api/v1/scenes`, payload, { headers });
       
       if (response.status === 200 || response.status === 201) {
+        // บันทึกตำแหน่งลง Database จริงทันทีผ่าน PUT /scenes/:id/position
+        const createdSceneId = response.data?.scene_id || response.data?.data?.scene_id || response.data?.id;
+        if (createdSceneId) {
+          try {
+            // 🔗 เชื่อมต่อ PUT /api/v1/scenes/:id/position: บันทึกพิกัดตำแหน่งเริ่มต้นของฉากที่สร้างใหม่
+            await apiPut(
+              `${API_BASE_URL}/api/v1/scenes/${createdSceneId}/position`,
+              {
+                node_x: Math.round(targetPos.x),
+                node_y: Math.round(targetPos.y),
+              },
+              { headers }
+            );
+          } catch (posErr) {
+            console.error("Failed to persist initial scene position:", posErr);
+          }
+        }
+
         showToast("สร้างฉากใหม่เรียบร้อยแล้ว", "success");
         await fetchStoryTreeAndChapters();
         window.dispatchEvent(new Event("novel-data-updated"));
       }
     } catch (err) {
       console.error("Create scene error:", err);
-      const errMsg = err.response?.data?.message || err.response?.data?.error || "เกิดข้อผิดพลาดในการสร้างฉาก (ชื่อฉากอาจซ้ำในตอนเดียวกัน)";
+      const errMsg = extractErrorMessage(
+        err,
+        "เกิดข้อผิดพลาดในการสร้างฉาก (ชื่อฉากอาจซ้ำในตอนเดียวกัน หรือข้อมูลไม่ถูกต้อง)"
+      );
       showToast(errMsg, "warn");
     } finally {
       setShowAddScenePopup(false);
@@ -1992,7 +2247,8 @@ let orphanCounter = 0;
     try {
       showToast("กำลังบันทึกการย้ายเส้น...", "info");
       
-      const oldSourceRes = await axios.get(`${API_BASE_URL}/scenes/${oldSourceId}`, { headers });
+      // 🔗 เชื่อมต่อ GET /api/v1/scenes/:id: ดึงข้อมูลฉากต้นทางเดิมเพื่อตรวจสอบรายการทางเลือก
+      const oldSourceRes = await apiGet(`${API_BASE_URL}/api/v1/scenes/${oldSourceId}`, { headers });
       const oldSourceData = oldSourceRes.data?.data || oldSourceRes.data;
       let oldChoices = Array.isArray(oldSourceData.choices) ? oldSourceData.choices : [];
 
@@ -2032,10 +2288,12 @@ let orphanCounter = 0;
             to_scene_id: parseInt(c.to_scene_id ?? c.toSceneId ?? c.targetSubScene ?? "0", 10),
           })),
         };
-        await axios.put(`${API_BASE_URL}/scenes/${oldSourceId}`, oldPayload, { headers });
+        // 🔗 เชื่อมต่อ PUT /api/v1/scenes/:id: อัปเดตฉากต้นทางเดิมหลังจากนำทางเลือกออก
+        await apiPut(`${API_BASE_URL}/api/v1/scenes/${oldSourceId}`, oldPayload, { headers });
 
         // 2. ไปเพิ่มในต้นทางใหม่พร้อมระบุปลายทางใหม่
-        const newSourceRes = await axios.get(`${API_BASE_URL}/scenes/${newSourceId}`, { headers });
+        // 🔗 เชื่อมต่อ GET /api/v1/scenes/:id: ดึงข้อมูลฉากต้นทางใหม่เพื่อเพิ่มทางเลือกเข้าไป
+        const newSourceRes = await apiGet(`${API_BASE_URL}/api/v1/scenes/${newSourceId}`, { headers });
         const newSourceData = newSourceRes.data?.data || newSourceRes.data;
         let newChoices = Array.isArray(newSourceData.choices) ? newSourceData.choices : [];
         
@@ -2070,7 +2328,8 @@ let orphanCounter = 0;
             to_scene_id: parseInt(c.to_scene_id ?? c.toSceneId ?? c.targetSubScene ?? "0", 10),
           })),
         };
-        await axios.put(`${API_BASE_URL}/scenes/${newSourceId}`, newPayload, { headers });
+        // 🔗 เชื่อมต่อ PUT /api/v1/scenes/:id: บันทึกฉากต้นทางใหม่พร้อมทางเลือกที่เพิ่มเข้ามา
+        await apiPut(`${API_BASE_URL}/api/v1/scenes/${newSourceId}`, newPayload, { headers });
       } else {
         // ต้นทางเดิม แต่เปลี่ยนปลายทาง
         let matched = false;
@@ -2123,7 +2382,8 @@ let orphanCounter = 0;
             to_scene_id: parseInt(c.to_scene_id ?? c.toSceneId ?? c.targetSubScene ?? "0", 10),
           })),
         };
-        await axios.put(`${API_BASE_URL}/scenes/${oldSourceId}`, payload, { headers });
+        // 🔗 เชื่อมต่อ PUT /api/v1/scenes/:id: บันทึกการแก้ไขปลายทางของทางเลือกในฉากเดิม
+        await apiPut(`${API_BASE_URL}/api/v1/scenes/${oldSourceId}`, payload, { headers });
       }
 
       setRfEdges((eds) =>
@@ -2145,7 +2405,26 @@ let orphanCounter = 0;
       window.dispatchEvent(new Event("novel-data-updated"));
     } catch (err) {
       console.error("Confirm edge update error:", err);
-      showToast("ไม่สามารถย้ายเส้นทางเลือกได้", "warn");
+      const serverMsg = extractErrorMessage(err, "");
+      let errorMsg = "ไม่สามารถย้ายเส้นทางเลือกได้";
+      if (serverMsg.includes("80 characters") || serverMsg.includes("80 ตัวอักษร")) {
+        errorMsg = "ข้อความทางเลือกต้องมีความยาวไม่เกิน 80 ตัวอักษร (VAL-04)";
+      } else if (serverMsg.includes("วงวน") || serverMsg.includes("cycle")) {
+        errorMsg = "ไม่สามารถย้ายเส้นได้เนื่องจากการย้ายนี้จะทำให้เกิดวงวนในเนื้อเรื่อง (Cycle)";
+      } else if (serverMsg.includes("ย้อนกลับ") || serverMsg.includes("reverse")) {
+        errorMsg = "ไม่สามารถย้ายเส้นได้เนื่องจากมีเส้นทางย้อนกลับสวนทางกันอยู่แล้ว";
+      } else if (serverMsg.includes("มีอยู่แล้ว") || serverMsg.includes("duplicate") || err.response?.status === 409) {
+        errorMsg = "มีทางเลือกนี้อยู่แล้วในเส้นทางเดียวกัน กรุณาตั้งชื่อตัวเลือกให้แตกต่าง";
+      } else if (serverMsg.includes("ฉากจบ") || serverMsg.includes("ending")) {
+        errorMsg = "ฉากต้นทางเป็นฉากจบ ไม่สามารถสร้างหรือย้ายทางเลือกออกมาได้";
+      } else if (serverMsg.includes("จุดเริ่มต้น") || serverMsg.includes("start")) {
+        errorMsg = "ไม่สามารถย้ายทางเลือกให้ชี้กลับไปยังจุดเริ่มต้นของเรื่องได้";
+      } else if (err.response?.status === 403) {
+        errorMsg = "คุณไม่มีสิทธิ์แก้ไขนิยายเรื่องนี้";
+      } else if (serverMsg && serverMsg !== "internal server error") {
+        errorMsg = `ไม่สามารถย้ายเส้นทางเลือกได้: ${serverMsg}`;
+      }
+      showToast(errorMsg, "warn");
     } finally {
       setShowEdgeUpdateConfirm(false);
       setPendingEdgeUpdate(null);
@@ -2181,8 +2460,8 @@ let orphanCounter = 0;
     try {
       showToast("กำลังบันทึกการเปลี่ยนแปลง...", "info");
       
-      // ดึงรายละเอียดฉากต้นทางเดิม
-      const oldSourceRes = await axios.get(`${API_BASE_URL}/scenes/${oldSourceId}`, { headers });
+      // 🔗 เชื่อมต่อ GET /api/v1/scenes/:id: ดึงรายละเอียดฉากต้นทางเดิม
+      const oldSourceRes = await apiGet(`${API_BASE_URL}/api/v1/scenes/${oldSourceId}`, { headers });
       const oldSourceData = oldSourceRes.data?.data || oldSourceRes.data;
       
       let oldChoices = Array.isArray(oldSourceData.choices) ? oldSourceData.choices : [];
@@ -2200,7 +2479,7 @@ let orphanCounter = 0;
 
         const oldIsEnding = !!(oldSourceData.is_ending || oldSourceData.IsEnding);
         const oldType = oldSourceData.type || oldSourceData.Type || "normal";
-        
+
         const oldPayload = {
           novel_id: parseInt(novelId, 10),
           chapter_id: parseInt(oldSourceData.chapter_id ?? oldSourceData.ChapterID ?? 0, 10),
@@ -2227,10 +2506,12 @@ let orphanCounter = 0;
             };
           })
         };
-        await axios.put(`${API_BASE_URL}/scenes/${oldSourceId}`, oldPayload, { headers });
+        // 🔗 เชื่อมต่อ PUT /api/v1/scenes/:id: บันทึกอัปเดตฉากต้นทางเดิมหลังจากนำทางเลือกออก
+        await apiPut(`${API_BASE_URL}/api/v1/scenes/${oldSourceId}`, oldPayload, { headers });
 
         // 2. ไปเพิ่มในต้นทางใหม่
-        const newSourceRes = await axios.get(`${API_BASE_URL}/scenes/${newSourceId}`, { headers });
+        // 🔗 เชื่อมต่อ GET /api/v1/scenes/:id: ดึงข้อมูลฉากต้นทางใหม่เพื่อเพิ่มทางเลือก
+        const newSourceRes = await apiGet(`${API_BASE_URL}/api/v1/scenes/${newSourceId}`, { headers });
         const newSourceData = newSourceRes.data?.data || newSourceRes.data;
         let newChoices = Array.isArray(newSourceData.choices) ? newSourceData.choices : [];
         
@@ -2270,7 +2551,8 @@ let orphanCounter = 0;
             };
           })
         };
-        await axios.put(`${API_BASE_URL}/scenes/${newSourceId}`, newPayload, { headers });
+        // 🔗 เชื่อมต่อ PUT /api/v1/scenes/:id: บันทึกอัปเดตฉากต้นทางใหม่พร้อมทางเลือกใหม่
+        await apiPut(`${API_BASE_URL}/api/v1/scenes/${newSourceId}`, newPayload, { headers });
         
       } else if (isTargetOrLabelChanged) {
         // กรณีไม่เปลี่ยนต้นทาง แต่เปลี่ยนปลายทางหรือข้อความ
@@ -2329,7 +2611,8 @@ let orphanCounter = 0;
             };
           })
         };
-        await axios.put(`${API_BASE_URL}/scenes/${oldSourceId}`, payload, { headers });
+        // 🔗 เชื่อมต่อ PUT /api/v1/scenes/:id: บันทึกการแก้ไขปลายทางหรือป้ายกำกับทางเลือก
+        await apiPut(`${API_BASE_URL}/api/v1/scenes/${oldSourceId}`, payload, { headers });
       }
 
       // อัปเดต React Flow state ฝั่ง Frontend ทันที
@@ -2355,7 +2638,26 @@ let orphanCounter = 0;
       changeMode(interactionMode); // คงเครื่องมือปัจจุบันไว้ ไม่บังคับสลับกลับไปโหมดเลือก
     } catch (err) {
       console.error("Update connection error:", err);
-      showToast("ไม่สามารถบันทึกการแก้ไขเส้นได้", "warn");
+      const serverMsg = extractErrorMessage(err, "");
+      let errorMsg = "ไม่สามารถบันทึกการแก้ไขเส้นได้";
+      if (serverMsg.includes("80 characters") || serverMsg.includes("80 ตัวอักษร")) {
+        errorMsg = "ข้อความทางเลือกต้องมีความยาวไม่เกิน 80 ตัวอักษร (VAL-04)";
+      } else if (serverMsg.includes("วงวน") || serverMsg.includes("cycle")) {
+        errorMsg = "ไม่สามารถแก้ไขได้เนื่องจากการแก้ไขนี้จะทำให้เกิดวงวนในเนื้อเรื่อง (Cycle)";
+      } else if (serverMsg.includes("ย้อนกลับ") || serverMsg.includes("reverse")) {
+        errorMsg = "ไม่สามารถแก้ไขได้เนื่องจากมีเส้นทางย้อนกลับสวนทางกันอยู่แล้ว";
+      } else if (serverMsg.includes("มีอยู่แล้ว") || serverMsg.includes("duplicate") || err.response?.status === 409) {
+        errorMsg = "มีทางเลือกนี้อยู่แล้วในเส้นทางเดียวกัน กรุณาตั้งชื่อตัวเลือกให้แตกต่าง";
+      } else if (serverMsg.includes("ฉากจบ") || serverMsg.includes("ending")) {
+        errorMsg = "ฉากต้นทางเป็นฉากจบ ไม่สามารถสร้างหรือย้ายทางเลือกออกมาได้";
+      } else if (serverMsg.includes("จุดเริ่มต้น") || serverMsg.includes("start")) {
+        errorMsg = "ไม่สามารถกำหนดให้ทางเลือกชี้ไปยังจุดเริ่มต้นของเรื่องได้";
+      } else if (err.response?.status === 403) {
+        errorMsg = "คุณไม่มีสิทธิ์แก้ไขนิยายเรื่องนี้";
+      } else if (serverMsg && serverMsg !== "internal server error") {
+        errorMsg = `ไม่สามารถบันทึกการแก้ไขเส้นได้: ${serverMsg}`;
+      }
+      showToast(errorMsg, "warn");
     }
   };
 
@@ -2377,7 +2679,8 @@ let orphanCounter = 0;
       showToast("กำลังลบทางเลือก...", "info");
       
       // 1. ดึงรายละเอียดฉากต้นทางเพื่อเสาะหา choice_id ที่เป็นตัวเลขจริงๆ จากฐานข้อมูล
-      const sourceRes = await axios.get(`${API_BASE_URL}/scenes/${sourceId}`, { headers });
+      // 🔗 เชื่อมต่อ GET /api/v1/scenes/:id: ดึงข้อมูลฉากต้นทางเพื่อค้นหา ID ของทางเลือกที่จะลบ
+      const sourceRes = await apiGet(`${API_BASE_URL}/api/v1/scenes/${sourceId}`, { headers });
       const sourceData = sourceRes.data?.data || sourceRes.data;
       const choicesList = Array.isArray(sourceData.choices) ? sourceData.choices : [];
       
@@ -2393,10 +2696,11 @@ let orphanCounter = 0;
       const actualChoiceId = matchedChoice?.choice_id ?? matchedChoice?.id ?? matchedChoice?.ChoiceID ?? matchedChoice?.ID;
       let isSuccess = false;
 
-      // 2. ลองยิง DELETE /choices/:id ของหลังบ้านโดยตรง (มีประสิทธิภาพสูงสุด ลบออกจาก DB จริง)
+      // 2. ลองยิง DELETE /api/v1/choices/:id ของหลังบ้านโดยตรง (มีประสิทธิภาพสูงสุด ลบออกจาก DB จริง)
       if (actualChoiceId && !isNaN(Number(actualChoiceId))) {
         try {
-          const res = await axios.delete(`${API_BASE_URL}/choices/${actualChoiceId}`, { headers });
+          // 🔗 เชื่อมต่อ DELETE /api/v1/choices/:id: ลบข้อมูลทางเลือกออกจากฐานข้อมูลโดยตรง
+          const res = await apiDelete(`${API_BASE_URL}/api/v1/choices/${actualChoiceId}`, { headers });
           if (res.status === 200 || res.status === 204 || res.data?.status === "success") {
             isSuccess = true;
           }
@@ -2405,7 +2709,7 @@ let orphanCounter = 0;
         }
       }
 
-      // 3. หากไม่พบ choice_id หรือลบทางตรงไม่สำเร็จ ค่อย fallback ไปกรองและยิง PUT /scenes/:id
+      // 3. หากไม่พบ choice_id หรือลบทางตรงไม่สำเร็จ ค่อย fallback ไปกรองและยิง PUT /api/v1/scenes/:id
       if (!isSuccess) {
         const updatedChoices = choicesList.filter((c) => {
           const cId = normalizeId(c.choice_id ?? c.id ?? c.ChoiceID ?? c.ID);
@@ -2452,7 +2756,8 @@ let orphanCounter = 0;
           }),
         };
 
-        await axios.put(`${API_BASE_URL}/scenes/${sourceId}`, payload, { headers });
+        // 🔗 เชื่อมต่อ PUT /api/v1/scenes/:id: บันทึกอัปเดตฉากโดยตัดทางเลือกที่ลบออกไป
+        await apiPut(`${API_BASE_URL}/api/v1/scenes/${sourceId}`, payload, { headers });
       }
 
       // 4. อัปเดตผัง React Flow State ทันทีใน Client
@@ -2479,6 +2784,33 @@ let orphanCounter = 0;
     const sceneId = sceneToDelete.id;
     const isTemp = sceneToDelete.data?.isTemp || String(sceneId).startsWith("temp-new-");
     
+    // ตรวจสอบเงื่อนไขที่ไม่สามารถลบฉากได้ พร้อมบอกเหตุผลชัดเจน
+    const isStart =
+      sceneToDelete.data?.isStart ||
+      sceneToDelete.data?.type === "start" ||
+      sceneToDelete.data?.Type === "start" ||
+      sceneToDelete.type === "start";
+
+    if (!isTemp && isStart) {
+      showToast("ไม่สามารถลบฉากได้ เนื่องจากเป็นฉากเริ่มต้นของนิยาย (หากต้องการลบ กรุณาเลือกฉากอื่นในตอนที่ 1 เป็นฉากเริ่มต้นก่อน)", "warn");
+      return;
+    }
+
+    // ตรวจสอบว่ามีฉากอื่นเชื่อมต่อมายังฉากนี้หรือไม่ (incoming choices)
+    const incomingEdges = rfEdges.filter(
+      (e) => String(e.target) === String(sceneId)
+    );
+    const hasIncomingChoices =
+      incomingEdges.length > 0 ||
+      (treeData?.edges || treeData?.Edges || []).some(
+        (e) => String(e.target || e.to_scene_id || e.ToSceneID) === String(sceneId)
+      );
+
+    if (!isTemp && hasIncomingChoices) {
+      showToast("ไม่สามารถลบฉากได้ เนื่องจากมีฉากอื่นเชื่อมต่อมายังฉากนี้ (กรุณาลบเส้นทางเลือกที่เชื่อมมายังฉากนี้ก่อน)", "warn");
+      return;
+    }
+
     try {
       if (isTemp) {
         // ลบจาก client-side ทันที
@@ -2492,10 +2824,12 @@ let orphanCounter = 0;
         const headers = {};
         if (token) headers["Authorization"] = `Bearer ${token}`;
         
-        await axios.delete(`${API_BASE_URL}/scenes/${sceneId}`, { headers });
+        // 🔗 เชื่อมต่อ DELETE /api/v1/scenes/:id: ลบฉากนิยายนี้ออกจากระบบ
+        await apiDelete(`${API_BASE_URL}/api/v1/scenes/${sceneId}`, { headers });
         
         // ดึงข้อมูล story-tree ใหม่
-        const response = await axios.get(`${API_BASE_URL}/novels/${novelId}/story-tree`);
+        // 🔗 เชื่อมต่อ GET /api/v1/novels/:id/story-tree: ดึงข้อมูลผังเรื่องราวใหม่หลังจากลบฉากสำเร็จ
+        const response = await apiGet(`${API_BASE_URL}/api/v1/novels/${novelId}/story-tree`);
         setTreeData(response.data?.data || response.data || null);
         showToast("ลบฉากเรียบร้อยแล้ว", "success");
         window.dispatchEvent(new Event("novel-data-updated"));
@@ -2508,9 +2842,47 @@ let orphanCounter = 0;
       setSelectedSceneId(null);
     } catch (err) {
       console.error("Delete scene error:", err);
-      showToast("เกิดข้อผิดพลาดในการลบฉาก", "warn");
+      const serverMsg =
+        err.response?.data?.error?.message ||
+        err.response?.data?.message ||
+        err.response?.data?.error ||
+        err.message ||
+        "";
+
+      let reasonMsg = "เกิดข้อผิดพลาดในการลบฉาก";
+      if (
+        serverMsg.toLowerCase().includes("start") ||
+        isStart
+      ) {
+        reasonMsg = "ไม่สามารถลบฉากได้ เนื่องจากเป็นฉากเริ่มต้นของนิยาย";
+      } else if (
+        serverMsg.toLowerCase().includes("incoming") ||
+        serverMsg.toLowerCase().includes("choice") ||
+        hasIncomingChoices
+      ) {
+        reasonMsg = "ไม่สามารถลบฉากได้ เนื่องจากมีฉากอื่นเชื่อมต่อมายังฉากนี้ (กรุณาลบเส้นทางเลือกที่เชื่อมมายังฉากนี้ก่อน)";
+      } else if (
+        err.response?.status === 403 ||
+        serverMsg.toLowerCase().includes("permission") ||
+        serverMsg.toLowerCase().includes("own")
+      ) {
+        reasonMsg = "ไม่สามารถลบฉากได้ เนื่องจากคุณไม่มีสิทธิ์แก้ไขนิยายเรื่องนี้";
+      } else if (
+        err.response?.status === 404 ||
+        serverMsg.toLowerCase().includes("not found")
+      ) {
+        reasonMsg = "ไม่สามารถลบฉากได้ เนื่องจากไม่พบข้อมูลฉากนี้ในระบบ";
+      } else if (hasIncomingChoices) {
+        reasonMsg = "ไม่สามารถลบฉากได้ เนื่องจากมีฉากอื่นเชื่อมต่อมายังฉากนี้ (กรุณาลบเส้นทางเลือกที่เชื่อมมายังฉากนี้ก่อน)";
+      } else if (serverMsg && serverMsg !== "internal server error") {
+        reasonMsg = `ไม่สามารถลบฉากได้: ${serverMsg}`;
+      } else {
+        reasonMsg = "ไม่สามารถลบฉากได้ เนื่องจากอาจมีฉากอื่นเชื่อมโยงอยู่ หรือเกิดข้อผิดพลาดจากระบบ";
+      }
+
+      showToast(reasonMsg, "warn");
     }
-  }, [sceneToDelete, novelId, showToast, changeMode, interactionMode, setRfNodes, setRfEdges]);
+  }, [sceneToDelete, rfEdges, treeData, novelId, showToast, changeMode, interactionMode, setRfNodes, setRfEdges]);
 
   const onNodesChangeWrapper = useCallback((changes) => {
     onNodesChangeRF(changes);
@@ -2560,8 +2932,9 @@ let orphanCounter = 0;
     if (token) headers["Authorization"] = `Bearer ${token}`;
 
     try {
-      await axios.put(
-        `${API_BASE_URL}/scenes/${node.id}/position`,
+      // 🔗 เชื่อมต่อ PUT /api/v1/scenes/:id/position: บันทึกตำแหน่งพิกัด x, y ของโหนดเมื่อลากเสร็จ
+      await apiPut(
+        `${API_BASE_URL}/api/v1/scenes/${node.id}/position`,
         {
           node_x: newX,
           node_y: newY,
@@ -2661,6 +3034,13 @@ let orphanCounter = 0;
 
     const currentMode = modeRef.current;
 
+    // โหมดเพิ่มฉาก (Add Node Mode) - ดักจับการคลิกทับโหนดเดิม
+    if (currentMode === "add-node") {
+      evt?.stopPropagation?.();
+      showToast("ตำแหน่งนี้มีฉากอยู่แล้ว กรุณาคลิกเลือกตำแหน่งว่างบน Canvas เพื่อวางฉากใหม่ค่ะ", "warn");
+      return;
+    }
+
     // โหมดลบฉาก (Delete Mode)
     if (currentMode === "delete") {
       setSceneToDelete(node);
@@ -2741,6 +3121,10 @@ let orphanCounter = 0;
       setConnectError("กรุณากรอกข้อความทางเลือกก่อนเชื่อมโหนด");
       return;
     }
+    if (choiceText.trim().length > 80) {
+      setConnectError("ข้อความทางเลือกต้องมีความยาวไม่เกิน 80 ตัวอักษรตามเงื่อนไขของระบบ (VAL-04)");
+      return;
+    }
     if (!connectSource || !connectTarget) {
       setConnectError("ไม่พบฉากต้นทางหรือปลายทาง กรุณาปิดหน้าต่างแล้วเลือกฉากใหม่");
       return;
@@ -2791,7 +3175,8 @@ let orphanCounter = 0;
       const headers = { "Content-Type": "application/json" };
       if (token) headers["Authorization"] = `Bearer ${token}`;
 
-      await axios.post(`${API_BASE_URL}/choices`, payload, { 
+      // 🔗 เชื่อมต่อ POST /api/v1/choices: สร้างเส้นทางเลือกเชื่อมโยงระหว่างฉากต้นทางและฉากปลายทาง
+      await apiPost(`${API_BASE_URL}/api/v1/choices`, payload, { 
         headers, 
         withCredentials: false 
       });
@@ -2809,7 +3194,8 @@ let orphanCounter = 0;
         const srcIdInt = parseInt(connectSource.id, 10);
         const dstIdInt = parseInt(connectTarget.id, 10);
         
-        const checkRes = await axios.get(`${API_BASE_URL}/novels/${novelId}/story-tree`, { withCredentials: false });
+        // 🔗 เชื่อมต่อ GET /api/v1/novels/:id/story-tree: ตรวจสอบความถูกต้องของเส้นทางเลือกใน Story Tree
+        const checkRes = await apiGet(`${API_BASE_URL}/api/v1/novels/${novelId}/story-tree`, { withCredentials: false });
         const freshTree = checkRes.data?.data || checkRes.data || null;
         const freshEdges = freshTree?.Edges || freshTree?.edges || [];
 
@@ -2834,7 +3220,33 @@ let orphanCounter = 0;
       }
 
       fetchStoryTreeAndChapters();
-      setConnectError("เชื่อมทางเลือกไม่สำเร็จ กรุณาตรวจสอบข้อมูลแล้วลองอีกครั้ง");
+
+      // ดึงข้อความ error จาก Backend เพื่อแสดงเหตุผลที่ตรงกับกฎระบบ
+      const serverMsg = extractErrorMessage(err, "");
+
+      let errorMsg = "เชื่อมทางเลือกไม่สำเร็จ กรุณาตรวจสอบข้อมูลแล้วลองอีกครั้ง";
+      if (serverMsg.includes("80 characters") || serverMsg.includes("80 ตัวอักษร")) {
+        errorMsg = "ข้อความทางเลือกต้องมีความยาวไม่เกิน 80 ตัวอักษร (ตามกฎ VAL-04)";
+      } else if (serverMsg.includes("วงวน") || serverMsg.includes("cycle")) {
+        errorMsg = "ไม่สามารถเชื่อมต่อได้เนื่องจากการเชื่อมต่อนี้จะทำให้เกิดวงวนในเนื้อเรื่อง (Cycle)";
+      } else if (serverMsg.includes("ย้อนกลับ") || serverMsg.includes("reverse")) {
+        errorMsg = "ไม่สามารถสร้างทางเลือกย้อนกลับไปยังฉากต้นทางได้ เนื่องจากมีเส้นทางเชื่อมโยงสวนทางกันอยู่แล้ว";
+      } else if (serverMsg.includes("มีอยู่แล้ว") || serverMsg.includes("duplicate") || err.response?.status === 409) {
+        errorMsg = "ทางเลือกนี้มีอยู่แล้วในเส้นทางเดียวกัน กรุณาตั้งชื่อตัวเลือกให้แตกต่าง";
+      } else if (serverMsg.includes("ฉากจบ") || serverMsg.includes("ending")) {
+        errorMsg = "ฉากต้นทางเป็นฉากจบ ไม่สามารถสร้างทางเลือกต่อไปได้";
+      } else if (serverMsg.includes("จุดเริ่มต้น") || serverMsg.includes("start")) {
+        errorMsg = "ไม่สามารถสร้างทางเลือกย้อนกลับไปที่จุดเริ่มต้นของเรื่องได้";
+      } else if (serverMsg.includes("ข้ามเรื่อง") || serverMsg.includes("cross")) {
+        errorMsg = "ไม่สามารถเชื่อมโยงฉากข้ามเรื่องนิยายกันได้";
+      } else if (err.response?.status === 403 || serverMsg.toLowerCase().includes("forbidden") || serverMsg.toLowerCase().includes("สิทธิ์")) {
+        errorMsg = "คุณไม่มีสิทธิ์แก้ไขนิยายเรื่องนี้";
+      } else if (serverMsg && serverMsg !== "internal server error") {
+        errorMsg = `เชื่อมทางเลือกไม่สำเร็จ: ${serverMsg}`;
+      }
+
+      setConnectError(errorMsg);
+      showToast(errorMsg, "warn");
     } finally {
       setIsSavingConnection(false);
     }
@@ -2922,14 +3334,14 @@ let orphanCounter = 0;
     if (interactionMode === "add-node") {
       return (
         <span>
-          ✚ <strong>โหมดเพิ่มฉาก:</strong> คลิกตรงพื้นที่ว่างเปล่าใดก็ได้บนบอร์ดแผนภาพเพื่อวางโหนด <strong>ฉากใหม่</strong>
+          ✚ <strong>โหมดเพิ่มฉาก:</strong> คลิกตรงพื้นที่ว่างเปล่าใดก็ได้บนบอร์ดแผนภาพเพื่อวางโหนด <strong>ฉากใหม่</strong> (กด Esc หรือคลิกปุ่มเพิ่มอีกครั้งเพื่อยกเลิก)
         </span>
       );
     }
     if (interactionMode === "delete") {
       return (
         <span style={{ color: "#ef4444" }}>
-          🗑️ <strong>โหมดลบ:</strong> คลิกเลือกโหนดฉากเพื่อลบ
+          🗑️ <strong>โหมดลบ:</strong> คลิกเลือกโหนดฉากหรือเส้นเชื่อมเพื่อลบ (กด Esc หรือคลิกปุ่มลบอีกครั้งเพื่อยกเลิก)
         </span>
       );
     }
@@ -2948,7 +3360,7 @@ let orphanCounter = 0;
     return (
       <div className="wst-page">
         <div className="wst-loading-state">
-          <p className="wst-error-text">⚠️ {error}</p>
+          <p className="wst-error-text">⚠️ {typeof error === "object" && error !== null ? (error.message || error.error || JSON.stringify(error)) : String(error || "")}</p>
           <button className="wst-error-button" type="button" onClick={fetchStoryTreeAndChapters}>
             ลองโหลดใหม่อีกครั้ง
           </button>
@@ -2959,14 +3371,6 @@ let orphanCounter = 0;
 
   return (
     <div className="wst-page">
-      {/* Toast Notification */}
-      {toast && (
-        <div className={`wst-toast ${toast.type}`}>
-          <i className={`ti ti-${toast.type === "success" ? "check-circle" : toast.type === "warn" ? "alert-circle" : "info-circle"}`} />
-          <span>{toast.message}</span>
-        </div>
-      )}
-
       {/* Modal Popup กำหนดทางเลือก (ขั้นตอนที่ 3) */}
       {isModalOpen && connectSource && connectTarget && (
         <div className="wst-modal-bg open" onClick={(e) => e.target.classList.contains("wst-modal-bg") && handleCloseModal()}>
@@ -3330,11 +3734,11 @@ let orphanCounter = 0;
                 <span>เพิ่ม</span>
               </button>
               <button 
-                title="คลิกเลือกโหนดฉากเพื่อลบ" 
+                title="ลบฉากหรือเส้นเชื่อม" 
                 className={`wst-toolbar-btn ${interactionMode==='delete' ? 'wst-toolbar-btn--delete-active':''}`}
                 onClick={() => changeMode(interactionMode === 'delete' ? 'select' : 'delete')}
               >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18M8 6V4h8v2M10 11v6M14 11v6M5 6l1 13a1 1 0 001 1h10a1 1 0 001-1l1-13"/></svg>
+                <Trash2 size={18} />
                 <span>ลบ</span>
               </button>
               <button 
@@ -3477,7 +3881,7 @@ let orphanCounter = 0;
               </label>
               <input
                 type="text"
-                placeholder="เช่น การเดินทางครั้งใหม่, เผชิญหน้ากับศัตรู..."
+                placeholder="เช่น การเดินทางครั้งใหม่, เผชิญหน้าศัตรู..."
                 value={newSceneTitle}
                 onChange={(e) => setNewSceneTitle(e.target.value)}
                 style={{
@@ -3500,7 +3904,9 @@ let orphanCounter = 0;
               ) : (
                 <select 
                   value={selectedMoveChapterId}
-                  onChange={(e) => setSelectedMoveChapterId(e.target.value)}
+                  onChange={(e) => {
+                    setSelectedMoveChapterId(e.target.value);
+                  }}
                   style={{
                     width: '100%', padding: '12px 16px', borderRadius: '12px',
                     border: '1.5px solid #bfdbfe', fontSize: '14.5px', fontFamily: 'inherit',
@@ -3535,15 +3941,15 @@ let orphanCounter = 0;
                 ยกเลิก
               </button>
               <button 
-                disabled={novelChapters.length === 0 || !newSceneTitle.trim()}
+                disabled={novelChapters.length === 0}
                 onClick={handleAddSceneBackend}
                 style={{
                   padding: '10px 24px', borderRadius: '20px', border: 'none',
                   background: 'linear-gradient(135deg, #1d4ed8 0%, #1e3a8a 100%)',
-                  color: '#ffffff', cursor: (novelChapters.length === 0 || !newSceneTitle.trim()) ? 'not-allowed' : 'pointer',
+                  color: '#ffffff', cursor: novelChapters.length === 0 ? 'not-allowed' : 'pointer',
                   fontSize: '14px', fontWeight: '700', transition: 'all 0.2s',
                   boxShadow: '0 4px 12px rgba(29, 78, 216, 0.25)',
-                  opacity: (novelChapters.length === 0 || !newSceneTitle.trim()) ? 0.5 : 1
+                  opacity: novelChapters.length === 0 ? 0.5 : 1
                 }}
               >
                 ตกลงสร้างฉาก
@@ -3592,7 +3998,7 @@ let orphanCounter = 0;
             </div>
 
             <p style={{ color: '#4b5563', fontSize: '14px', marginBottom: '24px', lineHeight: '1.5' }}>
-              คุณแน่ใจหรือไม่ว่าต้องการลบฉากนี้ออกจากระบบ? **การกระทำนี้ไม่สามารถย้อนคืนได้และเส้นเชื่อมเลือกใดๆ จากฉากนี้จะถูกลบออกด้วย**
+              คุณแน่ใจหรือไม่ว่าต้องการลบฉากนี้ออกจากระบบ? 
             </p>
             
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
@@ -3855,6 +4261,18 @@ let orphanCounter = 0;
               </button>
             </div>
         </WstModalOverlay>
+      )}
+
+      {/* Toast Notification - วางไว้ล่างสุดของ DOM เพื่อให้อยู่ด้านหน้าของ Modal และ Backdrop เสมอ */}
+      {toast && (
+        <div className={`wst-toast ${toast.type}`} style={{ zIndex: 9999999 }}>
+          <i className={`ti ti-${toast.type === "success" ? "check-circle" : toast.type === "warn" ? "alert-circle" : "info-circle"}`} />
+          <span>
+            {typeof toast.message === "object" && toast.message !== null
+              ? (toast.message.message || toast.message.error?.message || toast.message.error || JSON.stringify(toast.message))
+              : String(toast.message ?? "")}
+          </span>
+        </div>
       )}
     </div>
   );

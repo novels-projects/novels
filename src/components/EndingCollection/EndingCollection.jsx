@@ -18,8 +18,12 @@ export default function EndingCollection({ isOpen, endings, onClose, onViewStory
   const closeButtonRef = useRef(null);
   const detailRef     = useRef(null);
 
+  const token = typeof localStorage !== "undefined" ? localStorage.getItem("token") : null;
+  const isGuest = !token;
+
   const endingsList    = Array.isArray(endings) ? endings : [];
-  const unlockedEndings = endingsList.filter((item) => item?.is_unlocked);
+  // 🟢 ผู้เยี่ยมชม (Guest) จะไม่มีประวัติฉากจบที่ปลดล็อกในบัญชีส่วนตัว
+  const unlockedEndings = isGuest ? [] : endingsList.filter((item) => item?.is_unlocked);
   const totalEndings    = endingsList.length; // รวมทั้งที่ยังไม่ unlock
 
   // Dynamic filter buttons — แสดงเฉพาะ type ที่มีข้อมูลจริงใน unlocked list
@@ -107,7 +111,9 @@ export default function EndingCollection({ isOpen, endings, onClose, onViewStory
           <h2 id="ending-modal-title">รวมฉากจบที่ค้นพบแล้ว</h2>
           <div className="ending-modal__header-meta">
             <p className="ending-modal__description">
-              ดูเฉพาะฉากจบที่คุณค้นพบแล้วเท่านั้น
+              {isGuest
+                ? "เข้าสู่ระบบเพื่อสะสมและบันทึกฉากจบลงในคลังของคุณ"
+                : "ดูเฉพาะฉากจบที่คุณค้นพบแล้วเท่านั้น"}
             </p>
             {/* Badge จำนวนที่ค้นพบ */}
             <span className="ending-modal__count-badge" aria-label={`ค้นพบแล้ว ${unlockedEndings.length} จาก ${totalEndings} ฉากจบ`}>
@@ -142,8 +148,24 @@ export default function EndingCollection({ isOpen, endings, onClose, onViewStory
         <div className="ending-grid" role="list" aria-label="รายการฉากจบที่ค้นพบ">
           {visibleEndings.length === 0 ? (
             <div className="ending-empty" role="status">
-              <span className="ending-empty__icon">🔍</span>
-              <p>ยังไม่มีฉากจบที่ค้นพบในหมวดนี้</p>
+              <span className="ending-empty__icon">{isGuest ? "🔒" : "🔍"}</span>
+              <p className="ending-empty__title">
+                {isGuest
+                  ? "เข้าสู่ระบบเพื่อปลดล็อกและสะสมคลังฉากจบ"
+                  : "ยังไม่มีฉากจบที่ค้นพบในหมวดนี้"}
+              </p>
+              <p className="ending-empty__desc">
+                {isGuest
+                  ? "เมื่อคุณอ่านนิยายจนถึงฉากจบขณะเข้าสู่ระบบ ฉากจบที่ค้นพบจะถูกบันทึกและรวบรวมไว้ที่นี่โดยอัตโนมัติ"
+                  : "ลองเลือกเส้นทางใหม่ในเรื่องราวเพื่อค้นพบฉากจบที่ซ่อนอยู่"}
+              </p>
+              {isGuest && (
+                <div className="ending-empty__actions">
+                  <a href="/login-register" className="ending-empty__btn ending-empty__btn--primary">
+                    เข้าสู่ระบบ / สมัครสมาชิก
+                  </a>
+                </div>
+              )}
             </div>
           ) : (
             visibleEndings.map((ending) => {

@@ -6,7 +6,7 @@
 }
 
 .reading-settings__icon-aa {
-  font-family: 'Open Sans', serif;
+  font-family: 'Anuphan', sans-serif;
   font-size: 14.5px;
   font-weight: 800;
   letter-spacing: -0.5px;
@@ -24,7 +24,7 @@
   border: 1.5px solid var(--reader-accent-border, #f472b6);
   background: var(--reader-surface, #ffffff);
   color: var(--reader-accent, #db2777);
-  font-family: 'Sarabun', sans-serif;
+  font-family: 'Anuphan', sans-serif;
   font-size: 14.5px;
   font-weight: 700;
   cursor: pointer;
@@ -61,7 +61,7 @@
 }
 
 .reading-settings__label {
-  font-family: 'Sarabun', sans-serif;
+  font-family: 'Anuphan', sans-serif;
   font-size: 13px;
   font-weight: 600;
   color: var(--reader-muted, var(--gray-600));
@@ -78,7 +78,7 @@
   border-radius: 14px;
   border: 1.5px solid var(--reader-border, var(--gray-200));
   background: var(--reader-surface-soft, #f8fafc);
-  font-family: 'Sarabun', sans-serif;
+  font-family: 'Anuphan', sans-serif;
   font-size: 15px;
   color: var(--reader-text, var(--ink));
 }
@@ -96,7 +96,7 @@
   border: 1px solid var(--reader-border, var(--gray-200));
   background: var(--reader-surface, #ffffff);
   color: var(--reader-text, var(--ink));
-  font-family: 'Sarabun', sans-serif;
+  font-family: 'Anuphan', sans-serif;
   font-weight: 700;
   font-size: 15px;
   cursor: pointer;
@@ -110,7 +110,7 @@
 .reading-settings__font-size-value {
   min-width: 42px;
   text-align: center;
-  font-family: 'Sarabun', sans-serif;
+  font-family: 'Anuphan', sans-serif;
   font-size: 15px;
   font-weight: 600;
   color: var(--reader-muted, var(--gray-700));
@@ -134,7 +134,7 @@
   padding: 0 10px;
   border-radius: 14px;
   border: 2px solid transparent;
-  font-family: 'Sarabun', sans-serif;
+  font-family: 'Anuphan', sans-serif;
   font-size: 12px;
   font-weight: 700;
   cursor: pointer;

@@ -44,6 +44,19 @@ function getProcessedReportsRegistry() {
   }
 }
 
+function isAppealReport(report) {
+  if (!report) return false;
+  if (report.isAppeal || report.is_appeal) return true;
+  if (report.report_type === "appeal" || report.status === "appeal_pending") return true;
+  const reason = String(report.reason || report.appeal_reason || "").toLowerCase();
+  return (
+    reason.includes("ปลดระงับ") ||
+    reason.includes("ปลดแบน") ||
+    reason.includes("อุทธรณ์") ||
+    reason.includes("appeal")
+  );
+}
+
 // =========================================================================
 // Thai Date Formatting Helpers
 // =========================================================================
@@ -193,7 +206,8 @@ export default function AdminDashboardPage() {
     }
 
     try {
-      const res = await fetch(`${API_BASE_URL}/api/admin/dashboard/summary`, {
+      // 🔗 เชื่อมต่อ GET /api/v1/admin/dashboard/summary: ดึงข้อมูลสรุปภาพรวมระบบสำหรับแดชบอร์ดแอดมิน
+      const res = await fetch(`${API_BASE_URL}/api/v1/admin/dashboard/summary`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -238,8 +252,9 @@ export default function AdminDashboardPage() {
     }
 
     try {
+      // 🔗 เชื่อมต่อ GET /api/v1/admin/dashboard/trend: ดึงข้อมูลแนวโน้มสถิติย้อนหลัง 6 เดือนสำหรับกราฟ
       const res = await fetch(
-        `${API_BASE_URL}/api/admin/dashboard/trend?months=6&timezone=Asia%2FBangkok`,
+        `${API_BASE_URL}/api/v1/admin/dashboard/trend?months=6&timezone=Asia%2FBangkok`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -291,7 +306,8 @@ export default function AdminDashboardPage() {
     }
 
     try {
-      const res = await fetch(`${API_BASE_URL}/api/admin/reports?status=all&limit=100`, {
+      // 🔗 เชื่อมต่อ GET /api/v1/admin/reports: ดึงรายการรายงานทั้งหมดในระบบสำหรับแดชบอร์ด
+      const res = await fetch(`${API_BASE_URL}/api/v1/admin/reports?status=all&limit=100`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -605,7 +621,7 @@ export default function AdminDashboardPage() {
                     ) : (
                       <div className="admin-review-list">
                         {reportsData.map((item, idx) => {
-                          const isAppeal = item.report_type === "appeal" || item.status === "appeal_pending" || Boolean(item.appeal_reason || (item.reason && item.reason.includes("ปลดระงับ")));
+                          const isAppeal = isAppealReport(item);
                           const isDelete = !isAppeal && (item.report_type === "delete" || item.report_type === "removal" || (item.reason && (item.reason.includes("แจ้งลบ") || item.reason.includes("ขอลบ"))));
                           
                           let badgeText = "รายงาน";

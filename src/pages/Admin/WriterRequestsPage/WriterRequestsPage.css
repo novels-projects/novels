@@ -1,8 +1,6 @@
-@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+Thai:wght@600;700&family=Prompt:wght@400;500;600;700;800&display=swap');
-
 .wr-container {
   padding: 32px;
-  background-color: #fdf9f8;
+  background-color: #FFFAFC;
   background-image: radial-gradient(circle at 100% 0%, rgba(219, 39, 119, 0.04), transparent 45%);
   min-height: 100vh;
   font-family: 'Prompt', 'Sarabun', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -221,13 +219,13 @@
 
 .wr-filter-tab-btn:hover {
   border-color: #fbcfe8;
-  color: #db2777;
+  color: #C92770;
 }
 
 .wr-filter-tab-btn.active {
-  background-color: #db2777;
+  background-color: #C92770;
   color: #ffffff;
-  border-color: #db2777;
+  border-color: #C92770;
   box-shadow: 0 2px 8px rgba(219, 39, 119, 0.25);
 }
 
@@ -316,7 +314,7 @@
 
 .wr-view-btn.active {
   background-color: #ffffff;
-  color: #db2777;
+  color: #C92770;
   font-weight: 700;
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
 }
@@ -355,7 +353,7 @@
 }
 
 .wr-table-responsive::-webkit-scrollbar-thumb:hover {
-  background: #E91E8C;
+  background: #E83E8C;
 }
 
 .wr-table {
@@ -376,7 +374,7 @@
   background-color: #fff0f6 !important;
   padding: 14px 16px;
   font-size: 0.88rem;
-  color: #db2777 !important;
+  color: #C92770 !important;
   font-weight: 700;
   white-space: nowrap;
   border-bottom: 1.5px solid #fce7f3;
@@ -444,7 +442,7 @@
   height: 34px;
   border-radius: 50%;
   background: #fbcfe8;
-  color: #db2777;
+  color: #C92770;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1040,7 +1038,7 @@
   align-items: center;
   justify-content: center;
   background-color: #fff0f6;
-  color: #db2777;
+  color: #C92770;
   border: 1px solid #f9c0d9;
   font-size: 0.85rem;
   font-weight: 600;
@@ -1056,7 +1054,7 @@
 .category-badge-unified:hover {
   background-color: #fff0f6 !important;
   border-color: #f9c0d9 !important;
-  color: #db2777 !important;
+  color: #C92770 !important;
   transform: none !important;
   box-shadow: none !important;
 }
@@ -1220,7 +1218,7 @@
   align-items: center !important;
   justify-content: center !important;
   background-color: #fff0f6 !important;
-  color: #db2777 !important;
+  color: #C92770 !important;
   border: 1px solid #f9c0d9 !important;
   font-size: 0.85rem !important;
   font-weight: 600 !important;
@@ -1237,7 +1235,82 @@
 .wr-modal__genre-tag:hover {
   background-color: #fff0f6 !important;
   border-color: #f9c0d9 !important;
-  color: #db2777 !important;
+  color: #C92770 !important;
   transform: none !important;
   box-shadow: none !important;
+}
+
+.wr-container {
+  background-color: var(--gray-50, #FFFAFC);
+  background-image: radial-gradient(circle at 100% 0%, rgba(232, 62, 140, 0.055), transparent 45%);
+  color: var(--ink, #302431);
+  font-family: var(--font-ui, 'Anuphan', sans-serif);
+}
+
+.wr-title {
+  color: var(--ink, #302431);
+}
+
+.wr-subtitle {
+  color: var(--gray-600, #766873);
+}
+
+.wr-stat-card,
+.wr-table-card,
+.wr-modal {
+  border-color: var(--gray-100, #F5EEF2);
+  border-radius: var(--r-lg, 16px);
+  box-shadow: var(--shadow-sm);
+}
+
+.wr-stat-card:hover {
+  border-color: var(--pink-100, #FFD9EA);
+  box-shadow: var(--shadow-md);
+}
+
+.wr-stat-card--pending .wr-stat-card-icon {
+  background: var(--pink-50, #FFF1F7);
+  color: var(--pink-500, #E83E8C);
+}
+
+.wr-filter-tabs,
+.wr-search-input {
+  border-color: var(--gray-100, #F5EEF2);
+  border-radius: 10px;
+}
+
+.wr-filter-tab-btn.active {
+  background: var(--pink-500, #E83E8C);
+  color: #FFFFFF;
+}
+
+.wr-search-input:focus {
+  border-color: var(--pink-300, #F47FB3);
+  box-shadow: 0 0 0 3px rgba(232, 62, 140, 0.12);
+  outline: none;
+}
+
+.wr-table-card {
+  background: #FFFFFF;
+}
+
+.wr-table thead {
+  background: #FFF7FA;
+}
+
+.wr-table th {
+  color: #514553;
+}
+
+.wr-table tbody tr:hover {
+  background: #FFFAFC;
+}
+
+.wr-modal__header {
+  border-bottom-color: var(--gray-100, #F5EEF2);
+}
+
+.wr-modal__close:hover {
+  background: var(--pink-50, #FFF1F7);
+  color: var(--pink-700, #C92770);
 }

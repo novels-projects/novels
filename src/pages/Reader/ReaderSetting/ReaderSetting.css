@@ -1,11 +1,11 @@
 /* Scoped wrapper for Writer Setting page */
 .wst-page-container {
-  --pink: #E91E8C;
-  --pink-h: #C41575;
-  --pink-pale: #FFF0F8;
-  --pink-mid: #FFD6EE;
-  --pink-border: #FCE7F3;
-  --rose: #E91E8C;
+  --pink: #E83E8C;
+  --pink-h: #C92770;
+  --pink-pale: #FFF1F7;
+  --pink-mid: #FFD9EA;
+  --pink-border: #F3BCD5;
+  --rose: #E83E8C;
   --green: #15803D;
   --green-bg: #F0FDF4;
   --green-bd: #BBF7D0;
@@ -22,20 +22,20 @@
   --gray-bg: #F8F9FA;
   --gray-bd: #E5E7EB;
   --surface: #FFFFFF;
-  --bg: #FFFAFD;
-  --bg-input: #F8F7FC;
-  --text: #0F0A1E;
-  --text2: #3D3554;
-  --muted: #7C7591;
-  --faint: #EAEAEA;
-  --border: #F3F1F8;
-  --border-m: #EAEAEA;
+  --bg: #FFFAFC;
+  --bg-input: #FFFAFC;
+  --text: #302431;
+  --text2: #514553;
+  --muted: #766B76;
+  --faint: #DED3DA;
+  --border: #F1E8EE;
+  --border-m: #DED3DA;
   --r-pill: 999px;
-  --r-card: 20px;
-  --sans: 'Sarabun', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --display: 'Sarabun', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --shadow-sm: 0 2px 8px rgba(15,10,30,.02);
-  --shadow: 0 4px 20px rgba(15,10,30,.03);
+  --r-card: 16px;
+  --sans: 'Anuphan', sans-serif;
+  --display: 'Anuphan', sans-serif;
+  --shadow-sm: 0 2px 8px rgba(62, 34, 52, 0.06);
+  --shadow: 0 8px 24px rgba(62, 34, 52, 0.07);
   
   font-family: var(--sans);
   background: var(--bg);
@@ -272,7 +272,7 @@
 .wst-page-container .input:focus {
   border-color: var(--pink);
   background: var(--surface);
-  box-shadow: 0 0 0 4px rgba(233, 30, 140, 0.08);
+  box-shadow: 0 0 0 4px rgba(232, 62, 140, 0.1);
 }
 
 .wst-page-container .input.err {
@@ -296,12 +296,12 @@
   background: #FFFFFF !important;
   border: 1.5px solid #F472B6 !important;
   color: var(--text) !important;
-  box-shadow: 0 2px 8px rgba(233, 30, 140, 0.08);
+  box-shadow: 0 2px 8px rgba(232, 62, 140, 0.08);
 }
 
 .wst-page-container .editable-input:focus {
-  border-color: #E91E8C !important;
-  box-shadow: 0 0 0 4px rgba(233, 30, 140, 0.12) !important;
+  border-color: #E83E8C !important;
+  box-shadow: 0 0 0 4px rgba(232, 62, 140, 0.12) !important;
 }
 
 .wst-page-container .readonly-badge {
@@ -363,7 +363,7 @@
   position: absolute;
   inset: 0;
   border-radius: 50%;
-  background: rgba(233, 30, 140, .6);
+  background: rgba(232, 62, 140, .6);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1102,11 +1102,11 @@
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: thin;
-    scrollbar-color: #F472B6 #FFF0F8;
+    scrollbar-color: #F47FB3 #FFF1F7;
     padding: 6px 4px 10px;
     max-width: 100%;
-    background: var(--bg, #FFFAFD);
-    border-bottom: 1px solid var(--border, #F3F1F8);
+    background: var(--bg, #FFFAFC);
+    border-bottom: 1px solid var(--border, #F1E8EE);
     margin-bottom: 12px;
     z-index: 100;
   }
@@ -1117,17 +1117,17 @@
   }
 
   .wst-page-container .side-nav::-webkit-scrollbar-track {
-    background: #FFF0F8;
+    background: #FFF1F7;
     border-radius: 999px;
   }
 
   .wst-page-container .side-nav::-webkit-scrollbar-thumb {
-    background: #F472B6;
+    background: #F47FB3;
     border-radius: 999px;
   }
 
   .wst-page-container .side-nav::-webkit-scrollbar-thumb:hover {
-    background: #E91E8C;
+    background: #E83E8C;
   }
 
   .wst-page-container .side-nav-item {
@@ -1140,6 +1140,33 @@
   .wst-page-container .side-nav-sep {
     display: none;
   }
+}
+
+.wst-page-container .card {
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  box-shadow: var(--shadow-sm);
+}
+
+.wst-page-container .card-header {
+  border-color: var(--border);
+}
+
+.wst-page-container .card-icon.purple {
+  background: var(--pink-pale);
+  border-color: var(--pink-border);
+}
+
+.wst-page-container .card-icon.purple i {
+  color: var(--pink);
+}
+
+.wst-page-container .input {
+  border-radius: 10px;
+}
+
+.wst-page-container .btn {
+  border-radius: 10px;
 }
 
 /* 4. Mobile Portrait (541px - 640px) */
