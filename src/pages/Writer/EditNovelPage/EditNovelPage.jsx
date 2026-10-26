@@ -127,7 +127,7 @@ const EditNovelPage = ({ onNavigate }) => {
     const isSubmittedSuccessRef = React.useRef(false);
 
     const isDirty = React.useMemo(() => {
-        if (!initialForm || isSubmitting || isSubmittedSuccessRef.current) return false;
+        if (!initialForm || isSubmitting) return false;
         const catA = [...form.categories].sort().join(",");
         const catB = [...initialForm.categories].sort().join(",");
         return (

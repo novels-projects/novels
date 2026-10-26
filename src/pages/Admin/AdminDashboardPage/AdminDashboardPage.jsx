@@ -605,7 +605,7 @@ export default function AdminDashboardPage() {
                     ) : (
                       <div className="admin-review-list">
                         {reportsData.map((item, idx) => {
-                          const isAppeal = item.report_type === "appeal" || item.status === "appeal_pending" || isAppealReport(item);
+                          const isAppeal = item.report_type === "appeal" || item.status === "appeal_pending" || Boolean(item.appeal_reason || (item.reason && item.reason.includes("ปลดระงับ")));
                           const isDelete = !isAppeal && (item.report_type === "delete" || item.report_type === "removal" || (item.reason && (item.reason.includes("แจ้งลบ") || item.reason.includes("ขอลบ"))));
                           
                           let badgeText = "รายงาน";

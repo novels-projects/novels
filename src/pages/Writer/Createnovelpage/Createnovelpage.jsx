@@ -132,7 +132,7 @@ const CreateNovelPage = () => {
     const isSubmittedSuccessRef = React.useRef(false);
 
     const isDirty = React.useMemo(() => {
-        if (isSubmitting || isSubmittedSuccessRef.current) return false;
+        if (isSubmitting) return false;
         return (
             form.title.trim() !== "" ||
             form.tagline.trim() !== "" ||

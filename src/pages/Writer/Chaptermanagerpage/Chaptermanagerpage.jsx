@@ -2760,6 +2760,7 @@ const ChapterPanel = ({
 };
 
 const ChapterManagerPage = ({ onNavigate, novelId }) => {
+  const navigate = useNavigate();
   const { novelId: routeNovelId } = useParams();
   const rawId = routeNovelId || novelId;
 

@@ -1583,6 +1583,9 @@ let orphanCounter = 0;
     }
   }, [orphanNodes, orphanIndex, setCenter, showToast]);
 
+  // State เก็บ reason ของโหนดที่กำลัง hover อยู่ระหว่าง Connect Mode (แสดงผลทันทีบน banner โดยไม่ต้องรอ click)
+  const [hoverTargetInfo, setHoverTargetInfo] = useState(null); // { status: "valid" | "invalid", message } | null
+
   // Central connection cleanup function to reset all connection-related state
   const clearConnectionState = useCallback(() => {
     setConnectSource(null);
@@ -1593,7 +1596,7 @@ let orphanCounter = 0;
     setIsSavingConnection(false);
     setRfNodes((nds) => nds.filter((n) => n.id !== "cursor-node"));
     setRfEdges((eds) => eds.filter((e) => e.id !== "cursor-edge"));
-  }, [setRfNodes, setRfEdges]);
+  }, [setRfNodes, setRfEdges, setHoverTargetInfo]);
 
   // Cleanup on unmount or route change
   useEffect(() => {
@@ -1782,9 +1785,6 @@ let orphanCounter = 0;
     return map;
   }, [interactionMode, connectSource, rfNodes, getConnectionBlockReason]);
 
-  // State เก็บ reason ของโหนดที่กำลัง hover อยู่ระหว่าง Connect Mode (แสดงผลทันทีบน banner โดยไม่ต้องรอ click)
-  const [hoverTargetInfo, setHoverTargetInfo] = useState(null); // { status: "valid" | "invalid", message } | null
-
   const handleNodeMouseEnter = useCallback((evt, node) => {
     if (interactionMode !== "connect" || !connectSource || node.id === connectSource.id || node.id === "cursor-node") {
       return;
@@ -1795,11 +1795,11 @@ let orphanCounter = 0;
     } else {
       setHoverTargetInfo({ status: "invalid", message: `🚫 ไม่สามารถเชื่อมได้: ${getBlockReasonMessage(blockReason)}` });
     }
-  }, [interactionMode, connectSource, getConnectionBlockReason, getBlockReasonMessage]);
+  }, [interactionMode, connectSource, getConnectionBlockReason, getBlockReasonMessage, setHoverTargetInfo]);
 
   const handleNodeMouseLeave = useCallback(() => {
     setHoverTargetInfo(null);
-  }, []);
+  }, [setHoverTargetInfo]);
 
   // ฟังก์ชันสร้างโหนดเปล่าชั่วคราวลงกราฟตามพิกัด Canvas ทันทีโดยมีข้อมูลตอนที่เลือก
   const addSceneOnCanvasLocal = useCallback((x, y, chosenChapterId) => {
