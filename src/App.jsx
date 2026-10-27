@@ -596,8 +596,7 @@ const SceneEditorRoute = () => {
         console.error("SceneEditorRoute load chapterId error:", err);
         setChapterError(err.message || "เกิดข้อผิดพลาดในการโหลด chapterId");
       } finally {
-        if (!active) return;
-        setLoadingChapter(false);
+        if (active) setLoadingChapter(false);
       }
     };
     loadSceneData();

@@ -16,6 +16,7 @@ import { getBannedRegistry, cleanBanReason, extractBanDetails } from "../../../u
 import { showToast } from "../../../utils/toast";
 import { apiFetch } from "../../../utils/apiFetch";
 import { getAvatar, saveWriterAvatar } from "../../../utils/avatarService";
+import { stripHtml } from "../../../utils/stripHtml";
 // Removed authUtils import per user request
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
@@ -56,13 +57,6 @@ const initialNovelState = {
 const formatMinioUrl = (url) => {
   if (!url) return null;
   return url.replace('http://minio:9000', 'http://localhost:9000');
-};
-
-const stripHtml = (html = "") => {
-  if (!html) return "";
-  const div = document.createElement("div");
-  div.innerHTML = html;
-  return (div.textContent || "").trim();
 };
 
 // ใช้ร่วมกันระหว่าง showNoContentDialog กับ showRestartConfirm แทนที่จะก็อปปี้

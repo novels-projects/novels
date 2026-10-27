@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { NovelCardGridSkeleton, ButtonSpinner } from "../../../components/Skeleton";
+import { stripHtml } from "../../../utils/stripHtml";
 import "./BookshelfPage.css";
 import {
     ArrowLeft,
@@ -115,13 +116,6 @@ const normalizeCategoryName = (cat) => {
     if (typeof cat === "string") return cat.trim();
     if (typeof cat === "number") return String(cat);
     return String(cat.name || cat.Name || cat.title || cat.label || cat.label_th || "").trim();
-};
-
-const stripHtml = (html = "") => {
-    if (!html) return "";
-    const div = document.createElement("div");
-    div.innerHTML = html;
-    return (div.textContent || "").trim();
 };
 
 const getBookId = (item = {}) => {

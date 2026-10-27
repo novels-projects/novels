@@ -270,31 +270,6 @@ export const resolveAvatarAsync = async ({ userId, username, writerId, novelId }
         } catch (_) {}
       }
 
-      // 3. ตรวจสอบว่าแอดมินล็อกอินอยู่หรือไม่ เพื่อดึงรายชื่อผู้ใช้ทั้งหมด
-      if (token) {
-        try {
-          const adminUsersRes = await apiFetch(`${API_BASE_URL}/api/v1/admin/users?limit=100`, { headers });
-          if (adminUsersRes.ok) {
-            const adminJson = await adminUsersRes.json().catch(() => null);
-            const userList = adminJson?.data?.users || adminJson?.users || (Array.isArray(adminJson?.data) ? adminJson.data : []);
-            if (Array.isArray(userList)) {
-              let updated = false;
-              userList.forEach((u) => {
-                const av = formatMinioUrl(u.pic_profile || u.avatar_url || u.avatar);
-                if (av) {
-                  if (u.id) reg.byUserId[String(u.id)] = av;
-                  if (u.username) reg.byUsername[u.username.toLowerCase()] = av;
-                  updated = true;
-                }
-              });
-              if (updated) persistRegistry();
-
-              const found = getAvatar({ userId, username, writerId, novelId });
-              if (found) return found;
-            }
-          }
-        } catch (_) {}
-      }
     } catch (_) {}
 
     return null;
@@ -314,6 +289,14 @@ export const resolveAvatarAsync = async ({ userId, username, writerId, novelId }
 export const syncAdminUsersIfAvailable = async () => {
   const token = localStorage.getItem("token");
   if (!token) return;
+
+  try {
+    const user = JSON.parse(localStorage.getItem("user") || "null");
+    const role = String(user?.role || user?.user_role || user?.role_name || "").toLowerCase();
+    if (role !== "admin") return;
+  } catch {
+    return;
+  }
 
   try {
     const res = await apiFetch(`${API_BASE_URL}/api/v1/admin/users?limit=100`, {

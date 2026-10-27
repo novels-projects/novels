@@ -4,6 +4,7 @@ import axios from "axios";
 import { Pencil, Bookmark, Eye, Heart, BookOpen } from "lucide-react";
 import "./HomePage.css";
 import { getNovelStatusInfo } from "../../../utils/novelStatus";
+import { stripHtml } from "../../../utils/stripHtml";
 import { NovelCardSkeleton, NovelCardGridSkeleton, DataLoadError, Skeleton } from "../../../components/Skeleton";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
@@ -194,7 +195,7 @@ const HomePage = ({ onNavigate }) => {
             bio: data.author_bio || data.bio || data.author?.bio,
             follower_count: data.author_follower_count || data.follower_count || data.author?.follower_count || 0
           },
-          synopsis: data.captions || data.introduction || data.synopsis || "ไม่มีคำโปรย",
+          synopsis: stripHtml(data.captions || data.introduction || data.synopsis || "ไม่มีคำโปรย"),
           views: data.views || data.view_count || 0,
           like_count: data.like_count || data.likes || 0,
           bookshelf_count: data.bookshelf_count || data.bookmarks || 0,

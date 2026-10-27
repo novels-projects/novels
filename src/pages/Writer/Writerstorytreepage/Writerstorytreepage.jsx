@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import ReactFlow, {
   Handle,
   Position,
@@ -18,7 +18,8 @@ import ReactFlow, {
 import axios from "axios";
 import "./Writerstorytreepage.css";
 import { ChevronRight, Trash2 } from "lucide-react";
-import { TreeCanvasSkeleton, ButtonSpinner } from "../../../components/Skeleton";
+import { TreeCanvasSkeleton } from "../../../components/Skeleton";
+import { stripHtml } from "../../../utils/stripHtml";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
 
@@ -67,8 +68,8 @@ const apiDelete = async (url, config) => {
   }
 };
 
-const NODE_WIDTH = 260;
-const NODE_HEIGHT = 118;
+const NODE_WIDTH = 300;
+const NODE_HEIGHT = 190;
 const NODE_HORIZONTAL_GAP = 360;
 const NODE_VERTICAL_GAP = 300;
 const CANVAS_MARGIN = 36;
@@ -90,9 +91,9 @@ const WRITER_NODE_STYLE = {
 
   // ฉากทั่วไป = ฟ้าคราม (Sky Blue)
   [WRITER_NODE_STATUS.NORMAL]: {
-    stroke: "#0EA5E9",
-    fill: "#F0F9FF",
-    text: "#0369A1",
+    stroke: "#E83E8C",
+    fill: "#FFF1F7",
+    text: "#9D174D",
   },
 
   // ฉากจบ = ม่วงแดง/กุหลาบ (Rose Red)
@@ -112,7 +113,7 @@ const WRITER_NODE_STYLE = {
 
 const WRITER_LEGEND = [
   { label: "จุดเริ่มต้น", color: "#059669" },
-  { label: "ฉากทั่วไป", color: "#0EA5E9" },
+  { label: "ฉากทั่วไป", color: "#E83E8C" },
   { label: "ฉากจบ", color: "#E11D48" },
   { label: "ยังไม่เชื่อมต่อ", color: "#F59E0B" },
   { label: "เผยแพร่แล้ว", color: "#2563EB", isBadge: true },
@@ -195,50 +196,6 @@ const extractErrorMessage = (err, fallback = "เกิดข้อผิดพ�
 
   if (typeof err.message === "string" && err.message) return err.message;
   return fallback;
-};
-
-const stripHtml = (value) => {
-  if (typeof value !== "string" || !value) return "";
-  
-  let text = value;
-
-  // 1. Convert block-level tags & line breaks to spaces
-  text = text
-    .replace(/<\/(p|div|h[1-6]|li|blockquote|tr|table)>/gi, " ")
-    .replace(/<br\s*[\/]?>/gi, " ");
-
-  // 2. Strip remaining HTML tags
-  text = text.replace(/<[^>]+>/g, " ");
-
-  // 3. Decode common HTML entities (double-pass to catch double-encoded entities like &amp;nbsp;)
-  for (let i = 0; i < 2; i++) {
-    text = text
-      .replace(/&nbsp;/gi, " ")
-      .replace(/&amp;/gi, "&")
-      .replace(/&lt;/gi, "<")
-      .replace(/&gt;/gi, ">")
-      .replace(/&quot;/gi, '"')
-      .replace(/&#39;/gi, "'")
-      .replace(/&#160;/gi, " ")
-      .replace(/&[a-z0-9#]+;/gi, " ");
-  }
-
-  // 4. Decode via browser DOM if available
-  if (typeof document !== "undefined") {
-    try {
-      const textarea = document.createElement("textarea");
-      textarea.innerHTML = text;
-      text = textarea.value;
-    } catch (e) {
-      // fallback
-    }
-  }
-
-  // 5. Replace non-breaking space characters (\u00A0, \xa0) and collapse whitespace
-  text = text.replace(/[\u00A0\xa0]/g, " ");
-  text = text.replace(/\s+/g, " ").trim();
-
-  return text;
 };
 
 const getNodeId = (node) => normalizeId(node?.ID ?? node?.id ?? node?.SceneID ?? node?.scene_id);
@@ -398,9 +355,9 @@ const StoryNode = ({ data }) => {
   return (
     <div className={cardClassName} style={nodeCustomStyle}>
       {/* จุดเชื่อมเข้าโหนดด้านบน (Top), ด้านซ้าย (Left), ด้านขวา (Right) */}
-      <Handle type="target" position={Position.Top} id="target-top" style={{ background: "#2563eb", width: 8, height: 8 }} />
-      <Handle type="target" position={Position.Left} id="target-left" style={{ background: "#2563eb", width: 8, height: 8, top: "50%" }} />
-      <Handle type="target" position={Position.Right} id="target-right" style={{ background: "#2563eb", width: 8, height: 8, top: "50%" }} />
+      <Handle type="target" position={Position.Top} id="target-top" style={{ background: "#E83E8C", width: 8, height: 8 }} />
+      <Handle type="target" position={Position.Left} id="target-left" style={{ background: "#E83E8C", width: 8, height: 8, top: "50%" }} />
+      <Handle type="target" position={Position.Right} id="target-right" style={{ background: "#E83E8C", width: 8, height: 8, top: "50%" }} />
       
       {/* ป้ายแสดงสถานะ เผยแพร่ / ฉบับร่าง ที่มุมบนขวา */}
       <div className={`wst-node-card__publish-badge ${isPublished ? "wst-node-card__publish-badge--published" : "wst-node-card__publish-badge--draft"}`}>
@@ -425,7 +382,7 @@ const StoryNode = ({ data }) => {
 
       {/* เนื้อหาของฉาก */}
       <div className="wst-node-card__desc">
-        {description}
+        {stripHtml(description)}
       </div>
 
       {/* ปุ่มแก้ไข */}
@@ -446,7 +403,7 @@ const StoryNode = ({ data }) => {
       </button>
       
       {/* จุดปล่อยเส้นขาออกจากโหนด (Bottom เท่านั้น) */}
-      <Handle type="source" position={Position.Bottom} id="source-bottom" style={{ background: "#2563eb", width: 8, height: 8 }} />
+      <Handle type="source" position={Position.Bottom} id="source-bottom" style={{ background: "#E83E8C", width: 8, height: 8 }} />
     </div>
   );
 };
@@ -913,7 +870,7 @@ const StoryTreeInner = ({ novelId, onNavigate }) => {
       // 🔗 เชื่อมต่อ GET /api/v1/novels/:id/story-tree: ดึงผังโครงสร้างเนื้อเรื่องของนิยายเรื่องนี้
       // 🔗 เชื่อมต่อ GET /api/v1/novels/:id/chapters: ดึงรายชื่อตอน (Chapters) ทั้งหมดของนิยายเรื่องนี้
       const [treeRes, chaptersRes] = await Promise.all([
-        apiGet(`${API_BASE_URL}/api/v1/novels/${novelId}/story-tree`, { headers, withCredentials: false }),
+        apiGet(`${API_BASE_URL}/api/v1/novels/${novelId}/story-tree?mode=editor`, { headers, withCredentials: false }),
         apiGet(`${API_BASE_URL}/api/v1/novels/${novelId}/chapters`, { headers, withCredentials: false })
       ]);
       setTreeData(treeRes.data?.data || treeRes.data || null);
@@ -2829,7 +2786,7 @@ let orphanCounter = 0;
         
         // ดึงข้อมูล story-tree ใหม่
         // 🔗 เชื่อมต่อ GET /api/v1/novels/:id/story-tree: ดึงข้อมูลผังเรื่องราวใหม่หลังจากลบฉากสำเร็จ
-        const response = await apiGet(`${API_BASE_URL}/api/v1/novels/${novelId}/story-tree`);
+        const response = await apiGet(`${API_BASE_URL}/api/v1/novels/${novelId}/story-tree?mode=editor`);
         setTreeData(response.data?.data || response.data || null);
         showToast("ลบฉากเรียบร้อยแล้ว", "success");
         window.dispatchEvent(new Event("novel-data-updated"));
@@ -2872,8 +2829,6 @@ let orphanCounter = 0;
         serverMsg.toLowerCase().includes("not found")
       ) {
         reasonMsg = "ไม่สามารถลบฉากได้ เนื่องจากไม่พบข้อมูลฉากนี้ในระบบ";
-      } else if (hasIncomingChoices) {
-        reasonMsg = "ไม่สามารถลบฉากได้ เนื่องจากมีฉากอื่นเชื่อมต่อมายังฉากนี้ (กรุณาลบเส้นทางเลือกที่เชื่อมมายังฉากนี้ก่อน)";
       } else if (serverMsg && serverMsg !== "internal server error") {
         reasonMsg = `ไม่สามารถลบฉากได้: ${serverMsg}`;
       } else {
@@ -3195,7 +3150,7 @@ let orphanCounter = 0;
         const dstIdInt = parseInt(connectTarget.id, 10);
         
         // 🔗 เชื่อมต่อ GET /api/v1/novels/:id/story-tree: ตรวจสอบความถูกต้องของเส้นทางเลือกใน Story Tree
-        const checkRes = await apiGet(`${API_BASE_URL}/api/v1/novels/${novelId}/story-tree`, { withCredentials: false });
+        const checkRes = await apiGet(`${API_BASE_URL}/api/v1/novels/${novelId}/story-tree?mode=editor`, { withCredentials: false });
         const freshTree = checkRes.data?.data || checkRes.data || null;
         const freshEdges = freshTree?.Edges || freshTree?.edges || [];
 
@@ -3814,7 +3769,7 @@ let orphanCounter = 0;
                   onEdgeUpdateEnd={onEdgeUpdateEnd}
                   edgeUpdaterRadius={12}
                   fitView
-                  fitViewOptions={{ padding: 0.2 }}
+                  fitViewOptions={{ padding: 0.12, minZoom: 0.55 }}
                   preventScrolling={false}
                   panOnScroll
                   panOnDrag={interactionMode === 'pan'}
@@ -3823,7 +3778,7 @@ let orphanCounter = 0;
                   elementsSelectable={interactionMode === 'select' || interactionMode === 'delete'}
                   edgesFocusable={true}
                   edgesUpdatable={interactionMode === 'select'}
-                  minZoom={0.3}
+                  minZoom={0.5}
                   maxZoom={1.6}
                   className="wst-reactflow"
                 >
@@ -3840,7 +3795,7 @@ let orphanCounter = 0;
                         case WRITER_NODE_STATUS.ORPHAN:
                           return "#94A3B8";
                         default:
-                          return "#38BDF8";
+                          return "#E83E8C";
                       }
                     }}
                   />

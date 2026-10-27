@@ -14,7 +14,7 @@
   max-height: calc(100vh - 83px);
   width: 100%;
   background-color: #FFFAFC;
-  font-family: 'Sarabun', 'Prompt', 'Outfit', 'Inter', sans-serif;
+  font-family: var(--font-ui, 'Anuphan', sans-serif);
   color: #334155;
   overflow: hidden; /* ล็อกความสูงหน้าหลักไม่ให้มี scrollbar แนวตั้งดันจอ */
   box-sizing: border-box;
@@ -169,16 +169,16 @@
 
 /* Floating Canvas Header Overlay Container (Single Row: Left Heading, Right Toolbar) */
 .wst-canvas-header-overlay {
-  position: absolute;
-  top: 16px;
-  left: 16px;
-  right: 16px;
+  position: relative;
+  inset: auto;
   z-index: 25;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 12px;
-  pointer-events: none;
+  margin: 12px 16px 8px;
+  pointer-events: auto;
   box-sizing: border-box;
 }
 
@@ -187,10 +187,10 @@
   position: static;
   top: auto;
   left: auto;
-  background: rgba(250, 249, 246, 0.94); /* สีกลืนกับพื้นหลังกราฟ #FFFAFC */
+  background: rgba(255, 255, 255, 0.96);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
-  border: 1.5px solid rgba(226, 232, 240, 0.85);
+  border: 1px solid #F5EEF2;
   border-radius: 14px;
   padding: 8px 16px;
   box-shadow: 0 4px 16px rgba(15, 23, 42, 0.04);
@@ -199,12 +199,12 @@
   justify-content: center;
   flex-shrink: 1;
   min-width: 0;
-  max-width: 340px;
+  max-width: min(340px, 100%);
   transition: all 0.2s ease;
 }
 
 .wst-canvas-title {
-  font-family: 'Sarabun', sans-serif !important;
+  font-family: var(--font-ui, 'Anuphan', sans-serif) !important;
   font-size: 1.15rem;
   font-weight: 800;
   color: #0f172a;
@@ -213,7 +213,7 @@
 }
 
 .wst-canvas-sub {
-  font-family: 'Sarabun', sans-serif !important;
+  font-family: var(--font-ui, 'Anuphan', sans-serif) !important;
   font-size: 0.85rem;
   color: #334155;
   margin: 3px 0 0 0;
@@ -227,14 +227,14 @@
 }
 
 .wst-canvas-sub__label {
-  font-family: 'Sarabun', sans-serif !important;
+  font-family: var(--font-ui, 'Anuphan', sans-serif) !important;
   color: #C92770;
   font-weight: 700;
   font-size: 0.82rem;
 }
 
 .wst-canvas-sub__title {
-  font-family: 'Sarabun', sans-serif !important;
+  font-family: var(--font-ui, 'Anuphan', sans-serif) !important;
   color: #0f172a;
   font-weight: 800;
   font-size: 0.88rem;
@@ -243,13 +243,18 @@
 .wst-canvas-wrap {
   flex: 1;
   position: relative;
+  display: flex;
+  flex-direction: column;
   min-height: 0;
-  height: 100%;
+  height: auto;
 }
 
 .wst-canvas-scroll {
   width: 100%;
-  height: 100%;
+  height: auto;
+  flex: 1;
+  min-height: 0;
+  order: 1;
 }
 
 /* ─────────────────────────────────────────────
@@ -317,9 +322,9 @@
 }
 
 .wst-toolbar-btn--select-active {
-  background-color: #eff6ff !important;
-  color: #2563eb !important;
-  border-color: #bfdbfe !important;
+  background-color: #FFF1F7 !important;
+  color: #C92770 !important;
+  border-color: #F47FB3 !important;
   font-weight: 700;
 }
 
@@ -332,9 +337,9 @@
 }
 
 .wst-toolbar-btn--connect-active {
-  background-color: #eff6ff !important;
-  color: #2563eb !important;
-  border-color: #bfdbfe !important;
+  background-color: #FFF1F7 !important;
+  color: #C92770 !important;
+  border-color: #F47FB3 !important;
   font-weight: 700;
 }
 
@@ -346,9 +351,9 @@
 }
 
 .wst-toolbar-btn--add-active {
-  background-color: #eff6ff !important;
-  color: #2563eb !important;
-  border-color: #bfdbfe !important;
+  background-color: #FFF1F7 !important;
+  color: #C92770 !important;
+  border-color: #F47FB3 !important;
   font-weight: 700;
 }
 
@@ -356,11 +361,11 @@
    React Flow Custom Node (StoryNode)
    ───────────────────────────────────────────── */
 .wst-node-card {
-  width: 260px;
+  width: 300px;
   background: #ffffff;
   border: 2px solid #38bdf8;
   border-radius: 16px;
-  padding: 16px;
+  padding: 18px;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -435,7 +440,7 @@
 }
 
 .wst-node-card__title {
-  font-size: 0.95rem;
+  font-size: 1.05rem;
   font-weight: 700;
   color: #0f172a;
   line-height: 1.4;
@@ -443,8 +448,8 @@
 }
 
 .wst-node-card__desc {
-  font-size: 0.78rem;
-  line-height: 1.5;
+  font-size: 0.9rem;
+  line-height: 1.55;
   opacity: 0.85;
   display: -webkit-box;
   -webkit-line-clamp: 3;
@@ -1000,14 +1005,17 @@
    Floating Guidance Banner (แสดงด้านล่างตรงกลาง ไม่บดบัง Toolbar ด้านบน)
    ───────────────────────────────────────────── */
 .wst-canvas-guidance-banner {
-  position: absolute;
-  bottom: 24px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: rgba(239, 246, 255, 0.95); /* โทนฟ้า/น้ำเงินพาสเทลโปร่งแสง */
+  position: relative;
+  bottom: auto;
+  left: auto;
+  transform: none;
+  align-self: center;
+  margin: 6px 12px 8px;
+  order: 2;
+  background: rgba(255, 241, 247, 0.96);
   backdrop-filter: blur(8px);
-  color: #1e40af;       /* ข้อความสีน้ำเงินเข้มข้น */
-  border: 1.5px solid #bfdbfe; /* เส้นขอบฟ้าน้ำเงินบาง */
+  color: #9D174D;
+  border: 1px solid #FFD9EA;
   padding: 8px 20px;
   border-radius: 99px;
   font-size: 0.82rem;
@@ -1015,17 +1023,17 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  box-shadow: 0 8px 24px rgba(37, 99, 235, 0.15);
+  box-shadow: var(--shadow-sm, 0 2px 8px rgba(62, 34, 52, 0.06));
   pointer-events: none;
-  z-index: 100;
+  z-index: 1;
   white-space: nowrap;
   box-sizing: border-box;
   animation: bannerFadeInBottom 0.25s ease-out;
 }
 
 @keyframes bannerFadeInBottom {
-  from { opacity: 0; transform: translate(-50%, 10px); }
-  to { opacity: 1; transform: translate(-50%, 0); }
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 /* ─────────────────────────────────────────────
@@ -1383,7 +1391,7 @@
   font-size: 0.72rem !important;
   font-weight: 700 !important;
   fill: #334155 !important;
-  font-family: "Outfit", "Sarabun", sans-serif !important;
+  font-family: var(--font-ui, 'Anuphan', sans-serif) !important;
   pointer-events: none !important; /* ยอมให้เมาส์คลิกทะลุข้อความตัวอักษร */
 }
 
@@ -1584,7 +1592,7 @@
   cursor: pointer;
   transition: all 0.2s ease;
   box-sizing: border-box;
-  font-family: 'Sarabun', 'Prompt', sans-serif;
+  font-family: var(--font-ui, 'Anuphan', sans-serif);
   user-select: none;
   flex-shrink: 0;
 }
@@ -1848,16 +1856,15 @@
 
   /* Canvas Header Overlay (Left Heading, Right Toolbar) on Mobile */
   .wst-canvas-header-overlay {
-    position: absolute !important;
-    top: 10px !important;
-    left: 10px !important;
-    right: 10px !important;
+    position: relative !important;
+    inset: auto !important;
     z-index: 25 !important;
     display: flex !important;
-    align-items: center !important;
+    align-items: flex-start !important;
     justify-content: space-between !important;
+    flex-wrap: wrap !important;
     gap: 8px !important;
-    flex-wrap: nowrap !important;
+    margin: 8px 10px 6px !important;
   }
 
   .wst-canvas-heading {
@@ -1865,7 +1872,7 @@
     top: auto !important;
     left: auto !important;
     padding: 6px 10px !important;
-    max-width: 140px !important;
+    max-width: min(340px, 100%) !important;
     border-radius: 10px !important;
     background: rgba(255, 255, 255, 0.94) !important;
     backdrop-filter: blur(8px) !important;
@@ -1897,7 +1904,7 @@
     right: auto !important;
     z-index: 25 !important;
     width: max-content !important;
-    max-width: calc(100vw - 165px) !important;
+    max-width: 100% !important;
     margin: 0 !important;
     display: flex !important;
     flex-wrap: nowrap !important;
@@ -1931,7 +1938,12 @@
 
   /* Guidance Banner */
   .wst-canvas-guidance-banner {
-    bottom: 68px;
+    position: relative;
+    bottom: auto;
+    left: auto;
+    transform: none;
+    align-self: center;
+    margin: 4px 12px 8px;
     max-width: calc(100vw - 24px);
     white-space: normal;
     text-align: center;
@@ -2060,9 +2072,15 @@
 }
 
 .wst-canvas-header-overlay {
-  background: rgba(255, 255, 255, 0.92);
-  border-color: var(--gray-100, #F5EEF2);
-  box-shadow: var(--shadow-sm);
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.wst-canvas-guidance-banner {
+  color: var(--pink-700, #C92770);
+  background: var(--pink-50, #FFF1F7);
+  border-color: var(--pink-100, #FFD9EA);
 }
 
 .wst-node-card {

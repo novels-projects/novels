@@ -147,6 +147,8 @@ const ReadingPage = ({
     if (!novelId) return;
 
     let isSubscribed = true;
+    const token = localStorage.getItem("token");
+    const headers = token ? { Authorization: `Bearer ${token}` } : {};
     const fetchNovelAuthor = async () => {
       try {
         // 🔗 เชื่อมต่อ GET /api/v1/novels/:id: ดึงข้อมูลรายละเอียดของนิยายเพื่อตรวจสอบผู้แต่ง

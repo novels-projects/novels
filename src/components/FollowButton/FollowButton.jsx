@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import "./FollowButton.css";
 import { showToast } from "../../utils/toast";
 
@@ -40,7 +40,6 @@ export default function FollowButton({
   unfollowedText = "ติดตาม",
 }) {
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
   const [isFollowed, setIsFollowed] = useState(false);
   const [isSparking, setIsSparking] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
@@ -124,7 +123,6 @@ export default function FollowButton({
     }
 
     setLoading(true);
-    setError(null);
 
     try {
       const userId = localStorage.getItem("user_id") || (() => {
@@ -183,31 +181,29 @@ export default function FollowButton({
         console.warn("FollowButton: primary fetch error", e);
       }
 
-      // Fallback endpoint 1
-      if (!response || !response.ok) {
+      // Only retry a legacy route when the primary route is unavailable, not when it failed server-side.
+      if (!response || response.status === 404 || response.status === 405) {
         const fallbackEndpoint = isFollowed
           ? `${API_BASE_URL}/api/v1/writers/${numericWriterId}/unfollow`
           : `${API_BASE_URL}/api/v1/writers/${numericWriterId}/follow`;
         try {
-          const fbRes = await fetch(fallbackEndpoint, { method: "POST", headers });
-          if (fbRes.ok) {
-            response = fbRes;
-          }
-        } catch (_) {}
+          response = await fetch(fallbackEndpoint, { method: "POST", headers });
+        } catch (e) {
+          console.warn("FollowButton: versioned fallback fetch error", e);
+        }
       }
 
       // Second fallback for follow using POST /api/v1/follows with JSON payload
-      if ((!response || !response.ok) && !isFollowed) {
+      if ((!response || response.status === 404 || response.status === 405) && !isFollowed) {
         try {
-          const followsRes = await fetch(`${API_BASE_URL}/api/v1/follows`, {
+          response = await fetch(`${API_BASE_URL}/api/v1/follows`, {
             method: "POST",
             headers,
             body: JSON.stringify({ following_id: numericWriterId }),
           });
-          if (followsRes.ok) {
-            response = followsRes;
-          }
-        } catch (_) {}
+        } catch (e) {
+          console.warn("FollowButton: follows fallback fetch error", e);
+        }
       }
 
       let respBody = null;
@@ -219,8 +215,13 @@ export default function FollowButton({
         }
       }
 
-      // ตรวจสอบข้อผิดพลาดเฉพาะกรณีที่เป็น Client Validation ผิดพลาดจริง
-      if (response && !response.ok) {
+      if (!response) {
+        const message = "ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้ กรุณาลองใหม่";
+        showToast(message, { type: "error" });
+        return;
+      }
+
+      if (!response.ok) {
         if (response.status === 401) {
           setShowAuthModal(true);
           setLoading(false);
@@ -236,10 +237,9 @@ export default function FollowButton({
           setLoading(false);
           return;
         }
-
-        // กรณี Server Error (สถานะ >= 500) ใน Backend:
-        // ไม่โยนข้อผิดพลาดบล็อกผู้ใช้ แต่แจ้งเตือนเฉพาะ console และดำเนินการซิงค์ข้อมูลจริงต่อไป
-        console.warn("Backend follow returned status", response.status, respBody);
+        const message = getErrorMessage(respBody, response.status);
+        showToast(message, { type: "error" });
+        return;
       }
 
       // อัปเดต state ของการติดตาม
@@ -378,7 +378,7 @@ export default function FollowButton({
     } catch (err) {
       const errMsg = typeof err === "object" && err !== null ? (err.message || String(err)) : String(err);
       console.error("ติดตามนักเขียนล้มเหลว:", errMsg);
-      setError(errMsg);
+      showToast("ดำเนินการติดตามไม่สำเร็จ กรุณาลองใหม่", { type: "error" });
     } finally {
       setLoading(false);
     }

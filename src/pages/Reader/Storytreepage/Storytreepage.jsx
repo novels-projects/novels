@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect, useCallback, useRef } from "react";
+import { useMemo, useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useLocation, useNavigate } from "react-router-dom";
 import ReactFlow, {
   Background,
@@ -20,7 +20,8 @@ import "reactflow/dist/style.css";
 import "./Storytreepage.css";
 
 import EndingCollection from "../../../components/EndingCollection/EndingCollection";
-import { TreeCanvasSkeleton, ButtonSpinner } from "../../../components/Skeleton";
+import { TreeCanvasSkeleton } from "../../../components/Skeleton";
+import { stripHtml } from "../../../utils/stripHtml";
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
 
@@ -28,12 +29,12 @@ const BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
 const PINK = "#F526A2";
 
 // Tree layout constants (used both for laying out nodes and for centering the viewport on one)
-const LEVEL_GAP_X = 480;
-const LEVEL_GAP_Y = 320;
+const LEVEL_GAP_X = 420;
+const LEVEL_GAP_Y = 280;
 const NODE_START_X = 60;
 const NODE_START_Y = 220;
 // Offset from a node's top-left position to its visual center, used when calling setCenter()
-const NODE_CENTER_OFFSET = { x: 140, y: 60 };
+const NODE_CENTER_OFFSET = { x: 150, y: 74 };
 // Offset between vertically-stacked choice labels when several edges converge on the same
 // target scene — without this their labels land on top of each other and become unreadable.
 const EDGE_LABEL_STAGGER = 20;
@@ -61,16 +62,11 @@ const formatDate = (dateStr) => {
   }
 };
 
-const stripHtml = (text) => {
-  if (!text || typeof text !== "string") return "";
-  return text.replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim();
-};
-
 const StoryNode = ({ data }) => {
   const currentStatus = data.computedStatus || NODE_STATUS.LOCKED;
   const sceneType = data.type || "normal";
 
-  const isLocked = !data.isAdmin && (currentStatus === NODE_STATUS.LOCKED || currentStatus === NODE_STATUS.ENDING_LOCKED);
+  const isLocked = currentStatus === NODE_STATUS.LOCKED || currentStatus === NODE_STATUS.ENDING_LOCKED;
 
   // Icon shown on the corner waypoint badge — mirrors how a map marks "you are here" (📍),
   // completed checkpoints (✓), locked areas (🔒), and the finish line (🏆).
@@ -84,15 +80,9 @@ const StoryNode = ({ data }) => {
   };
 
   let rawTitle = stripHtml(data.title || data.scene_name || data.name || data.label || data.chapter_name || "เนื้อเรื่อง");
-  if (rawTitle === "เนื้อเรื่องยังไม่เปิดเผย" && data.isAdmin) {
-    rawTitle = stripHtml(data.chapter_title || data.chapterName || `ฉากที่ ${data.id}`);
-  }
   const sceneTitle = rawTitle;
 
   let rawDesc = stripHtml(data.summary || data.description || data.short_content || data.content_summary || data.content || "อ่านต่อเพื่อค้นหาความลับในฉากนี้...");
-  if (rawDesc.includes("ผ่านเงื่อนไขในฉากก่อนหน้า") && data.isAdmin) {
-    rawDesc = "รายละเอียดฉากเนื้อเรื่อง";
-  }
   const sceneDescription = rawDesc;
 
   const chapterLabel = data.chapter_title || data.ChapterTitle || data.chapterName || data.chapter_name;
@@ -515,15 +505,7 @@ const StoryTreeInner = ({ activeNovelId, effectiveUserId, onNavigate }) => {
 
       let computedStatus = NODE_STATUS.LOCKED;
 
-      if (isAdmin) {
-        if (node.type === "start") {
-          computedStatus = isCurrentNode ? NODE_STATUS.CURRENT : NODE_STATUS.VISITED;
-        } else if (node.type === "ending") {
-          computedStatus = isCurrentNode ? NODE_STATUS.CURRENT : NODE_STATUS.ENDING_UNLOCKED;
-        } else {
-          computedStatus = isCurrentNode ? NODE_STATUS.CURRENT : NODE_STATUS.VISITED;
-        }
-      } else if (node.type === "start") {
+      if (node.type === "start") {
         computedStatus = isCurrentNode ? NODE_STATUS.CURRENT : NODE_STATUS.VISITED;
       } else if (node.type === "ending") {
         if (isCurrentNode) {
@@ -758,7 +740,7 @@ const StoryTreeInner = ({ activeNovelId, effectiveUserId, onNavigate }) => {
   const handleNodeClick = async (event, node) => {
     const targetNode = node.data ? node : { data: node };
     const currentStatus = targetNode.data?.computedStatus;
-    const clickable = isAdmin || currentStatus === NODE_STATUS.CURRENT ||
+    const clickable = currentStatus === NODE_STATUS.CURRENT ||
       currentStatus === NODE_STATUS.VISITED ||
       currentStatus === NODE_STATUS.ENDING_UNLOCKED;
 
@@ -821,7 +803,7 @@ const StoryTreeInner = ({ activeNovelId, effectiveUserId, onNavigate }) => {
     if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
     const status = node.data?.computedStatus;
     
-    if (!isAdmin && (status === NODE_STATUS.LOCKED || status === NODE_STATUS.ENDING_LOCKED)) return;
+    if (status === NODE_STATUS.LOCKED || status === NODE_STATUS.ENDING_LOCKED) return;
 
     setHoveredNode(node);
   };
@@ -950,7 +932,7 @@ const StoryTreeInner = ({ activeNovelId, effectiveUserId, onNavigate }) => {
             <div className="stp__scene-list" aria-label="รายการฉากในนิยาย">
               {computedNodes.length > 0 ? computedNodes.map((node) => {
                 const nodeStatus = node.data?.computedStatus;
-                const isLocked = !isAdmin && (nodeStatus === NODE_STATUS.LOCKED || nodeStatus === NODE_STATUS.ENDING_LOCKED);
+                const isLocked = nodeStatus === NODE_STATUS.LOCKED || nodeStatus === NODE_STATUS.ENDING_LOCKED;
                 const sceneTitle = stripHtml(node.data?.title || "");
                 const isIntroduction = sceneTitle.toLowerCase().startsWith("บทนำ");
                 const outgoingChoices = computedEdges.filter((edge) => edge.source === node.id).length;
@@ -1004,10 +986,10 @@ const StoryTreeInner = ({ activeNovelId, effectiveUserId, onNavigate }) => {
                 nodeTypes={nodeTypes}
                 edgeTypes={edgeTypes}
                 fitView
-                fitViewOptions={{ padding: 0.2 }}
+                fitViewOptions={{ padding: 0.12, minZoom: 0.55 }}
                 zoomOnScroll
                 panOnDrag
-                minZoom={0.15}
+                minZoom={0.5}
                 maxZoom={1.75}
                 translateExtent={translateExtent}
                 onlyRenderVisibleElements

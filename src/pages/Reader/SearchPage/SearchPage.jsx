@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState, useCallback } from "react";
 import axios from "axios";
 import { useNavigate, useLocation } from "react-router-dom";
 import { getNovelStatusInfo } from "../../../utils/novelStatus";
+import { stripHtml } from "../../../utils/stripHtml";
 import { Eye, Heart, Bookmark, Pencil, SlidersHorizontal, Check } from "lucide-react";
 import { NovelCardGridSkeleton, DataLoadError } from "../../../components/Skeleton";
 import "./SearchPage.css";
@@ -42,7 +43,7 @@ const normalizeNovel = (data) => {
     title: data.title || "ไม่มีชื่อเรื่อง",
     categories: uniqueCategories,
     coverImage: data.cover_image || data.coverImage || null,
-    synopsis: data.captions || data.introduction || data.description || "",
+    synopsis: stripHtml(data.captions || data.introduction || data.description || ""),
     author: data.pen_name || data.penName || data.author_pen_name || data.author_penName || data.author_name || data.authorName || "ไม่ทราบผู้แต่ง",
     stats: {
       views: data.views || data.view_count || 0,
