@@ -5,7 +5,6 @@ import (
 	"errors"
 	"log"
 	"net/http"
-	"strconv"
 	"strings"
 
 	"novel-be/internal/models"
@@ -71,13 +70,7 @@ func UpdateChapterHandler(chapterService service.ChapterService, sceneService se
 			return
 		}
 
-		pathParts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
-		if len(pathParts) < 2 {
-			RespondWithError3(w, http.StatusBadRequest, "invalid chapter id")
-			return
-		}
-
-		chapterID, err := strconv.Atoi(pathParts[1])
+		chapterID, err := extractIDFromPath(r.URL.Path, "/chapters/")
 		if err != nil {
 			RespondWithError3(w, http.StatusBadRequest, "invalid chapter id")
 			return

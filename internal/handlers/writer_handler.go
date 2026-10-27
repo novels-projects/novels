@@ -166,7 +166,11 @@ func (h *WriterHandler) Approve(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, http.StatusBadRequest, "ขาดข้อมูลรหัสคำขอนักเขียน (writer_id)")
 		return
 	}
-	writerID, _ := strconv.Atoi(writerIDStr)
+	writerID, err := strconv.Atoi(writerIDStr)
+	if err != nil || writerID <= 0 {
+		WriteError(w, http.StatusBadRequest, "รหัสคำขอนักเขียนไม่ถูกต้อง")
+		return
+	}
 
 	if err := h.service.ApproveWriter(r.Context(), uint(writerID), adminID); err != nil {
 		if status := writerActionStatusCode(err); status == http.StatusInternalServerError {

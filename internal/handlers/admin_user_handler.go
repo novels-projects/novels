@@ -19,6 +19,14 @@ type AdminUserHandler struct {
 	auditService service.AuditService
 }
 
+func adminUserIDFromPath(path, suffix string) (int, error) {
+	path = stripAPIVersionPrefix(path)
+	path = strings.TrimPrefix(path, "/api/admin/users/")
+	path = strings.TrimPrefix(path, "/admin/users/")
+	path = strings.TrimSuffix(path, suffix)
+	return strconv.Atoi(strings.Trim(path, "/"))
+}
+
 func NewAdminUserHandler(authService service.AuthService, auditService service.AuditService) *AdminUserHandler {
 	return &AdminUserHandler{authService: authService, auditService: auditService}
 }
@@ -51,8 +59,7 @@ func (h *AdminUserHandler) GetUserDetail(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	pathID := strings.TrimPrefix(r.URL.Path, "/api/admin/users/")
-	userID, err := strconv.Atoi(pathID)
+	userID, err := adminUserIDFromPath(r.URL.Path, "")
 	if err != nil || userID <= 0 {
 		WriteError(w, http.StatusBadRequest, "รหัสผู้ใช้ไม่ถูกต้อง")
 		return
@@ -78,9 +85,7 @@ func (h *AdminUserHandler) UpdateUserStatus(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	pathID := strings.TrimPrefix(r.URL.Path, "/api/admin/users/")
-	pathID = strings.TrimSuffix(pathID, "/status")
-	userID, err := strconv.Atoi(pathID)
+	userID, err := adminUserIDFromPath(r.URL.Path, "/status")
 	if err != nil || userID <= 0 {
 		WriteError(w, http.StatusBadRequest, "รหัสผู้ใช้ไม่ถูกต้อง")
 		return
@@ -152,9 +157,7 @@ func (h *AdminUserHandler) DemoteUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	pathID := strings.TrimPrefix(r.URL.Path, "/api/admin/users/")
-	pathID = strings.TrimSuffix(pathID, "/demote")
-	userID, err := strconv.Atoi(pathID)
+	userID, err := adminUserIDFromPath(r.URL.Path, "/demote")
 	if err != nil || userID <= 0 {
 		WriteError(w, http.StatusBadRequest, "รหัสผู้ใช้ไม่ถูกต้อง")
 		return
@@ -197,9 +200,7 @@ func (h *AdminUserHandler) RestoreUserWriterAccess(w http.ResponseWriter, r *htt
 		return
 	}
 
-	pathID := strings.TrimPrefix(r.URL.Path, "/api/admin/users/")
-	pathID = strings.TrimSuffix(pathID, "/restore-writer")
-	userID, err := strconv.Atoi(pathID)
+	userID, err := adminUserIDFromPath(r.URL.Path, "/restore-writer")
 	if err != nil || userID <= 0 {
 		WriteError(w, http.StatusBadRequest, "รหัสผู้ใช้ไม่ถูกต้อง")
 		return
@@ -250,8 +251,7 @@ func (h *AdminUserHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	pathID := strings.TrimPrefix(r.URL.Path, "/api/admin/users/")
-	userID, err := strconv.Atoi(pathID)
+	userID, err := adminUserIDFromPath(r.URL.Path, "")
 	if err != nil || userID <= 0 {
 		WriteError(w, http.StatusBadRequest, "รหัสผู้ใช้ไม่ถูกต้อง")
 		return
@@ -313,10 +313,7 @@ func (h *AdminUserHandler) AdminUpdateUsername(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	pathID := strings.TrimPrefix(r.URL.Path, "/api/admin/users/")
-	pathID = strings.TrimPrefix(pathID, "/admin/users/")
-	pathID = strings.TrimSuffix(pathID, "/username")
-	userID, err := strconv.Atoi(pathID)
+	userID, err := adminUserIDFromPath(r.URL.Path, "/username")
 	if err != nil || userID <= 0 {
 		WriteError(w, http.StatusBadRequest, "รหัสผู้ใช้ไม่ถูกต้อง")
 		return

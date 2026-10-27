@@ -26,13 +26,13 @@ func GetStoryTreeHandler(sceneService service.SceneService, novelService service
 		}
 
 		// 🔒 ตรวจสอบสิทธิ์: ถ้าเป็นการเรียกจากผู้ใช้ที่ login แล้ว ตรวจสอบเจ้าของหรือ admin
-		authUserID, ok := middleware.GetUserIDFromContext(r.Context())
+		authUserID, authenticated := middleware.GetUserIDFromContext(r.Context())
 		isOwnerOrAdmin := false
 		novelIsPublished := false
 		var novelDetail interface{}
 		var novelErr error
 
-		if ok && authUserID != 0 {
+		if authenticated && authUserID != 0 {
 			// check admin role
 			if role, roleOk := middleware.GetRoleFromContext(r.Context()); roleOk && role == "admin" {
 				isOwnerOrAdmin = true
@@ -55,14 +55,21 @@ func GetStoryTreeHandler(sceneService service.SceneService, novelService service
 		if novelDetail == nil {
 			novelDetail, novelErr = novelService.GetNovelDetail(novelID)
 		}
-		if novelErr == nil {
-			if np, ok := novelDetail.(*models.Novel); ok && np != nil {
-				novelIsPublished = np.IsPublished
-			}
+		if novelErr != nil {
+			RespondWithError(w, http.StatusNotFound, "novel not found", novelErr.Error())
+			return
 		}
+		novel, isNovel := novelDetail.(*models.Novel)
+		if !isNovel || novel == nil {
+			RespondWithError(w, http.StatusNotFound, "novel not found", "novel not found")
+			return
+		}
+		novelIsPublished = novel.IsPublished
 
-		// เจ้าของและแอดมินต้องเห็นทุกฉาก โดยไม่อิงประวัติการอ่านของบัญชี
-		userID := storyTreeUserID(authUserID, ok, isOwnerOrAdmin)
+		userID := storyTreeUserID(authUserID, authenticated)
+		if r.URL.Query().Get("mode") == "editor" && isOwnerOrAdmin {
+			userID = -1
+		}
 
 		tree, err := sceneService.GetStoryTree(novelID, userID)
 		if err != nil {
@@ -205,8 +212,8 @@ func GetStoryTreeHandler(sceneService service.SceneService, novelService service
 	}
 }
 
-func storyTreeUserID(authUserID uint, authenticated bool, canViewAllScenes bool) int {
-	if !authenticated || authUserID == 0 || canViewAllScenes {
+func storyTreeUserID(authUserID uint, authenticated bool) int {
+	if !authenticated || authUserID == 0 {
 		return 0
 	}
 	return int(authUserID)

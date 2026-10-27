@@ -17,7 +17,7 @@ func GetChaptersByNovelHandler(chapterService service.ChapterService, novelServi
 			return
 		}
 
-		path := strings.TrimPrefix(r.URL.Path, "/novels/")
+		path := strings.TrimPrefix(stripAPIVersionPrefix(r.URL.Path), "/novels/")
 		parts := strings.Split(path, "/")
 		if len(parts) < 2 || parts[1] != "chapters" {
 			RespondWithError(w, http.StatusBadRequest, "invalid path format", "expected /novels/{id}/chapters")
@@ -27,7 +27,7 @@ func GetChaptersByNovelHandler(chapterService service.ChapterService, novelServi
 		novelIDStr := strings.TrimSpace(parts[0])
 		novelID, err := strconv.Atoi(novelIDStr)
 		if err != nil || novelID <= 0 {
-			RespondWithError(w, http.StatusBadRequest, "invalid novel_id", err.Error())
+			RespondWithError(w, http.StatusBadRequest, "invalid novel_id", "novel_id must be a positive integer")
 			return
 		}
 
@@ -92,7 +92,7 @@ func GetScenesByChapterHandler(sceneService service.SceneService, chapterService
 			return
 		}
 
-		path := strings.TrimPrefix(r.URL.Path, "/chapters/")
+		path := strings.TrimPrefix(stripAPIVersionPrefix(r.URL.Path), "/chapters/")
 		parts := strings.Split(path, "/")
 		if len(parts) < 2 || parts[1] != "scenes" {
 			RespondWithError(w, http.StatusBadRequest, "invalid path format", "expected /chapters/{id}/scenes")
@@ -102,7 +102,7 @@ func GetScenesByChapterHandler(sceneService service.SceneService, chapterService
 		chapterIDStr := strings.TrimSpace(parts[0])
 		chapterID, err := strconv.Atoi(chapterIDStr)
 		if err != nil || chapterID <= 0 {
-			RespondWithError(w, http.StatusBadRequest, "invalid chapter_id", err.Error())
+			RespondWithError(w, http.StatusBadRequest, "invalid chapter_id", "chapter_id must be a positive integer")
 			return
 		}
 

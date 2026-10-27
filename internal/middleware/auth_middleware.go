@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"time"
 
 	"novel-be/internal/dto"
 
@@ -56,13 +57,16 @@ func recordUnauthorized(r *http.Request, reason string, attemptedRole string) {
 		return
 	}
 	userID, hasUserID := GetUserIDFromContext(r.Context())
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), 5*time.Second)
+	auditRequest := r.Clone(ctx)
 	go func() {
+		defer cancel()
 		defer func() {
 			if rec := recover(); rec != nil {
 				log.Printf("audit log (unauthorized) recorder panic: %v", rec)
 			}
 		}()
-		unauthorizedRecorder(r, reason, attemptedRole, userID, hasUserID)
+		unauthorizedRecorder(auditRequest, reason, attemptedRole, userID, hasUserID)
 	}()
 }
 
@@ -84,7 +88,7 @@ func writeAuthError(w http.ResponseWriter, statusCode int, code, message string)
 // 3. นำ Token มาถอดรหัสและตรวจสอบลายเซ็นดิจิทัล (jwt.Parse)
 //   - ตรวจว่า Algorithm ที่ใช้คือ "HS256" (HMAC-SHA256) ป้องกันช่องโหว่ Alg None Attack
 //   - ตรวจว่าลายเซ็นตรงกับ jwtSecret ของระบบหรือไม่ และโทเคนหมดอายุหรือยัง (exp claim)
-//  4. ถ้าผ่าน -> ดึงข้อมูล Payload (Claims) ได้แก่ "user_id" และ "role" ฝังลงใน r.Context()
+//     4. ถ้าผ่าน -> ดึงข้อมูล Payload (Claims) ได้แก่ "user_id" และ "role" ฝังลงใน r.Context()
 //     เพื่อให้ Handler ในชั้นถัดไปสามารถดึง User ID ไปใช้ได้อย่างปลอดภัยโดยไม่ต้อง Verify ซ้ำ
 //
 // =========================================================================================

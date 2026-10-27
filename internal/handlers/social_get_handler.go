@@ -15,7 +15,7 @@ func GetCommentCountByNovelHandler(socialService service.SocialService) http.Han
 			return
 		}
 
-		path := strings.TrimPrefix(r.URL.Path, "/novels/")
+		path := strings.TrimPrefix(stripAPIVersionPrefix(r.URL.Path), "/novels/")
 		parts := strings.Split(path, "/")
 		if len(parts) < 3 || parts[1] != "comments" || parts[2] != "count" {
 			RespondWithError(w, http.StatusBadRequest, "invalid path format", "expected /novels/{id}/comments/count")
@@ -25,7 +25,7 @@ func GetCommentCountByNovelHandler(socialService service.SocialService) http.Han
 		novelIDStr := strings.TrimSpace(parts[0])
 		novelID, err := strconv.Atoi(novelIDStr)
 		if err != nil || novelID <= 0 {
-			RespondWithError(w, http.StatusBadRequest, "invalid novel_id", err.Error())
+			RespondWithError(w, http.StatusBadRequest, "invalid novel_id", "novel_id must be a positive integer")
 			return
 		}
 
@@ -49,7 +49,7 @@ func GetCommentsByNovelHandler(socialService service.SocialService) http.Handler
 			return
 		}
 
-		path := strings.TrimPrefix(r.URL.Path, "/novels/")
+		path := strings.TrimPrefix(stripAPIVersionPrefix(r.URL.Path), "/novels/")
 		parts := strings.Split(path, "/")
 		if len(parts) < 2 || parts[1] != "comments" {
 			RespondWithError(w, http.StatusBadRequest, "invalid path format", "expected /novels/{id}/comments")
@@ -59,7 +59,7 @@ func GetCommentsByNovelHandler(socialService service.SocialService) http.Handler
 		novelIDStr := strings.TrimSpace(parts[0])
 		novelID, err := strconv.Atoi(novelIDStr)
 		if err != nil || novelID <= 0 {
-			RespondWithError(w, http.StatusBadRequest, "invalid novel_id", err.Error())
+			RespondWithError(w, http.StatusBadRequest, "invalid novel_id", "novel_id must be a positive integer")
 			return
 		}
 
@@ -83,7 +83,7 @@ func GetCommentsBySceneHandler(socialService service.SocialService) http.Handler
 			return
 		}
 
-		path := strings.TrimPrefix(r.URL.Path, "/scenes/")
+		path := strings.TrimPrefix(stripAPIVersionPrefix(r.URL.Path), "/scenes/")
 		parts := strings.Split(path, "/")
 		if len(parts) < 2 || parts[1] != "comments" {
 			RespondWithError(w, http.StatusBadRequest, "invalid path format", "expected /scenes/{id}/comments")
@@ -93,7 +93,7 @@ func GetCommentsBySceneHandler(socialService service.SocialService) http.Handler
 		sceneIDStr := strings.TrimSpace(parts[0])
 		sceneID, err := strconv.Atoi(sceneIDStr)
 		if err != nil || sceneID <= 0 {
-			RespondWithError(w, http.StatusBadRequest, "invalid scene_id", err.Error())
+			RespondWithError(w, http.StatusBadRequest, "invalid scene_id", "scene_id must be a positive integer")
 			return
 		}
 

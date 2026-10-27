@@ -44,9 +44,8 @@ func (h *AuditHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
-	idText := strings.TrimPrefix(r.URL.Path, "/api/admin/audit-logs/")
-	id, err := strconv.ParseInt(strings.Trim(idText, "/"), 10, 64)
-	if err != nil || id <= 0 {
+	id, err := extractAuditLogID(r.URL.Path)
+	if err != nil {
 		WriteError(w, http.StatusBadRequest, "invalid audit log id")
 		return
 	}
@@ -60,6 +59,21 @@ func (h *AuditHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	WriteJSON(w, http.StatusOK, auditResponse(*item))
+}
+
+func extractAuditLogID(path string) (int64, error) {
+	for _, prefix := range []string{"/api/v1/admin/audit-logs/", "/api/admin/audit-logs/"} {
+		if strings.HasPrefix(path, prefix) {
+			path = strings.TrimPrefix(path, prefix)
+			break
+		}
+	}
+
+	id, err := strconv.ParseInt(strings.Trim(path, "/"), 10, 64)
+	if err != nil || id <= 0 {
+		return 0, errors.New("invalid audit log id")
+	}
+	return id, nil
 }
 
 func (h *AuditHandler) GetMetadata(w http.ResponseWriter, r *http.Request) {

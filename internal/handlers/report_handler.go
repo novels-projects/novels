@@ -132,11 +132,8 @@ func (h *ReportHandler) UpdateReportStatus(w http.ResponseWriter, r *http.Reques
 	}
 
 	// 🟢 2. ดึง report_id จาก URL Path (เช่น ตัด /api/admin/reports/ และ /status ออก)
-	path := strings.TrimPrefix(r.URL.Path, "/api/admin/reports/")
-	idStr := strings.TrimSuffix(path, "/status")
-
-	reportID, err := strconv.Atoi(idStr)
-	if err != nil || reportID <= 0 {
+	reportID, err := extractAdminIDFromPath(r.URL.Path, "reports", "/status")
+	if err != nil {
 		WriteError(w, http.StatusBadRequest, "invalid report ID")
 		return
 	}

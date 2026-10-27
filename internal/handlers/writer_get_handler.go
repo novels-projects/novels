@@ -17,7 +17,12 @@ func GetWriterDetailHandler(writerService service.WriterService) http.HandlerFun
 			return
 		}
 
-		id, err := extractIDFromPath(r.URL.Path, "/writer/")
+		path := stripAPIVersionPrefix(r.URL.Path)
+		prefix := "/writer/"
+		if strings.HasPrefix(path, "/writers/") {
+			prefix = "/writers/"
+		}
+		id, err := extractIDFromPath(r.URL.Path, prefix)
 		if err != nil {
 			RespondWithError(w, http.StatusBadRequest, "invalid writer id", err.Error())
 			return
@@ -40,7 +45,9 @@ func GetWriterBookshelfCountsHandler(socialService service.SocialService) http.H
 			return
 		}
 
-		path := strings.TrimPrefix(r.URL.Path, "/writer/")
+		path := stripAPIVersionPrefix(r.URL.Path)
+		path = strings.TrimPrefix(path, "/writer/")
+		path = strings.TrimPrefix(path, "/writers/")
 		parts := strings.Split(strings.TrimSuffix(path, "/"), "/")
 		if len(parts) != 2 || parts[1] != "bookshelf-counts" {
 			RespondWithError(w, http.StatusBadRequest, "invalid path format", "expected /writer/{id}/bookshelf-counts")
@@ -49,7 +56,7 @@ func GetWriterBookshelfCountsHandler(socialService service.SocialService) http.H
 
 		id, err := strconv.Atoi(parts[0])
 		if err != nil || id <= 0 {
-			RespondWithError(w, http.StatusBadRequest, "invalid writer id", err.Error())
+			RespondWithError(w, http.StatusBadRequest, "invalid writer id", "writer id must be a positive integer")
 			return
 		}
 
@@ -73,7 +80,9 @@ func GetWriterTotalViewsHandler(writerService service.WriterService) http.Handle
 			return
 		}
 
-		path := strings.TrimPrefix(r.URL.Path, "/writer/")
+		path := stripAPIVersionPrefix(r.URL.Path)
+		path = strings.TrimPrefix(path, "/writer/")
+		path = strings.TrimPrefix(path, "/writers/")
 		parts := strings.Split(strings.TrimSuffix(path, "/"), "/")
 		if len(parts) != 2 || parts[1] != "total-views" {
 			RespondWithError(w, http.StatusBadRequest, "invalid path format", "expected /writer/{id}/total-views")
@@ -82,7 +91,7 @@ func GetWriterTotalViewsHandler(writerService service.WriterService) http.Handle
 
 		id, err := strconv.Atoi(parts[0])
 		if err != nil || id <= 0 {
-			RespondWithError(w, http.StatusBadRequest, "invalid writer id", err.Error())
+			RespondWithError(w, http.StatusBadRequest, "invalid writer id", "writer id must be a positive integer")
 			return
 		}
 

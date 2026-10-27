@@ -4,8 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
-	"strconv"
-	"strings"
 
 	"novel-be/internal/service"
 )
@@ -66,10 +64,8 @@ func AdminUpdateCategoryHandler(s service.CategoryService, audit service.AuditSe
 			return
 		}
 
-		pathID := strings.TrimPrefix(r.URL.Path, "/api/admin/categories/")
-		pathID = strings.Trim(pathID, "/")
-		id, err := strconv.Atoi(pathID)
-		if err != nil || id <= 0 {
+		id, err := extractAdminIDFromPath(r.URL.Path, "categories", "")
+		if err != nil {
 			RespondWithError(w, http.StatusBadRequest, "Invalid category ID", "invalid category_id")
 			return
 		}
@@ -125,10 +121,8 @@ func AdminDeleteCategoryHandler(s service.CategoryService, audit service.AuditSe
 			return
 		}
 
-		pathID := strings.TrimPrefix(r.URL.Path, "/api/admin/categories/")
-		pathID = strings.Trim(pathID, "/")
-		id, err := strconv.Atoi(pathID)
-		if err != nil || id <= 0 {
+		id, err := extractAdminIDFromPath(r.URL.Path, "categories", "")
+		if err != nil {
 			RespondWithError(w, http.StatusBadRequest, "Invalid category ID", "invalid category_id")
 			return
 		}

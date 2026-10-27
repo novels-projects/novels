@@ -54,9 +54,8 @@ func (s *sceneService) GetStoryTree(novelID int, userID int) (models.StoryTreeRe
 		).Scan(&currentSceneID)
 	}
 
-	// ถ้าไม่มี user_id ส่งมา แปลว่าเรียกจากโหมด writer/preview
-	// ให้แสดงโหนดทั้งหมดเป็นปลดล็อก เพื่อให้ผู้เขียนดูโครงสร้างทั้งหมด
-	if userID <= 0 {
+	// A negative user ID is reserved for an authorized editor preview.
+	if userID < 0 {
 		for i := range nodes {
 			nodes[i].IsUnlocked = true
 		}

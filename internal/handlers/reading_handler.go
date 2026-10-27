@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"novel-be/internal/dto"
 	"novel-be/internal/middleware"
@@ -167,7 +168,11 @@ func DeleteReadingHistoryByNovelHandler(readingService service.ReadingService) h
 			return
 		}
 
-		novelID, err := extractIDFromPath(r.URL.Path, "/history/")
+		prefix := "/history/"
+		if strings.HasPrefix(r.URL.Path, "/api/v1/reading/histories/") {
+			prefix = "/api/v1/reading/histories/"
+		}
+		novelID, err := extractIDFromPath(r.URL.Path, prefix)
 		if err != nil {
 			WriteError(w, http.StatusBadRequest, "invalid novel id")
 			return

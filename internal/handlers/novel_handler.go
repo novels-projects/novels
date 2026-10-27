@@ -279,12 +279,18 @@ func writeNovelActionResponse(w http.ResponseWriter, message string) {
 }
 
 func extractAdminNovelID(path, suffix string) (int, error) {
+	path = stripAPIVersionPrefix(path)
 	trimmed := strings.TrimSuffix(strings.Trim(path, "/"), strings.Trim(suffix, "/"))
 	parts := strings.Split(strings.Trim(trimmed, "/"), "/")
-	if len(parts) != 4 || parts[0] != "api" || parts[1] != "admin" || parts[2] != "novels" {
+	var idPath string
+	if len(parts) == 4 && parts[0] == "api" && parts[1] == "admin" && parts[2] == "novels" {
+		idPath = parts[3]
+	} else if len(parts) == 3 && parts[0] == "admin" && parts[1] == "novels" {
+		idPath = parts[2]
+	} else {
 		return 0, errors.New("invalid path")
 	}
-	id, err := strconv.Atoi(parts[3])
+	id, err := strconv.Atoi(idPath)
 	if err != nil || id <= 0 {
 		return 0, errors.New("invalid novel id")
 	}
@@ -607,13 +613,8 @@ func UnbanNovelHandler(novelService service.NovelService, auditService service.A
 			return
 		}
 		// Extract novel ID from URL path /api/admin/novels/{id}/unban
-		parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
-		if len(parts) < 5 {
-			WriteError(w, http.StatusBadRequest, "invalid path")
-			return
-		}
-		novelID, err := strconv.Atoi(parts[3])
-		if err != nil || novelID <= 0 {
+		novelID, err := extractAdminNovelID(r.URL.Path, "/unban")
+		if err != nil {
 			WriteError(w, http.StatusBadRequest, "invalid novel id")
 			return
 		}
@@ -674,8 +675,9 @@ func UnbanNovelHandler(novelService service.NovelService, auditService service.A
 }
 
 func extractNovelIDFromPath(urlPath string) (int, error) {
-	if strings.HasPrefix(urlPath, "/novels/") {
-		return extractIDFromPath(urlPath, "/novels/")
+	path := stripAPIVersionPrefix(urlPath)
+	if strings.HasPrefix(path, "/novels/") {
+		return extractIDFromPath(path, "/novels/")
 	}
 	if strings.HasPrefix(urlPath, "/api/v1/writer/novels/") {
 		return extractIDFromPath(urlPath, "/api/v1/writer/novels/")
@@ -690,7 +692,7 @@ func NovelSubRouteHandler(sceneService service.SceneService, novelService servic
 			return
 		}
 
-		path := strings.TrimPrefix(r.URL.Path, "/novels/")
+		path := strings.TrimPrefix(stripAPIVersionPrefix(r.URL.Path), "/novels/")
 		if !strings.HasSuffix(path, "/start") {
 			http.NotFound(w, r)
 			return

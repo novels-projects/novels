@@ -8,7 +8,6 @@ import (
 	"log"
 	"net/http"
 	"strconv"
-	"strings"
 
 	"novel-be/internal/middleware"
 	"novel-be/internal/models"
@@ -374,9 +373,10 @@ func FollowWriterHandler(socialService service.SocialService, notificationServic
 			return
 		}
 
-		writerIDStr := strings.TrimPrefix(r.URL.Path, "/api/writers/")
-		writerIDStr = strings.TrimSuffix(writerIDStr, "/follow")
-		writerID, err := strconv.Atoi(writerIDStr)
+		writerID, err := extractIDFromPath(r.URL.Path, "/api/writers/")
+		if err != nil {
+			writerID, err = extractIDFromPath(r.URL.Path, "/writers/")
+		}
 		if err != nil || writerID == 0 {
 			WriteError(w, http.StatusBadRequest, "invalid writer_id")
 			return
@@ -413,9 +413,10 @@ func UnfollowWriterHandler(socialService service.SocialService) http.HandlerFunc
 			return
 		}
 
-		writerIDStr := strings.TrimPrefix(r.URL.Path, "/api/writers/")
-		writerIDStr = strings.TrimSuffix(writerIDStr, "/unfollow")
-		writerID, err := strconv.Atoi(writerIDStr)
+		writerID, err := extractIDFromPath(r.URL.Path, "/api/writers/")
+		if err != nil {
+			writerID, err = extractIDFromPath(r.URL.Path, "/writers/")
+		}
 		if err != nil || writerID == 0 {
 			WriteError(w, http.StatusBadRequest, "invalid writer_id")
 			return
