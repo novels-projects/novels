@@ -6,6 +6,10 @@ CREATE TABLE categories (
     name VARCHAR(255) NOT NULL
 );
 
+-- ป้องกันชื่อหมวดหมู่ซ้ำ (Case-insensitive)
+CREATE UNIQUE INDEX IF NOT EXISTS idx_categories_name_lower_unique
+    ON categories (LOWER(TRIM(name)));
+
 -- ==========================================
 -- 2. สร้างตาราง User & Identity
 -- ==========================================
@@ -16,25 +20,22 @@ CREATE TABLE users (
     password_hash VARCHAR(255) NOT NULL,
     role VARCHAR(50) DEFAULT 'reader', -- reader / writer / admin
     pic_profile VARCHAR(255),
+    status VARCHAR(20) NOT NULL DEFAULT 'active',
+    suspended_reason TEXT,
+    suspended_at TIMESTAMP,
+    last_action_by_admin_id INTEGER REFERENCES users(user_id),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-DO $$
-BEGIN
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'status') THEN
-        ALTER TABLE users ADD COLUMN status VARCHAR(20) NOT NULL DEFAULT 'active';
-    END IF;
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'suspended_reason') THEN
-        ALTER TABLE users ADD COLUMN suspended_reason TEXT;
-    END IF;
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'suspended_at') THEN
-        ALTER TABLE users ADD COLUMN suspended_at TIMESTAMP;
-    END IF;
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'last_action_by_admin_id') THEN
-        ALTER TABLE users ADD COLUMN last_action_by_admin_id INTEGER REFERENCES users(user_id);
-    END IF;
-END $$;
+CREATE TABLE user_notification_settings (
+    user_id INTEGER PRIMARY KEY REFERENCES users(user_id) ON DELETE CASCADE,
+    novel_update_enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    follower_enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    like_enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    comment_enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    system_enabled BOOLEAN NOT NULL DEFAULT TRUE
+);
 
 CREATE TABLE writers (
     writer_id SERIAL PRIMARY KEY,
@@ -47,7 +48,10 @@ CREATE TABLE writers (
     avatar_url VARCHAR(255),
     status VARCHAR(20) DEFAULT 'pending',
     applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    approved_at TIMESTAMP
+    approved_at TIMESTAMP,
+    rejected_at TIMESTAMP,
+    acted_by_admin_id INTEGER REFERENCES users(user_id) ON DELETE SET NULL,
+    rejection_reason TEXT
 );
 
 -- สร้างตารางกลางสำหรับ Writer M:N Category (แก้ปัญหา Array)
@@ -70,7 +74,7 @@ CREATE TABLE novels (
     is_published BOOLEAN DEFAULT FALSE,
     is_completed BOOLEAN DEFAULT FALSE,
 
-    -- ✅ แก้ตรงนี้: ชี้ไปที่ตาราง writers แทน users
+    -- ✅ ชี้ไปที่ตาราง writers แทน users
     author_id INTEGER REFERENCES writers(writer_id) ON DELETE CASCADE,
 
     views INTEGER DEFAULT 0,
@@ -108,6 +112,8 @@ CREATE TABLE scenes (
     ending_title VARCHAR(255),
     ending_type VARCHAR(50), -- good / bad / true / secret
     ending_description TEXT,
+    node_x DOUBLE PRECISION,
+    node_y DOUBLE PRECISION,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT unique_scene_title_per_chapter UNIQUE (chapter_id, title)
@@ -180,6 +186,7 @@ CREATE TABLE user_scene_history (
     id SERIAL PRIMARY KEY,
     user_id INTEGER REFERENCES users(user_id) ON DELETE CASCADE,
     scene_id INTEGER REFERENCES scenes(scene_id) ON DELETE CASCADE,
+    visit_count INTEGER NOT NULL DEFAULT 1,
     visited_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE (user_id, scene_id)
 );
@@ -193,7 +200,7 @@ CREATE TABLE user_endings (
 );
 
 -- ==========================================
--- 6. สร้างตาราง System (Future)
+-- 6. สร้างตาราง System & Admin
 -- ==========================================
 CREATE TABLE reports (
     report_id SERIAL PRIMARY KEY,
@@ -201,8 +208,13 @@ CREATE TABLE reports (
     novel_id INTEGER REFERENCES novels(novel_id) ON DELETE CASCADE,
     reason TEXT NOT NULL,
     status VARCHAR(50) DEFAULT 'pending', -- pending / reviewed / resolved
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    report_type VARCHAR(20) NOT NULL DEFAULT 'report',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT chk_reports_report_type CHECK (report_type IN ('report', 'appeal'))
 );
+
+CREATE INDEX idx_reports_type_status_created
+    ON reports (report_type, status, created_at DESC);
 
 CREATE TABLE notifications (
     notification_id SERIAL PRIMARY KEY,
@@ -214,6 +226,54 @@ CREATE TABLE notifications (
     is_read BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE audit_logs (
+    log_id BIGSERIAL PRIMARY KEY,
+    actor_user_id INTEGER REFERENCES users(user_id) ON DELETE SET NULL,
+    actor_role VARCHAR(50) NOT NULL,
+    action VARCHAR(100) NOT NULL,
+    target_type VARCHAR(50),
+    target_id BIGINT,
+    status VARCHAR(20) NOT NULL,
+    ip_address INET,
+    metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_audit_logs_actor_created_at
+    ON audit_logs (actor_user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_action_created_at
+    ON audit_logs (action, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_target
+    ON audit_logs (target_type, target_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_status_created_at
+    ON audit_logs (status, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at
+    ON audit_logs (created_at DESC);
+
+-- Dashboard query indexes
+CREATE INDEX IF NOT EXISTS idx_reports_status_pending
+    ON reports (status, created_at DESC)
+    WHERE status IN ('pending', 'appeal_pending');
+
+CREATE INDEX IF NOT EXISTS idx_writers_status_pending
+    ON writers (status, applied_at DESC)
+    WHERE status = 'pending';
+
+CREATE INDEX IF NOT EXISTS idx_users_created_at
+    ON users (created_at);
+
+CREATE INDEX IF NOT EXISTS idx_novels_created_at
+    ON novels (created_at);
+
+CREATE INDEX IF NOT EXISTS idx_writers_user_id
+    ON writers (user_id);
+
+CREATE INDEX IF NOT EXISTS idx_novels_author_id
+    ON novels (author_id);
+
+CREATE INDEX IF NOT EXISTS idx_reports_novel_id
+    ON reports (novel_id);
 
 -- ==========================================
 
@@ -470,3 +530,22 @@ INSERT INTO user_endings (user_id, scene_id) VALUES
 INSERT INTO user_choice_history (user_id, choice_id) VALUES
 (4,1), (4,3), (4,5),
 (5,2), (5,4);
+
+-- เพิ่มค่าเริ่มต้นสำหรับ user_notification_settings ให้กับผู้ใช้ทั้งหมด
+INSERT INTO user_notification_settings (
+    user_id,
+    novel_update_enabled,
+    follower_enabled,
+    like_enabled,
+    comment_enabled,
+    system_enabled
+)
+SELECT
+    u.user_id,
+    TRUE,
+    TRUE,
+    TRUE,
+    TRUE,
+    TRUE
+FROM users u
+ON CONFLICT (user_id) DO NOTHING;
